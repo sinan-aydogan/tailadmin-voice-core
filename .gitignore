@@ -1,0 +1,65 @@
+# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.python-version
+
+# Data (indirilen modeller, üretilen sesler, kullanıcı yüklemeleri)
+data/
+
+# Logs
+logs/
+*.log
+
+# SQLite veritabanı
+*.db
+*.sqlite
+*.sqlite3
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursor/
+
+# PyTorch / Model cache
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (frontend bağımlılıkları varsa)
+node_modules/
