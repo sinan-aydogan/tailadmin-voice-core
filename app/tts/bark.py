@@ -31,6 +31,16 @@ class BarkEngine(BaseTTS):
             return
             
         try:
+            # Fix for PyTorch 2.6+ weights_only default change
+            # Monkey-patch torch.load to use weights_only=False for compatibility
+            import torch
+            _original_torch_load = torch.load
+            def _patched_torch_load(*args, **kwargs):
+                if 'weights_only' not in kwargs:
+                    kwargs['weights_only'] = False
+                return _original_torch_load(*args, **kwargs)
+            torch.load = _patched_torch_load
+            
             from bark import SAMPLE_RATE, generate_audio, preload_models
             
             logger.info(f"Preloading Bark models on {self._device}...")
