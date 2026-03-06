@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="tr" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Core - AI Ses Yönetimi</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(var(--border))",
+                        input: "hsl(var(--input))",
+                        ring: "hsl(var(--ring))",
+                        background: "hsl(var(--background))",
+                        foreground: "hsl(var(--foreground))",
+                        primary: {
+                            DEFAULT: "hsl(var(--primary))",
+                            foreground: "hsl(var(--primary-foreground))",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(var(--secondary))",
+                            foreground: "hsl(var(--secondary-foreground))",
+                        },
+                        destructive: {
+                            DEFAULT: "hsl(var(--destructive))",
+                            foreground: "hsl(var(--destructive-foreground))",
+                        },
+                        success: {
+                            DEFAULT: "hsl(var(--success))",
+                            foreground: "hsl(var(--success-foreground))",
+                        },
+                        warning: {
+                            DEFAULT: "hsl(var(--warning))",
+                            foreground: "hsl(var(--warning-foreground))",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(var(--muted))",
+                            foreground: "hsl(var(--muted-foreground))",
+                        },
+                        accent: {
+                            DEFAULT: "hsl(var(--accent))",
+                            foreground: "hsl(var(--accent-foreground))",
+                        },
+                        popover: {
+                            DEFAULT: "hsl(var(--popover))",
+                            foreground: "hsl(var(--popover-foreground))",
+                        },
+                        card: {
+                            DEFAULT: "hsl(var(--card))",
+                            foreground: "hsl(var(--card-foreground))",
+                        },
+                    },
+                    borderRadius: {
+                        lg: "var(--radius)",
+                        md: "calc(var(--radius) - 2px)",
+                        sm: "calc(var(--radius) - 4px)",
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom Theme -->
+    <link rel="stylesheet" href="css/shadcn-theme.css">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Tom Select -->
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+</head>
+<body class="bg-background text-foreground antialiased">
+    
+    <!-- Login View -->
+    <div id="loginView" class="hidden min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-md">
+            <div class="card">
+                <div class="card-header text-center">
+                    <div class="mx-auto w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4">
+                        <i data-lucide="mic-2" class="w-6 h-6 text-primary-foreground"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold">Voice Core</h1>
+                    <p class="text-muted-foreground mt-1">AI Ses Yönetim Sistemi</p>
+                </div>
+                <div class="card-content">
+                    <form id="loginForm" class="space-y-4">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium">Kullanıcı Adı</label>
+                            <input type="text" id="username" required 
+                                class="input"
+                                placeholder="Kullanıcı adınızı girin">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium">Şifre</label>
+                            <input type="password" id="password" required 
+                                class="input"
+                                placeholder="••••••••">
+                        </div>
+                        <div id="loginError" class="hidden p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                            Giriş başarısız. Lütfen bilgilerinizi kontrol edin.
+                        </div>
+                        <button type="submit" class="btn btn-primary w-full">
+                            <i data-lucide="log-in" class="w-4 h-4"></i>
+                            Giriş Yap
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- App View -->
+    <div id="appView" class="hidden min-h-screen flex">
+        
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar w-64 flex-shrink-0 flex flex-col border-r transition-all duration-300">
+            <!-- Logo -->
+            <div class="h-16 flex items-center px-6 border-b border-border">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                        <i data-lucide="mic-2" class="w-4 h-4 text-primary-foreground"></i>
+                    </div>
+                    <span class="font-bold text-lg">Voice Core</span>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                <a href="#dashboard" data-route="dashboard" class="sidebar-item">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    Dashboard
+                </a>
+                <a href="#profiles" data-route="profiles" class="sidebar-item">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    Ses Profilleri
+                </a>
+                <a href="#tts" data-route="tts" class="sidebar-item">
+                    <i data-lucide="volume-2" class="w-4 h-4"></i>
+                    Metin Okuma
+                </a>
+                <a href="#stt" data-route="stt" class="sidebar-item">
+                    <i data-lucide="mic" class="w-4 h-4"></i>
+                    Sesten Metne
+                </a>
+                <a href="#models" data-route="models" class="sidebar-item">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Model Yöneticisi
+                </a>
+                <a href="#queue" data-route="queue" class="sidebar-item">
+                    <i data-lucide="list-checks" class="w-4 h-4"></i>
+                    İşlem Kuyruğu
+                </a>
+                <a href="#settings" data-route="settings" class="sidebar-item">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    Ayarlar
+                </a>
+            </nav>
+            
+            <!-- User Section -->
+            <div class="border-t border-border p-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+                        <i data-lucide="user" class="w-4 h-4 text-muted-foreground"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate username-display">Admin</p>
+                        <p class="text-xs text-muted-foreground">Yönetici</p>
+                    </div>
+                    <button id="logoutBtn" class="p-2 rounded-lg hover:bg-accent transition-colors" title="Çıkış Yap">
+                        <i data-lucide="log-out" class="w-4 h-4 text-muted-foreground"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col min-w-0">
+            
+            <!-- Header -->
+            <header class="h-16 border-b border-border bg-card flex items-center justify-between px-6 sticky top-0 z-30">
+                <div class="flex items-center gap-4">
+                    <button id="sidebarToggle" class="lg:hidden p-2 rounded-lg hover:bg-accent transition-colors">
+                        <i data-lucide="menu" class="w-5 h-5"></i>
+                    </button>
+                    <h1 id="pageTitle" class="text-xl font-semibold">Dashboard</h1>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" class="p-2 rounded-lg hover:bg-accent transition-colors">
+                        <i data-lucide="moon" class="w-5 h-5 hidden dark:block"></i>
+                        <i data-lucide="sun" class="w-5 h-5 block dark:hidden"></i>
+                    </button>
+                    
+                    <!-- Notifications will be injected here by notification.js -->
+                    
+                    <!-- Mobile User Menu -->
+                    <div class="lg:hidden">
+                        <button id="mobileUserBtn" class="p-2 rounded-lg hover:bg-accent transition-colors">
+                            <i data-lucide="user" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <div id="mainContent" class="max-w-7xl mx-auto">
+                    <!-- Content will be rendered here -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Download Progress Modal -->
+    <div id="downloadModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay" onclick="closeDownloadModal()"></div>
+        <div class="modal">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">Model İndiriliyor</h3>
+                    <button onclick="closeDownloadModal()" class="p-1 rounded hover:bg-accent transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <div id="downloadProgressContent">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div id="downloadSpinner" class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <div>
+                            <p id="downloadModelName" class="font-medium">Model Adı</p>
+                            <p id="downloadStatus" class="text-sm text-muted-foreground">İndirme başlatılıyor...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-muted-foreground">İlerleme</span>
+                            <span id="downloadPercent" class="font-medium">0%</span>
+                        </div>
+                        <div class="progress h-2">
+                            <div id="downloadProgressBar" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="downloadFiles" class="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                        <!-- File list will be populated here -->
+                    </div>
+                </div>
+                
+                <div id="downloadError" class="hidden">
+                    <div class="alert alert-error mb-4">
+                        <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                        <div>
+                            <p class="font-medium">İndirme Başarısız</p>
+                            <p id="downloadErrorMessage" class="text-sm mt-1"></p>
+                        </div>
+                    </div>
+                    <button onclick="retryDownload()" class="btn btn-primary w-full">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        Tekrar Dene
+                    </button>
+                </div>
+                
+                <div id="downloadSuccess" class="hidden">
+                    <div class="alert alert-success mb-4">
+                        <i data-lucide="check-circle" class="w-5 h-5"></i>
+                        <div>
+                            <p class="font-medium">İndirme Tamamlandı</p>
+                            <p class="text-sm mt-1">Model kullanıma hazır.</p>
+                        </div>
+                    </div>
+                    <button onclick="closeDownloadModal()" class="btn btn-primary w-full">
+                        Tamam
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js?v=2"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/app.js"></script>
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        
+        // Theme initialization
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</body>
+</html>

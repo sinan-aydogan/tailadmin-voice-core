@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_RETENTION_DAYS: int = 30
     
+    # HuggingFace Token (optional, for authenticated downloads)
+    HF_TOKEN: Optional[str] = None
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

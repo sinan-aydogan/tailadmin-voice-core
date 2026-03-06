@@ -21,6 +21,7 @@ PORT = settings.UI_PORT
 Handler = http.server.SimpleHTTPRequestHandler
 
 if __name__ == "__main__":
+    socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
         logger.info(f"Serving UI at http://localhost:{PORT}")
         try:
