@@ -47,6 +47,11 @@ MODEL_INTEGRITY_CHECKS = {
         "min_size_mb": 1500,
         "optional_files": ["clvp2.pth", "diffusion_decoder.pth", "hifidecoder.pth"]
     },
+    "musicgen": {
+        "required_files": ["config.json", "pytorch_model.bin"],
+        "min_size_mb": 1000,
+        "optional_files": ["generation_config.json", "tokenizer.json"]
+    },
     "whisper-tiny": {
         "required_files": ["model.bin"],
         "min_size_mb": 50,

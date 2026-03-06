@@ -36,6 +36,16 @@ AVAILABLE_MODELS = [
         "languages": ["en"]
     },
     {
+        "id": "musicgen",
+        "engine": "musicgen",
+        "name": "MusicGen (Small)",
+        "type": "music",
+        "repo_id": "facebook/musicgen-small",
+        "description": "AI music generation from text descriptions. Creates instrumental music.",
+        "size_estimate_mb": 1500,
+        "languages": ["multilingual"]
+    },
+    {
         "id": "whisper-tiny",
         "engine": "whisper",
         "name": "Faster Whisper (Tiny)",

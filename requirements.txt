@@ -31,6 +31,8 @@ bcrypt>=3.2.0  # Resolves passlib ValueError on password length detection
 faster-whisper>=1.0.0
 openai-whisper
 
+# Music Generation (using transformers instead of audiocraft to avoid PyAV dependency)
+
 # ML Core
 torch>=2.1.0
 torchaudio>=2.1.0

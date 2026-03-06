@@ -38,7 +38,8 @@ async def create_tts_task(
     engine_to_model = {
         "xtts": "xtts-v2",
         "bark": "bark", 
-        "tortoise": "tortoise"
+        "tortoise": "tortoise",
+        "musicgen": "musicgen"
     }
     model_id = engine_to_model.get(engine_name, engine_name)
     
@@ -101,7 +102,8 @@ async def get_available_engines(
     model_to_engine = {
         "xtts-v2": "xtts",
         "bark": "bark",
-        "tortoise": "tortoise"
+        "tortoise": "tortoise",
+        "musicgen": "musicgen"
     }
     
     ready_engines = []

@@ -7,6 +7,7 @@ from loguru import logger
 from app.tts.base import BaseTTS
 from app.tts.xtts import XTTSEngine
 from app.tts.bark import BarkEngine
+from app.tts.musicgen import MusicGenEngine
 # Tortoise temporarily disabled due to dependency conflicts
 # from app.tts.tortoise import TortoiseEngine
 from app.config import settings
@@ -17,6 +18,7 @@ class TTSRegistry:
     _engines: Dict[str, Type[BaseTTS]] = {
         "xtts": XTTSEngine,
         "bark": BarkEngine,
+        "musicgen": MusicGenEngine,
         # "tortoise": TortoiseEngine,  # Temporarily disabled
     }
     
