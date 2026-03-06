@@ -18,12 +18,13 @@ pydub
 # TTS Engines
 TTS>=0.22.0
 suno-bark
-tortoise-tts
+# tortoise-tts temporarily disabled due to transformers conflict with TTS
+# tortoise-tts
 
 # Pinned dependencies to resolve conflicts
 bangla<0.0.5  # Fixed Python 3.10 syntax error on Python 3.9
-transformers==4.31.0  # Resolves conflict between tortoise-tts and TTS
-bcrypt==3.2.0  # Resolves passlib ValueError on password length detection
+transformers>=4.33.0,<4.40.0  # Compatible with TTS>=0.22.0
+bcrypt>=3.2.0  # Resolves passlib ValueError on password length detection
 
 
 # STT Engines
