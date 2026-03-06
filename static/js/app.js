@@ -472,7 +472,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                             ${readyEngines.includes('xtts') ? '<option value="xtts">XTTS V2</option>' : ''}
                                             ${readyEngines.includes('bark') ? '<option value="bark">Bark</option>' : ''}
                                             ${readyEngines.includes('tortoise') ? '<option value="tortoise">Tortoise</option>' : ''}
-                                            ${readyEngines.includes('musicgen') ? '<option value="musicgen">MusicGen (Müzik)</option>' : ''}
+                                            ${readyEngines.includes('musicgen-small') ? '<option value="musicgen-small">MusicGen Small (Hızlı)</option>' : ''}
+                                            ${readyEngines.includes('musicgen-medium') ? '<option value="musicgen-medium">MusicGen Medium (Dengeli)</option>' : ''}
+                                            ${readyEngines.includes('musicgen-large') ? '<option value="musicgen-large">MusicGen Large (En İyi Kalite)</option>' : ''}
+                                            ${readyEngines.includes('musicgen-melody') ? '<option value="musicgen-melody">MusicGen Melody (Referanslı)</option>' : ''}
                                             ${readyEngines.length === 0 ? '<option value="" disabled>Model indirilmesi gerekiyor</option>' : ''}
                                         </select>
                                         ${readyEngines.length === 0 ? `

@@ -39,7 +39,10 @@ async def create_tts_task(
         "xtts": "xtts-v2",
         "bark": "bark", 
         "tortoise": "tortoise",
-        "musicgen": "musicgen"
+        "musicgen-small": "musicgen-small",
+        "musicgen-medium": "musicgen-medium",
+        "musicgen-large": "musicgen-large",
+        "musicgen-melody": "musicgen-melody"
     }
     model_id = engine_to_model.get(engine_name, engine_name)
     
@@ -103,7 +106,10 @@ async def get_available_engines(
         "xtts-v2": "xtts",
         "bark": "bark",
         "tortoise": "tortoise",
-        "musicgen": "musicgen"
+        "musicgen-small": "musicgen-small",
+        "musicgen-medium": "musicgen-medium",
+        "musicgen-large": "musicgen-large",
+        "musicgen-melody": "musicgen-melody"
     }
     
     ready_engines = []

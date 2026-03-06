@@ -13,11 +13,12 @@ from app.config import settings
 from app.core.device import detect_device
 
 class MusicGenEngine(BaseTTS):
-    def __init__(self):
+    def __init__(self, model_size="small"):
         self._processor = None
         self._model = None
         self._device = detect_device()
-        self.model_path = os.path.join(settings.MODELS_DIR, "musicgen")
+        self.model_size = model_size  # small, medium, large, melody
+        self.model_path = os.path.join(settings.MODELS_DIR, f"musicgen-{model_size}")
         
     @property
     def engine_name(self) -> str:
@@ -41,8 +42,8 @@ class MusicGenEngine(BaseTTS):
             
             logger.info(f"Loading MusicGen model on {self._device}...")
             
-            # Load model from HuggingFace
-            model_name = "facebook/musicgen-small"
+            # Load model from HuggingFace based on size
+            model_name = f"facebook/musicgen-{self.model_size}"
             self._processor = AutoProcessor.from_pretrained(model_name)
             self._model = MusicgenForConditionalGeneration.from_pretrained(model_name)
             self._model = self._model.to(self._device)

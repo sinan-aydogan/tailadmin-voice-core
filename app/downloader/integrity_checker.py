@@ -47,9 +47,24 @@ MODEL_INTEGRITY_CHECKS = {
         "min_size_mb": 1500,
         "optional_files": ["clvp2.pth", "diffusion_decoder.pth", "hifidecoder.pth"]
     },
-    "musicgen": {
+    "musicgen-small": {
         "required_files": ["config.json", "pytorch_model.bin"],
         "min_size_mb": 1000,
+        "optional_files": ["generation_config.json", "tokenizer.json"]
+    },
+    "musicgen-medium": {
+        "required_files": ["config.json", "pytorch_model.bin"],
+        "min_size_mb": 2500,
+        "optional_files": ["generation_config.json", "tokenizer.json"]
+    },
+    "musicgen-large": {
+        "required_files": ["config.json", "pytorch_model.bin"],
+        "min_size_mb": 6000,
+        "optional_files": ["generation_config.json", "tokenizer.json"]
+    },
+    "musicgen-melody": {
+        "required_files": ["config.json", "pytorch_model.bin"],
+        "min_size_mb": 2500,
         "optional_files": ["generation_config.json", "tokenizer.json"]
     },
     "whisper-tiny": {

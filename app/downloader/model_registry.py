@@ -36,13 +36,43 @@ AVAILABLE_MODELS = [
         "languages": ["en"]
     },
     {
-        "id": "musicgen",
+        "id": "musicgen-small",
         "engine": "musicgen",
         "name": "MusicGen (Small)",
         "type": "music",
         "repo_id": "facebook/musicgen-small",
-        "description": "AI music generation from text descriptions. Creates instrumental music.",
+        "description": "AI music generation from text descriptions. Fast generation, good quality.",
         "size_estimate_mb": 1500,
+        "languages": ["multilingual"]
+    },
+    {
+        "id": "musicgen-medium",
+        "engine": "musicgen",
+        "name": "MusicGen (Medium)",
+        "type": "music",
+        "repo_id": "facebook/musicgen-medium",
+        "description": "AI music generation with better quality than small model.",
+        "size_estimate_mb": 3500,
+        "languages": ["multilingual"]
+    },
+    {
+        "id": "musicgen-large",
+        "engine": "musicgen",
+        "name": "MusicGen (Large)",
+        "type": "music",
+        "repo_id": "facebook/musicgen-large",
+        "description": "Best quality AI music generation. Slower but higher fidelity.",
+        "size_estimate_mb": 8000,
+        "languages": ["multilingual"]
+    },
+    {
+        "id": "musicgen-melody",
+        "engine": "musicgen",
+        "name": "MusicGen (Melody)",
+        "type": "music",
+        "repo_id": "facebook/musicgen-melody",
+        "description": "Music generation conditioned on melodic input. Can use reference audio.",
+        "size_estimate_mb": 3500,
         "languages": ["multilingual"]
     },
     {

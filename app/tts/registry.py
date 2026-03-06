@@ -18,7 +18,10 @@ class TTSRegistry:
     _engines: Dict[str, Type[BaseTTS]] = {
         "xtts": XTTSEngine,
         "bark": BarkEngine,
-        "musicgen": MusicGenEngine,
+        "musicgen-small": lambda: MusicGenEngine("small"),
+        "musicgen-medium": lambda: MusicGenEngine("medium"),
+        "musicgen-large": lambda: MusicGenEngine("large"),
+        "musicgen-melody": lambda: MusicGenEngine("melody"),
         # "tortoise": TortoiseEngine,  # Temporarily disabled
     }
     
