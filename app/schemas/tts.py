@@ -11,6 +11,7 @@ class TTSGenerateRequest(BaseModel):
     tag_ids: Optional[List[int]] = []
     # engine-specific kwargs
     speed_factor: Optional[float] = 1.0
+    max_length: Optional[int] = None  # For MusicGen duration (tokens)
 
 class TTSOutputResponse(BaseModel):
     id: int

@@ -79,6 +79,10 @@ async def create_tts_task(
         }
     }
     
+    # Add MusicGen-specific parameters
+    if request.max_length and engine_name.startswith('musicgen'):
+        payload["kwargs"]["max_length"] = request.max_length
+    
     # Create Task in DB
     task = Task(
         type="tts",

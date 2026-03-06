@@ -252,7 +252,7 @@ def get_ready_for_tts() -> List[str]:
     Returns:
         List of healthy TTS model IDs
     """
-    tts_models = ["xtts-v2", "bark", "tortoise"]
+    tts_models = ["xtts-v2", "bark", "tortoise", "musicgen-small", "musicgen-medium", "musicgen-large", "musicgen-melody"]
     ready = []
     for model_id in tts_models:
         if is_model_healthy(model_id):

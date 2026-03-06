@@ -68,7 +68,9 @@ class MusicGenEngine(BaseTTS):
             import scipy.io.wavfile as wavfile
             
             # Set generation parameters
-            max_length = kwargs.get('max_length', 256)  # Default length
+            # max_new_tokens determines duration: ~50 tokens = 1 second
+            # 256 tokens = ~5 seconds, 512 = ~10 seconds, 1024 = ~20 seconds
+            max_length = kwargs.get('max_length', 512)  # Default ~10 seconds
             
             # Process inputs
             inputs = self._processor(

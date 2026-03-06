@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     
                                     <div class="space-y-2">
                                         <label class="text-sm font-medium">TTS Motoru</label>
-                                        <select id="ttsEngine" class="input">
+                                        <select id="ttsEngine" class="input" onchange="toggleMusicGenDuration()">
                                             ${readyEngines.includes('xtts') ? '<option value="xtts">XTTS V2</option>' : ''}
                                             ${readyEngines.includes('bark') ? '<option value="bark">Bark</option>' : ''}
                                             ${readyEngines.includes('tortoise') ? '<option value="tortoise">Tortoise</option>' : ''}
@@ -484,6 +484,19 @@ document.addEventListener('DOMContentLoaded', () => {
                                                 Model Yöneticisi'nden model indirin
                                             </p>
                                         ` : ''}
+                                    </div>
+                                    
+                                    <!-- MusicGen Duration Selector -->
+                                    <div id="musicGenDurationContainer" class="space-y-2" style="display: none;">
+                                        <label class="text-sm font-medium">Müzik Süresi (saniye)</label>
+                                        <select id="musicGenDuration" class="input">
+                                            <option value="256">5 saniye</option>
+                                            <option value="512" selected>10 saniye</option>
+                                            <option value="768">15 saniye</option>
+                                            <option value="1024">20 saniye</option>
+                                            <option value="1280">25 saniye</option>
+                                            <option value="1500">30 saniye</option>
+                                        </select>
                                     </div>
                                 </div>
 
@@ -591,6 +604,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    window.toggleMusicGenDuration = () => {
+        const engine = document.getElementById('ttsEngine')?.value || '';
+        const durationContainer = document.getElementById('musicGenDurationContainer');
+        
+        if (engine.startsWith('musicgen')) {
+            durationContainer.style.display = 'block';
+        } else {
+            durationContainer.style.display = 'none';
+        }
+    };
+
     window.submitTts = async () => {
         const profileId = document.getElementById('ttsProfile').value;
         const text = document.getElementById('ttsText').value;
@@ -609,13 +633,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // Get selected tags
             const tagSelect = document.getElementById('ttsTags');
             const tagIds = tagSelect?.tomselect?.getValue() || [];
-
-            await api.generateTts({
+            
+            // Prepare request payload
+            const payload = {
                 text,
                 profile_id: parseInt(profileId),
                 engine,
                 tag_ids: tagIds.map(id => parseInt(id))
-            });
+            };
+            
+            // Add MusicGen duration if applicable
+            if (engine.startsWith('musicgen')) {
+                const durationTokens = document.getElementById('musicGenDuration')?.value || '512';
+                payload.max_length = parseInt(durationTokens);
+            }
+
+            await api.generateTts(payload);
 
             notificationSystem?.showToast('Ses üretme görevi kuyruğa eklendi', 'success');
             document.getElementById('ttsText').value = '';
