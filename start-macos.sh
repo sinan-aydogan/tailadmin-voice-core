@@ -118,8 +118,29 @@ echo "🚀 Starting Voice Core API..."
 echo "   API will be available at: http://localhost:${API_PORT:-5001}"
 echo ""
 
-# Trap Ctrl+C to deactivate virtual environment on exit
-trap 'echo -e "\n🛑 Shutting down..."; deactivate 2>/dev/null || true; exit 0' INT
+# Start the UI server in background
+echo "🚀 Starting Voice Core UI Server..."
+echo "   UI will be available at: http://localhost:${UI_PORT:-5002}"
+echo ""
 
-# Start the API
+# Start UI server in background
+python3 frontend_server.py &
+UI_PID=$!
+
+# Function to cleanup processes on exit
+cleanup() {
+    echo -e "\n🛑 Shutting down..."
+    if kill -0 $UI_PID 2>/dev/null; then
+        echo "   Stopping UI server..."
+        kill $UI_PID 2>/dev/null
+        wait $UI_PID 2>/dev/null
+    fi
+    deactivate 2>/dev/null || true
+    exit 0
+}
+
+# Trap Ctrl+C and other signals
+trap cleanup INT TERM EXIT
+
+# Start the API (foreground)
 python3 main.py

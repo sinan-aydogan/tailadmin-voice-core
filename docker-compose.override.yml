@@ -8,8 +8,6 @@
 # Or set COMPOSE_FILE environment variable:
 #   export COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml
 
-version: '3.8'
-
 services:
   voice-core-api:
     # Remove GPU reservations for macOS
