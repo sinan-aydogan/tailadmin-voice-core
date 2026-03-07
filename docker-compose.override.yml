@@ -1,0 +1,25 @@
+# Docker Compose Override for macOS
+# macOS Docker Desktop does not support GPU passthrough
+# This file disables GPU-specific settings for macOS compatibility
+#
+# Usage on macOS:
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+#
+# Or set COMPOSE_FILE environment variable:
+#   export COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml
+
+version: '3.8'
+
+services:
+  voice-core-api:
+    # Remove GPU reservations for macOS
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+    # Disable NVIDIA-specific environment variables
+    environment:
+      - USE_GPU=cpu  # Force CPU mode on macOS Docker
+      - NVIDIA_VISIBLE_DEVICES=void
+      - CUDA_VISIBLE_DEVICES=""

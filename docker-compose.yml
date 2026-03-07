@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  voice-core-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voice-core-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-5001}:5001"
+    volumes:
+      # Persistent storage for models, outputs, and database
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Mount .env file for configuration
+      - ./.env:/app/.env:ro
+    environment:
+      # GPU Configuration
+      - USE_GPU=${USE_GPU:-auto}
+      - NVIDIA_VISIBLE_DEVICES=all
+      # PyTorch CUDA settings
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      # HuggingFace cache directories
+      - HF_HOME=/app/data/models/.cache/huggingface
+      - TORCH_HOME=/app/data/models/.cache/torch
+      # Python settings
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - voice-core-network
+
+  # Optional: Frontend server (can also be served by the API)
+  voice-core-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voice-core-ui
+    restart: unless-stopped
+    ports:
+      - "${UI_PORT:-5002}:5002"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - API_URL=http://voice-core-api:5001
+    command: python frontend_server.py
+    depends_on:
+      voice-core-api:
+        condition: service_healthy
+    networks:
+      - voice-core-network
+
+networks:
+  voice-core-network:
+    driver: bridge
