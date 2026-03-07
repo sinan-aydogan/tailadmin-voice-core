@@ -114,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'stt': { title: 'Sesten Metne', render: renderStt },
         'models': { title: 'Model Yöneticisi', render: renderModels },
         'queue': { title: 'İşlem Kuyruğu', render: renderQueue },
+        'playlists': { title: 'İş Listeleri', render: () => window.renderPlaylists() },
         'settings': { title: 'Ayarlar', render: renderSettings }
     };
 
@@ -1990,5 +1991,447 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Start the app
+    // ==================== Playlists ====================
+    let currentPlaylistId = null;
+    let playlists = [];
+    let dragSrcEl = null;
+
+    window.renderPlaylists = async function() {
+        mainContent.innerHTML = renderLoading();
+        
+        try {
+            playlists = await api.getPlaylists();
+            
+            mainContent.innerHTML = `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-2xl font-bold">İş Listeleri</h2>
+                        <button onclick="showCreatePlaylistModal()" class="btn btn-primary">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            Yeni Liste
+                        </button>
+                    </div>
+                    
+                    ${playlists.length === 0 ? `
+                        <div class="card">
+                            <div class="card-content py-12 text-center">
+                                <i data-lucide="list-video" class="w-12 h-12 mx-auto text-muted-foreground mb-4"></i>
+                                <h3 class="text-lg font-medium mb-2">Henüz liste yok</h3>
+                                <p class="text-muted-foreground mb-4">TTS işlerini toplu olarak planlamak için bir liste oluşturun</p>
+                                <button onclick="showCreatePlaylistModal()" class="btn btn-primary">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                    İlk Listeyi Oluştur
+                                </button>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="space-y-4">
+                            ${playlists.map(playlist => `
+                                <div class="card playlist-card" data-playlist-id="${playlist.id}">
+                                    <div class="card-header cursor-pointer" onclick="togglePlaylist(${playlist.id})">
+                                        <div class="flex items-center justify-between w-full">
+                                            <div class="flex items-center gap-3">
+                                                <i data-lucide="chevron-right" class="w-5 h-5 transition-transform playlist-toggle-icon" id="toggle-icon-${playlist.id}"></i>
+                                                <div>
+                                                    <h3 class="font-semibold">${playlist.name}</h3>
+                                                    <p class="text-sm text-muted-foreground">
+                                                        ${playlist.total_items} iş • 
+                                                        ${playlist.status === 'completed' ? 'Tamamlandı' : 
+                                                          playlist.status === 'processing' ? 'İşleniyor' :
+                                                          playlist.status === 'paused' ? 'Duraklatıldı' : 'Bekliyor'}
+                                                        ${playlist.duration_seconds ? ` • ${formatDuration(playlist.duration_seconds)}` : ''}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                ${getPlaylistStatusBadge(playlist)}
+                                                ${playlist.status === 'pending' ? `
+                                                    <button onclick="event.stopPropagation(); startPlaylist(${playlist.id})" class="btn btn-primary btn-sm">
+                                                        <i data-lucide="play" class="w-4 h-4"></i>
+                                                    </button>
+                                                ` : playlist.status === 'processing' ? `
+                                                    <button onclick="event.stopPropagation(); pausePlaylist(${playlist.id})" class="btn btn-outline btn-sm">
+                                                        <i data-lucide="pause" class="w-4 h-4"></i>
+                                                    </button>
+                                                ` : playlist.status === 'paused' ? `
+                                                    <button onclick="event.stopPropagation(); resumePlaylist(${playlist.id})" class="btn btn-primary btn-sm">
+                                                        <i data-lucide="play" class="w-4 h-4"></i>
+                                                    </button>
+                                                ` : ''}
+                                                <button onclick="event.stopPropagation(); showCreatePlaylistItemModal(${playlist.id})" class="btn btn-outline btn-sm">
+                                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="event.stopPropagation(); deletePlaylist(${playlist.id})" class="btn btn-outline btn-sm text-destructive hover:bg-destructive/10">
+                                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="hidden playlist-items" id="playlist-items-${playlist.id}">
+                                        <div class="border-t border-border">
+                                            ${playlist.total_items === 0 ? `
+                                                <div class="p-4 text-center text-muted-foreground">
+                                                    Henüz iş eklenmemiş
+                                                </div>
+                                            ` : `
+                                                <div class="divide-y divide-border" id="items-container-${playlist.id}">
+                                                    <!-- Items will be loaded here -->
+                                                </div>
+                                            `}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            `;
+            
+            lucide.createIcons();
+        } catch (e) {
+            mainContent.innerHTML = renderError('Listeler yüklenirken hata oluştu');
+        }
+    }
+
+    window.getPlaylistStatusBadge = function(playlist) {
+        const progress = playlist.progress_percentage;
+        if (playlist.status === 'completed') {
+            return `<span class="badge badge-success">%100</span>`;
+        } else if (playlist.status === 'processing') {
+            return `<span class="badge badge-primary">%${progress}</span>`;
+        } else if (playlist.status === 'paused') {
+            return `<span class="badge badge-warning">%${progress}</span>`;
+        } else if (playlist.status === 'failed') {
+            return `<span class="badge badge-destructive">Hata</span>`;
+        }
+        return `<span class="badge badge-secondary">Bekliyor</span>`;
+    }
+
+    window.formatDuration = function(seconds) {
+        if (seconds < 60) return `${seconds}s`;
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}dk`;
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        return `${hours}s ${mins}dk`;
+    }
+
+    window.togglePlaylist = async function(playlistId) {
+        const itemsDiv = document.getElementById(`playlist-items-${playlistId}`);
+        const icon = document.getElementById(`toggle-icon-${playlistId}`);
+        
+        if (itemsDiv.classList.contains('hidden')) {
+            itemsDiv.classList.remove('hidden');
+            icon.classList.add('rotate-90');
+            await window.loadPlaylistItems(playlistId);
+        } else {
+            itemsDiv.classList.add('hidden');
+            icon.classList.remove('rotate-90');
+        }
+    }
+
+    window.loadPlaylistItems = async function(playlistId) {
+        try {
+            const playlist = await api.getPlaylist(playlistId);
+            const container = document.getElementById(`items-container-${playlistId}`);
+            
+            if (!container) return;
+            
+            container.innerHTML = playlist.items.map((item, index) => `
+                <div class="flex items-center gap-3 p-3 hover:bg-accent/50 draggable-item" 
+                     draggable="true"
+                     data-item-id="${item.id}"
+                     data-playlist-id="${playlistId}">
+                    <div class="cursor-move text-muted-foreground hover:text-foreground">
+                        <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm truncate">${item.text}</p>
+                        <p class="text-xs text-muted-foreground">
+                            ${item.status === 'completed' ? '✓ Tamamlandı' : 
+                              item.status === 'processing' ? '⏳ İşleniyor' :
+                              item.status === 'failed' ? '✗ Hata' : '⏸ Sırada'}
+                        </p>
+                    </div>
+                    <button onclick="deletePlaylistItem(${playlistId}, ${item.id})" class="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `).join('');
+            
+            // Setup drag and drop
+            setupDragAndDrop(container, playlistId);
+            lucide.createIcons();
+        } catch (e) {
+            console.error('Failed to load playlist items:', e);
+        }
+    }
+
+    window.setupDragAndDrop = function(container, playlistId) {
+        const items = container.querySelectorAll('.draggable-item');
+        
+        items.forEach(item => {
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('dragenter', handleDragEnter);
+            item.addEventListener('dragover', handleDragOver);
+            item.addEventListener('dragleave', handleDragLeave);
+            item.addEventListener('drop', handleDrop);
+            item.addEventListener('dragend', handleDragEnd);
+        });
+    }
+
+    window.handleDragStart = function(e) {
+        dragSrcEl = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+        this.classList.add('opacity-50');
+    }
+
+    window.handleDragOver = function(e) {
+        if (e.preventDefault) e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+
+    window.handleDragEnter = function(e) {
+        this.classList.add('bg-accent');
+    }
+
+    window.handleDragLeave = function(e) {
+        this.classList.remove('bg-accent');
+    }
+
+    window.handleDrop = function(e) {
+        if (e.stopPropagation) e.stopPropagation();
+        
+        if (dragSrcEl !== this) {
+            const container = dragSrcEl.parentNode;
+            const items = Array.from(container.children);
+            const srcIndex = items.indexOf(dragSrcEl);
+            const targetIndex = items.indexOf(this);
+            
+            if (srcIndex < targetIndex) {
+                this.after(dragSrcEl);
+            } else {
+                this.before(dragSrcEl);
+            }
+            
+            // Save new order
+            const playlistId = dragSrcEl.dataset.playlistId;
+            const newOrder = Array.from(container.children).map(el => parseInt(el.dataset.itemId));
+            api.reorderPlaylistItems(playlistId, newOrder);
+        }
+        
+        return false;
+    }
+
+    window.handleDragEnd = function(e) {
+        this.classList.remove('opacity-50');
+        document.querySelectorAll('.draggable-item').forEach(item => {
+            item.classList.remove('bg-accent');
+        });
+    }
+
+    // Playlist actions
+    window.showCreatePlaylistModal = function() {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm';
+        modal.innerHTML = `
+            <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
+                <div class="p-4 border-b border-border">
+                    <h3 class="text-lg font-semibold">Yeni İş Listesi</h3>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Liste Adı</label>
+                        <input type="text" id="playlistName" class="input w-full" placeholder="Örn: Lunera Olumlama">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Açıklama</label>
+                        <textarea id="playlistDescription" class="input w-full" rows="2" placeholder="Liste açıklaması (isteğe bağlı)"></textarea>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="useSingleModel" class="rounded border-border">
+                        <label for="useSingleModel" class="text-sm">Tüm işler için aynı modeli kullan</label>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 p-4 border-t border-border">
+                    <button onclick="closeModal(this)" class="btn btn-outline">İptal</button>
+                    <button onclick="createPlaylist()" class="btn btn-primary">Oluştur</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        lucide.createIcons();
+    };
+
+    window.createPlaylist = async function() {
+        const name = document.getElementById('playlistName').value;
+        const description = document.getElementById('playlistDescription').value;
+        const useSingleModel = document.getElementById('useSingleModel').checked;
+        
+        if (!name) {
+            notificationSystem?.showToast('Liste adı gerekli', 'error');
+            return;
+        }
+        
+        try {
+            await api.createPlaylist({
+                name,
+                description,
+                use_single_model: useSingleModel,
+                items: []
+            });
+            
+            closeModal(document.querySelector('.fixed.z-50'));
+            notificationSystem?.showToast('Liste oluşturuldu', 'success');
+            renderPlaylists();
+        } catch (e) {
+            notificationSystem?.showToast('Liste oluşturulurken hata', 'error');
+        }
+    };
+
+    window.showCreatePlaylistItemModal = async function(playlistId) {
+        const playlist = await api.getPlaylist(playlistId);
+        
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm';
+        modal.innerHTML = `
+            <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+                <div class="p-4 border-b border-border">
+                    <h3 class="text-lg fontibold">İş Ekle: ${playlist.name}</h3>
+                </div>
+                <div class="p-4 space-y-4 overflow-y-auto flex-1">
+                    ${playlist.use_single_model ? `
+                        <div class="bg-muted p-3 rounded-lg text-sm">
+                            <i data-lucide="info" class="w-4 h-4 inline mr-1"></i>
+                            Bu liste için tek model modu aktif. Tüm işler aynı modelle yapılacak.
+                        </div>
+                    ` : ''}
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Metin</label>
+                        <textarea id="itemText" class="input w-full" rows="4" placeholder="Seslendirilecek metin..."></textarea>
+                    </div>
+                    ${!playlist.use_single_model ? `
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">TTS Modeli</label>
+                                <select id="itemModel" class="input w-full">
+                                    <option value="xtts-v2">Coqui XTTS v2</option>
+                                    <option value="bark">Suno Bark</option>
+                                    <option value="tortoise">Tortoise TTS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Ses Profili</label>
+                                <select id="itemProfile" class="input w-full">
+                                    <option value="">Varsayılan</option>
+                                </select>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="flex justify-end gap-2 p-4 border-t border-border">
+                    <button onclick="closeModal(this)" class="btn btn-outline">İptal</button>
+                    <button onclick="addPlaylistItem(${playlistId})" class="btn btn-primary">Ekle</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        lucide.createIcons();
+    };
+
+    window.addPlaylistItem = async function(playlistId) {
+        const text = document.getElementById('itemText').value;
+        if (!text) {
+            notificationSystem?.showToast('Metin gerekli', 'error');
+            return;
+        }
+        
+        const data = { text };
+        
+        const modelSelect = document.getElementById('itemModel');
+        const profileSelect = document.getElementById('itemProfile');
+        
+        if (modelSelect) data.model_id = modelSelect.value;
+        if (profileSelect) data.profile_id = profileSelect.value || null;
+        
+        try {
+            await api.addPlaylistItem(playlistId, data);
+            closeModal(document.querySelector('.fixed.z-50'));
+            notificationSystem?.showToast('İş eklendi', 'success');
+            
+            // Refresh playlist view to update item count
+            await window.renderPlaylists();
+            
+            // If playlist was open, reopen it and show items
+            const itemsDiv = document.getElementById(`playlist-items-${playlistId}`);
+            if (itemsDiv) {
+                itemsDiv.classList.remove('hidden');
+                const icon = document.getElementById(`toggle-icon-${playlistId}`);
+                if (icon) icon.classList.add('rotate-90');
+                await window.loadPlaylistItems(playlistId);
+            }
+        } catch (e) {
+            notificationSystem?.showToast('İş eklenirken hata', 'error');
+        }
+    };
+
+    window.startPlaylist = async function(playlistId) {
+        try {
+            await api.processPlaylist(playlistId);
+            notificationSystem?.showToast('Liste işleme alındı', 'success');
+            renderPlaylists();
+        } catch (e) {
+            notificationSystem?.showToast('Başlatılırken hata', 'error');
+        }
+    };
+
+    window.pausePlaylist = async function(playlistId) {
+        try {
+            await api.pausePlaylist(playlistId);
+            notificationSystem?.showToast('Liste duraklatıldı', 'success');
+            renderPlaylists();
+        } catch (e) {
+            notificationSystem?.showToast('Duraklatılırken hata', 'error');
+        }
+    };
+
+    window.resumePlaylist = async function(playlistId) {
+        try {
+            await api.resumePlaylist(playlistId);
+            notificationSystem?.showToast('Liste devam ediyor', 'success');
+            renderPlaylists();
+        } catch (e) {
+            notificationSystem?.showToast('Devam ettirilirken hata', 'error');
+        }
+    };
+
+    window.deletePlaylist = async function(playlistId) {
+        if (!confirm('Bu listeyi silmek istediğinize emin misiniz?')) return;
+        
+        try {
+            await api.deletePlaylist(playlistId);
+            notificationSystem?.showToast('Liste silindi', 'success');
+            renderPlaylists();
+        } catch (e) {
+            notificationSystem?.showToast('Silinirken hata', 'error');
+        }
+    };
+
+    window.deletePlaylistItem = async function(playlistId, itemId) {
+        try {
+            await api.deletePlaylistItem(playlistId, itemId);
+            notificationSystem?.showToast('İş silindi', 'success');
+            await window.loadPlaylistItems(playlistId);
+        } catch (e) {
+            notificationSystem?.showToast('Silinirken hata', 'error');
+        }
+    };
+
+    window.closeModal = function(element) {
+        const modal = element.closest('.fixed.z-50');
+        if (modal) modal.remove();
+    };
+
     init();
 });

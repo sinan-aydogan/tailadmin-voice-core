@@ -3,6 +3,7 @@ User model.
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 class User(Base):
@@ -17,3 +18,6 @@ class User(Base):
     # User preferences
     theme = Column(String, default="light")  # 'light' or 'dark'
     language = Column(String, default="tr")  # 'tr' or 'en'
+    
+    # Relationships
+    playlists = relationship("Playlist", back_populates="user")

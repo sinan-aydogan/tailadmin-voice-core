@@ -171,3 +171,37 @@ nav button.settings-tab.active {
 .text-orange-600 {
     color: hsl(24, 95%, 40%);
 }
+
+/* Playlist Styles */
+.playlist-card {
+    transition: all 0.2s ease;
+}
+
+.playlist-card:hover {
+    border-color: hsl(var(--primary) / 0.5);
+}
+
+.playlist-toggle-icon {
+    transition: transform 0.2s ease;
+}
+
+.playlist-toggle-icon.rotate-90 {
+    transform: rotate(90deg);
+}
+
+.draggable-item {
+    transition: all 0.2s ease;
+    cursor: grab;
+}
+
+.draggable-item:active {
+    cursor: grabbing;
+}
+
+.draggable-item.dragging {
+    opacity: 0.5;
+}
+
+.draggable-item.drag-over {
+    background-color: hsl(var(--accent));
+}

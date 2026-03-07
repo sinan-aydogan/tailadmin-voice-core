@@ -219,6 +219,59 @@ class ApiClient {
     async deleteSecretKey() {
         return this.request('/settings/secret-key', 'DELETE');
     }
+
+    // Playlists
+    async getPlaylists() {
+        return this.request('/playlists');
+    }
+
+    async getPlaylist(id) {
+        return this.request(`/playlists/${id}`);
+    }
+
+    async createPlaylist(data) {
+        return this.request('/playlists', 'POST', data);
+    }
+
+    async updatePlaylist(id, data) {
+        return this.request(`/playlists/${id}`, 'PUT', data);
+    }
+
+    async deletePlaylist(id) {
+        return this.request(`/playlists/${id}`, 'DELETE');
+    }
+
+    async addPlaylistItem(playlistId, data) {
+        return this.request(`/playlists/${playlistId}/items`, 'POST', data);
+    }
+
+    async updatePlaylistItem(playlistId, itemId, data) {
+        return this.request(`/playlists/${playlistId}/items/${itemId}`, 'PUT', data);
+    }
+
+    async deletePlaylistItem(playlistId, itemId) {
+        return this.request(`/playlists/${playlistId}/items/${itemId}`, 'DELETE');
+    }
+
+    async reorderPlaylistItems(playlistId, itemIds) {
+        return this.request(`/playlists/${playlistId}/reorder`, 'POST', { item_ids: itemIds });
+    }
+
+    async processPlaylist(id) {
+        return this.request(`/playlists/${id}/process`, 'POST');
+    }
+
+    async pausePlaylist(id) {
+        return this.request(`/playlists/${id}/pause`, 'POST');
+    }
+
+    async resumePlaylist(id) {
+        return this.request(`/playlists/${id}/resume`, 'POST');
+    }
+
+    async stopPlaylist(id) {
+        return this.request(`/playlists/${id}/stop`, 'POST');
+    }
 }
 
 const api = new ApiClient();

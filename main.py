@@ -25,6 +25,7 @@ from app.routers.settings_router import router as settings_router
 from app.routers.logs_router import router as logs_router
 from app.routers.tags_router import router as tags_router
 from app.routers.llm_router import router as llm_router
+from app.routers.playlist_router import router as playlist_router
 from app.queue.worker import worker
 from app.websocket import manager, notification_manager
 import asyncio
@@ -159,6 +160,7 @@ app.include_router(settings_router)
 app.include_router(logs_router)
 app.include_router(tags_router)
 app.include_router(llm_router)
+app.include_router(playlist_router)
 
 # Serve data directory for audio/model files
 app.mount("/data", StaticFiles(directory="data"), name="data")
