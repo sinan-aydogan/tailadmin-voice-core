@@ -1,21 +1,32 @@
 """
 Database initialization and seeding.
+Uses migration system for schema management.
 """
 from sqlalchemy.orm import Session
 from loguru import logger
 
-from app.database import engine
+from app.database import engine, SessionLocal
 from app.models.base import Base
 import app.models  # Ensures all models are imported before create_all
 from app.models.user import User
 from app.auth.service import get_password_hash
 from app.config import settings
 
+
 def init_db():
-    """Create all tables and reset stale tasks."""
-    logger.info("Initializing database tables...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created successfully.")
+    """Initialize database using migration system."""
+    logger.info("Initializing database...")
+    
+    # Run migrations
+    from app.migrations import MigrationRunner
+    db = SessionLocal()
+    try:
+        runner = MigrationRunner(db)
+        runner.run_migrations()
+        logger.info("Migrations completed successfully.")
+    finally:
+        db.close()
+    
     reset_stale_tasks()
 
 def reset_stale_tasks():

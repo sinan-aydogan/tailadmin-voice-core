@@ -377,8 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         <div class="space-y-2">
                             <label class="text-sm font-medium">Referans Ses</label>
-                            <input type="file" id="profileAudio" accept="audio/*" class="input">
-                            <p class="text-xs text-muted-foreground">Ses dosyası veya mikrofon kaydı yükleyin</p>
+                            <div id="profileAudioUpload"></div>
                         </div>
                         
                         <div class="flex gap-3 pt-4">
@@ -394,6 +393,15 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         lucide.createIcons();
 
+        // Initialize file upload component
+        const fileUpload = createFileUploadComponent('profileAudioUpload', {
+            accept: 'audio/*',
+            maxSize: 10 * 1024 * 1024, // 10MB
+            onChange: (file) => {
+                console.log('Selected file:', file?.name);
+            }
+        });
+
         document.getElementById('createProfileForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button[type="submit"]');
@@ -407,9 +415,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     description: ''
                 });
 
-                const audioFile = document.getElementById('profileAudio').files[0];
-                if (audioFile) {
-                    await api.uploadProfileAudio(profile.id, audioFile);
+                if (fileUpload.getFile()) {
+                    await api.uploadProfileAudio(profile.id, fileUpload.getFile());
                 }
 
                 notificationSystem?.showToast('Profil oluşturuldu', 'success');
@@ -1581,7 +1588,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="card-content space-y-6">
                         <div class="space-y-2">
                             <label class="text-sm font-medium">Ses Dosyası</label>
-                            <input type="file" id="sttFile" accept="audio/*" class="input">
+                            <div id="sttAudioUpload"></div>
                         </div>
 
                         <div class="space-y-2">
@@ -1602,10 +1609,18 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         lucide.createIcons();
+
+        // Initialize file upload component
+        window.sttFileUpload = createFileUploadComponent('sttAudioUpload', {
+            accept: 'audio/*',
+            maxSize: 50 * 1024 * 1024, // 50MB for STT
+            placeholder: 'Ses dosyası yüklemek için tıklayın veya sürükleyin',
+            hint: 'MP3, WAV, M4A desteklenir. Maksimum: 50MB'
+        });
     }
 
     window.submitStt = async () => {
-        const file = document.getElementById('sttFile').files[0];
+        const file = window.sttFileUpload?.getFile();
         const language = document.getElementById('sttLanguage').value;
 
         if (!file) {
@@ -1620,7 +1635,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const result = await api.transcribeSttUpload(file, language || null, 'small', 'whisper');
             notificationSystem?.showToast(`Transkripsiyon başlatıldı (Görev #${result.task_id})`, 'success');
-            document.getElementById('sttFile').value = '';
+            window.sttFileUpload?.clear();
         } catch (e) {
             notificationSystem?.showToast('Hata: ' + e.message, 'error');
         } finally {
@@ -1660,16 +1675,174 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <h3 class="font-semibold text-lg">${title}</h3>
                     <p class="text-muted-foreground mt-1">${description}</p>
-                    ${action ? `
-                        <button onclick="${action}" class="btn btn-primary mt-6">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                            Yeni Oluştur
-                        </button>
-                    ` : ''}
+
                 </div>
             </div>
         `;
     }
+
+    // ==================== File Upload Component ====================
+    window.createFileUploadComponent = function(containerId, options = {}) {
+        const {
+            accept = '*/*',
+            maxSize = 10 * 1024 * 1024, // 10MB default
+            onChange = null,
+            placeholder = 'Dosya yüklemek için tıklayın veya sürükleyin',
+            hint = 'Maksimum dosya boyutu: 10MB'
+        } = options;
+
+        const container = document.getElementById(containerId);
+        if (!container) return null;
+
+        let currentFile = null;
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function render() {
+            if (currentFile) {
+                // Show file preview
+                container.innerHTML = `
+                    <div class="file-preview">
+                        <div class="file-preview-icon">
+                            <i data-lucide="file-audio" class="w-5 h-5"></i>
+                        </div>
+                        <div class="file-preview-info">
+                            <div class="file-preview-name">${currentFile.name}</div>
+                            <div class="file-preview-size">${formatFileSize(currentFile.size)}</div>
+                        </div>
+                        <button type="button" class="file-preview-remove" onclick="this.closest('.file-preview').dispatchEvent(new CustomEvent('removeFile'))">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Show upload zone - no native input in DOM, created dynamically on click
+                container.innerHTML = `
+                    <div class="file-upload-zone relative p-8 text-center" id="${containerId}_zone">
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="file-upload-icon">
+                                <i data-lucide="upload-cloud" class="w-full h-full"></i>
+                            </div>
+                            <div>
+                                <p class="file-upload-text">${placeholder}</p>
+                                <p class="file-upload-hint mt-1">${hint}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        function handleFileSelect(file) {
+            if (!file) return;
+
+            if (file.size > maxSize) {
+                notificationSystem?.showToast(`Dosya çok büyük. Maksimum: ${formatFileSize(maxSize)}`, 'error');
+                return;
+            }
+
+            currentFile = file;
+            render();
+
+            if (onChange) {
+                onChange(currentFile);
+            }
+        }
+
+        function setupEventListeners() {
+            const zone = container.querySelector(`#${containerId}_zone`);
+
+            if (zone) {
+                // Click on zone to create and trigger file input dynamically
+                zone.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Create file input dynamically
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = accept;
+                    input.style.display = 'none';
+                    input.style.visibility = 'hidden';
+                    input.style.position = 'absolute';
+                    input.style.width = '0';
+                    input.style.height = '0';
+                    input.style.opacity = '0';
+                    
+                    // Handle file selection
+                    input.addEventListener('change', (e) => {
+                        if (e.target.files.length > 0) {
+                            handleFileSelect(e.target.files[0]);
+                        }
+                        // Remove input after selection
+                        input.remove();
+                    });
+                    
+                    // Trigger click
+                    document.body.appendChild(input);
+                    input.click();
+                });
+
+                // Drag and drop events
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zone.classList.add('drag-over');
+                });
+
+                zone.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zone.classList.remove('drag-over');
+                });
+
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zone.classList.remove('drag-over');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        handleFileSelect(files[0]);
+                    }
+                });
+            }
+
+            // Remove file event
+            container.addEventListener('removeFile', () => {
+                currentFile = null;
+                render();
+                setupEventListeners();
+                if (onChange) {
+                    onChange(null);
+                }
+            });
+        }
+
+        // Initial render
+        render();
+        setupEventListeners();
+
+        // Return public API
+        return {
+            getFile: () => currentFile,
+            setFile: (file) => handleFileSelect(file),
+            clear: () => {
+                currentFile = null;
+                render();
+                setupEventListeners();
+                if (onChange) {
+                    onChange(null);
+                }
+            }
+        };
+    };
 
     // ==================== Download Modal Functions ====================
     function showDownloadModal(modelName) {
@@ -2061,6 +2234,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                                 <button onclick="event.stopPropagation(); showCreatePlaylistItemModal(${playlist.id})" class="btn btn-outline btn-sm">
                                                     <i data-lucide="plus" class="w-4 h-4"></i>
                                                 </button>
+                                                <button onclick="event.stopPropagation(); showEditPlaylistModal(${playlist.id})" class="btn btn-outline btn-sm">
+                                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                </button>
                                                 <button onclick="event.stopPropagation(); deletePlaylist(${playlist.id})" class="btn btn-outline btn-sm text-destructive hover:bg-destructive/10">
                                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                                 </button>
@@ -2232,7 +2408,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Playlist actions
-    window.showCreatePlaylistModal = function() {
+    window.showCreatePlaylistModal = async function() {
+        // Load tags for the modal
+        let tags = [];
+        try {
+            tags = await api.getTags();
+        } catch (e) {
+            console.log('Could not load tags');
+        }
+        
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm';
         modal.innerHTML = `
@@ -2251,7 +2435,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="flex items-center gap-2">
                         <input type="checkbox" id="useSingleModel" class="rounded border-border">
-                        <label for="useSingleModel" class="text-sm">Tüm işler için aynı modeli kullan</label>
+                        <label for="useSingleModel" class="text-sm">Tüm işler için aynı ayarları kullan</label>
+                    </div>
+                    <div id="singleConfigContainer" class="hidden space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">TTS Modeli</label>
+                            <select id="singleModelId" class="input w-full">
+                                <option value="xtts-v2">Coqui XTTS v2</option>
+                                <option value="bark">Suno Bark</option>
+                                <option value="tortoise">Tortoise TTS</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Etiket</label>
+                            <select id="singleTagId" class="input w-full">
+                                <option value="">Etiket seçin (isteğe bağlı)</option>
+                                ${tags.map(tag => `
+                                    <option value="${tag.id}">${tag.name}</option>
+                                `).join('')}
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-end gap-2 p-4 border-t border-border">
@@ -2261,7 +2464,134 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         document.body.appendChild(modal);
+        
+        // Setup checkbox toggle
+        const checkbox = document.getElementById('useSingleModel');
+        const configContainer = document.getElementById('singleConfigContainer');
+        if (checkbox && configContainer) {
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    configContainer.classList.remove('hidden');
+                } else {
+                    configContainer.classList.add('hidden');
+                }
+            });
+        }
+        
         lucide.createIcons();
+    };
+
+    window.showEditPlaylistModal = async function(playlistId) {
+        try {
+            const [playlist, tags] = await Promise.all([
+                api.getPlaylist(playlistId),
+                api.getTags()
+            ]);
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm';
+            modal.innerHTML = `
+                <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
+                    <div class="p-4 border-b border-border">
+                        <h3 class="text-lg font-semibold">Listeyi Düzenle</h3>
+                    </div>
+                    <div class="p-4 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Liste Adı</label>
+                            <input type="text" id="editPlaylistName" class="input w-full" value="${playlist.name}" placeholder="Liste adı">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Açıklama</label>
+                            <textarea id="editPlaylistDescription" class="input w-full" rows="2" placeholder="Liste açıklaması (isteğe bağlı)">${playlist.description || ''}</textarea>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="editUseSingleModel" class="rounded border-border" ${playlist.use_single_model ? 'checked' : ''}>
+                            <label for="editUseSingleModel" class="text-sm">Tüm işler için aynı ayarları kullan</label>
+                        </div>
+                        <div id="singleConfigContainer" class="${playlist.use_single_model ? '' : 'hidden'} space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">TTS Modeli</label>
+                                <select id="editSingleModelId" class="input w-full">
+                                    <option value="xtts-v2" ${playlist.single_model_id === 'xtts-v2' ? 'selected' : ''}>Coqui XTTS v2</option>
+                                    <option value="bark" ${playlist.single_model_id === 'bark' ? 'selected' : ''}>Suno Bark</option>
+                                    <option value="tortoise" ${playlist.single_model_id === 'tortoise' ? 'selected' : ''}>Tortoise TTS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Etiket</label>
+                                <select id="editSingleTagId" class="input w-full">
+                                    <option value="">Etiket seçin (isteğe bağlı)</option>
+                                    ${tags.map(tag => `
+                                        <option value="${tag.id}" ${playlist.single_tag_id === tag.id ? 'selected' : ''}>
+                                            ${tag.name}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 p-4 border-t border-border">
+                        <button onclick="closeModal(this)" class="btn btn-outline">İptal</button>
+                        <button onclick="updatePlaylist(${playlistId})" class="btn btn-primary">Kaydet</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Setup checkbox toggle for single model config
+            const checkbox = document.getElementById('editUseSingleModel');
+            const configContainer = document.getElementById('singleConfigContainer');
+            if (checkbox && configContainer) {
+                checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        configContainer.classList.remove('hidden');
+                    } else {
+                        configContainer.classList.add('hidden');
+                    }
+                });
+            }
+            
+            lucide.createIcons();
+        } catch (e) {
+            notificationSystem?.showToast('Liste bilgileri yüklenirken hata', 'error');
+        }
+    };
+
+    window.updatePlaylist = async function(playlistId) {
+        const name = document.getElementById('editPlaylistName').value;
+        const description = document.getElementById('editPlaylistDescription').value;
+        const useSingleModel = document.getElementById('editUseSingleModel').checked;
+        
+        if (!name) {
+            notificationSystem?.showToast('Liste adı gerekli', 'error');
+            return;
+        }
+        
+        const data = {
+            name,
+            description,
+            use_single_model: useSingleModel
+        };
+        
+        if (useSingleModel) {
+            const modelSelect = document.getElementById('editSingleModelId');
+            const tagSelect = document.getElementById('editSingleTagId');
+            if (modelSelect) data.single_model_id = modelSelect.value;
+            if (tagSelect) data.single_tag_id = tagSelect.value ? parseInt(tagSelect.value) : null;
+        } else {
+            data.single_model_id = null;
+            data.single_profile_id = null;
+            data.single_tag_id = null;
+        }
+        
+        try {
+            await api.updatePlaylist(playlistId, data);
+            closeModal(document.querySelector('.fixed.z-50'));
+            notificationSystem?.showToast('Liste güncellendi', 'success');
+            await window.renderPlaylists();
+        } catch (e) {
+            notificationSystem?.showToast('Liste güncellenirken hata', 'error');
+        }
     };
 
     window.createPlaylist = async function() {
@@ -2274,13 +2604,22 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
+        const data = {
+            name,
+            description,
+            use_single_model: useSingleModel,
+            items: []
+        };
+        
+        if (useSingleModel) {
+            const modelSelect = document.getElementById('singleModelId');
+            const tagSelect = document.getElementById('singleTagId');
+            if (modelSelect) data.single_model_id = modelSelect.value;
+            if (tagSelect) data.single_tag_id = tagSelect.value ? parseInt(tagSelect.value) : null;
+        }
+        
         try {
-            await api.createPlaylist({
-                name,
-                description,
-                use_single_model: useSingleModel,
-                items: []
-            });
+            await api.createPlaylist(data);
             
             closeModal(document.querySelector('.fixed.z-50'));
             notificationSystem?.showToast('Liste oluşturuldu', 'success');
@@ -2378,11 +2717,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.startPlaylist = async function(playlistId) {
         try {
-            await api.processPlaylist(playlistId);
-            notificationSystem?.showToast('Liste işleme alındı', 'success');
+            const result = await api.processPlaylist(playlistId);
+            notificationSystem?.showToast(result.message || 'Liste işleme alındı', 'success');
             renderPlaylists();
         } catch (e) {
-            notificationSystem?.showToast('Başlatılırken hata', 'error');
+            notificationSystem?.showToast('Başlatılırken hata: ' + (e.message || 'Bilinmeyen hata'), 'error');
+            console.error('Start playlist error:', e);
         }
     };
 

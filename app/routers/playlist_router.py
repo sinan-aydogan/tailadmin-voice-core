@@ -15,6 +15,7 @@ from app.schemas.playlist import (
     PlaylistItemCreate, PlaylistItemUpdate, PlaylistItemResponse,
     PlaylistReorderRequest, PlaylistStatusResponse
 )
+from app.queue.worker import submit_tts_task
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
 
@@ -336,12 +337,48 @@ async def process_playlist(
     playlist.started_at = datetime.utcnow()
     db.commit()
     
-    logger.info(f"Started processing playlist '{playlist.name}'")
+    logger.info(f"Started processing playlist '{playlist.name}' with {len(playlist.items)} items")
     
-    # TODO: Trigger background processing
-    # This will be implemented with the queue system
+    # Submit each item to the queue
+    processed_count = 0
+    for item in playlist.items:
+        if item.status == PlaylistItemStatus.QUEUED:
+            try:
+                # Determine model and profile to use
+                model_id = item.model_id or playlist.single_model_id
+                profile_id = item.profile_id or playlist.single_profile_id
+                
+                if not model_id:
+                    logger.warning(f"Skipping item {item.id}: no model specified")
+                    item.status = PlaylistItemStatus.FAILED
+                    item.error_message = "No TTS model specified"
+                    continue
+                
+                # Submit to queue
+                task = submit_tts_task(
+                    text=item.text,
+                    model_id=model_id,
+                    profile_id=profile_id,
+                    user_id=current_user.id,
+                    playlist_item_id=item.id
+                )
+                
+                item.status = PlaylistItemStatus.PROCESSING
+                processed_count += 1
+                logger.info(f"Submitted playlist item {item.id} to queue as task {task.id}")
+                
+            except Exception as e:
+                logger.error(f"Failed to submit playlist item {item.id}: {e}")
+                item.status = PlaylistItemStatus.FAILED
+                item.error_message = str(e)
     
-    return {"message": "Playlist processing started", "playlist_id": playlist_id}
+    db.commit()
+    
+    return {
+        "message": f"Playlist processing started ({processed_count} items queued)",
+        "playlist_id": playlist_id,
+        "queued_items": processed_count
+    }
 
 
 @router.post("/{playlist_id}/pause")

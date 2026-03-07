@@ -37,6 +37,7 @@ class Playlist(Base):
     use_single_model = Column(Boolean, default=False)  # If True, all items use same model
     single_model_id = Column(String, nullable=True)    # Model ID if single_model is True
     single_profile_id = Column(Integer, nullable=True) # Profile ID if single_model is True
+    single_tag_id = Column(Integer, nullable=True)     # Tag ID if single_model is True
     
     # Status tracking
     status = Column(String, default=PlaylistStatus.PENDING)

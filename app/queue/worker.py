@@ -10,6 +10,7 @@ from loguru import logger
 from app.database import SessionLocal
 from app.models.queue import Task
 from app.models.generation import Tag, TTSOutput, STTResult
+from app.models.playlist import PlaylistItem, PlaylistItemStatus
 from app.tts.registry import get_tts_engine
 from app.stt.registry import get_stt_engine
 from app.websocket import notification_manager
@@ -133,46 +134,77 @@ class TaskWorker:
             db.close()
 
     async def _handle_tts(self, db: Session, payload: dict, task_id: int, user_id: str = None):
-        engine_name = payload.get("engine")
+        engine_name = payload.get("engine") or payload.get("model_id")
         text = payload.get("text")
         language = payload.get("language", "tr")
         output_path = payload.get("output_path")
         profile_id = payload.get("profile_id")
         profile_path = payload.get("profile_path")
+        playlist_item_id = payload.get("playlist_item_id")
         kwargs = payload.get("kwargs", {})
         
-        engine = get_tts_engine(engine_name)
-        success = await engine.generate_audio(
-            text=text,
-            output_path=output_path,
-            language=language,
-            profile_path=profile_path,
-            user_id=user_id,
-            **kwargs
-        )
+        # Update playlist item status if applicable
+        playlist_item = None
+        if playlist_item_id:
+            playlist_item = db.query(PlaylistItem).filter(PlaylistItem.id == playlist_item_id).first()
+            if playlist_item:
+                playlist_item.status = PlaylistItemStatus.PROCESSING
+                db.commit()
         
-        if success:
-            # Create TTSOutput record
-            tts_record = TTSOutput(
+        try:
+            engine = get_tts_engine(engine_name)
+            success = await engine.generate_audio(
                 text=text,
-                engine=engine_name,
-                profile_id=profile_id,
-                language=language,
                 output_path=output_path,
-                duration_sec=0.0 # Could calculate this if needed
+                language=language,
+                profile_path=profile_path,
+                user_id=user_id,
+                **kwargs
             )
             
-            # Attach tags if any
-            tag_ids = payload.get("tag_ids", [])
-            if tag_ids:
-                tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
-                tts_record.tags = tags
+            if success:
+                # Create TTSOutput record
+                tts_record = TTSOutput(
+                    text=text,
+                    engine=engine_name,
+                    profile_id=profile_id,
+                    language=language,
+                    output_path=output_path,
+                    duration_sec=0.0 # Could calculate this if needed
+                )
                 
-            db.add(tts_record)
-            db.flush()
-            return True, {"output_id": tts_record.id, "output_path": output_path, "text": text[:100]}
-            
-        return False, {"error": "Engine generation failed"}
+                # Attach tags if any
+                tag_ids = payload.get("tag_ids", [])
+                if tag_ids:
+                    tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+                    tts_record.tags = tags
+                    
+                db.add(tts_record)
+                db.flush()
+                
+                # Update playlist item on success
+                if playlist_item:
+                    playlist_item.status = PlaylistItemStatus.COMPLETED
+                    playlist_item.output_path = output_path
+                    db.commit()
+                
+                return True, {"output_id": tts_record.id, "output_path": output_path, "text": text[:100]}
+            else:
+                # Update playlist item on failure
+                if playlist_item:
+                    playlist_item.status = PlaylistItemStatus.FAILED
+                    playlist_item.error_message = "Engine generation failed"
+                    db.commit()
+                return False, {"error": "Engine generation failed"}
+                
+        except Exception as e:
+            logger.error(f"TTS processing error: {e}")
+            # Update playlist item on exception
+            if playlist_item:
+                playlist_item.status = PlaylistItemStatus.FAILED
+                playlist_item.error_message = str(e)
+                db.commit()
+            raise
 
     async def _handle_stt(self, db: Session, payload: dict, task_id: int, user_id: str = None):
         engine_name = payload.get("engine")
@@ -203,6 +235,43 @@ class TaskWorker:
             return True, {"result_id": stt_record.id, "transcript": result_text[:200]}
             
         return False, {"error": result_text}
+
+
+def submit_tts_task(text: str, model_id: str, profile_id: int = None, user_id: int = None, playlist_item_id: int = None) -> Task:
+    """
+    Submit a TTS task to the queue.
+    
+    Args:
+        text: Text to synthesize
+        model_id: TTS model identifier
+        profile_id: Optional voice profile ID
+        user_id: User ID for the task
+        playlist_item_id: Optional playlist item ID to update status
+        
+    Returns:
+        Created Task object
+    """
+    db = SessionLocal()
+    try:
+        task = Task(
+            task_type="tts",
+            status="pending",
+            user_id=user_id,
+            params={
+                "text": text,
+                "model_id": model_id,
+                "profile_id": profile_id,
+                "playlist_item_id": playlist_item_id
+            }
+        )
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        logger.info(f"Submitted TTS task {task.id} for playlist item {playlist_item_id}")
+        return task
+    finally:
+        db.close()
+
 
 # Global worker instance
 worker = TaskWorker()

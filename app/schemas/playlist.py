@@ -49,6 +49,7 @@ class PlaylistBase(BaseModel):
     use_single_model: bool = False
     single_model_id: Optional[str] = None
     single_profile_id: Optional[int] = None
+    single_tag_id: Optional[int] = None
 
 
 class PlaylistCreate(PlaylistBase):
@@ -63,6 +64,7 @@ class PlaylistUpdate(BaseModel):
     use_single_model: Optional[bool] = None
     single_model_id: Optional[str] = None
     single_profile_id: Optional[int] = None
+    single_tag_id: Optional[int] = None
 
 
 class PlaylistResponse(PlaylistBase):

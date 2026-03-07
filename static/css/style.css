@@ -67,15 +67,57 @@ nav button.settings-tab.active {
     font-weight: 700;
 }
 
-/* Tom Select Dark Mode */
+/* Tom Select Dark Mode - Comprehensive */
 .ts-control {
     background-color: hsl(var(--background)) !important;
     border-color: hsl(var(--border)) !important;
     color: hsl(var(--foreground)) !important;
+    box-shadow: none !important;
+}
+
+/* Tom Select wrapper */
+.ts-wrapper {
+    background-color: hsl(var(--background)) !important;
+}
+
+.ts-wrapper.single .ts-control {
+    background-color: hsl(var(--background)) !important;
+}
+
+/* Multi-select control */
+.ts-wrapper.multi .ts-control {
+    background-color: hsl(var(--background)) !important;
+}
+
+/* Input inside ts-control */
+.ts-control > input {
+    background-color: transparent !important;
+    color: hsl(var(--foreground)) !important;
+}
+
+.ts-control > input::placeholder {
+    color: hsl(var(--muted-foreground)) !important;
 }
 
 .ts-control input {
     color: hsl(var(--foreground)) !important;
+    background-color: transparent !important;
+}
+
+.ts-control input::placeholder {
+    color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Tom Select focus state */
+.ts-control.focus {
+    border-color: hsl(var(--ring)) !important;
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
+}
+
+/* Tom Select disabled state */
+.ts-control.disabled {
+    background-color: hsl(var(--muted)) !important;
+    opacity: 0.5 !important;
 }
 
 .ts-dropdown {
@@ -94,29 +136,245 @@ nav button.settings-tab.active {
     color: hsl(var(--accent-foreground)) !important;
 }
 
+.ts-dropdown .option.selected {
+    background-color: hsl(var(--primary) / 0.1) !important;
+    color: hsl(var(--primary)) !important;
+}
+
 .ts-dropdown .no-results {
     color: hsl(var(--muted-foreground)) !important;
 }
 
-.ts-control .item {
-    background-color: hsl(var(--primary) / 0.1) !important;
+/* Tom Select dropdown in dark mode */
+.ts-dropdown {
+    background-color: hsl(var(--popover)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--popover-foreground)) !important;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3) !important;
+    z-index: 1000 !important;
+}
+
+/* Tom Select dropdown content */
+.ts-dropdown-content {
+    background-color: hsl(var(--popover)) !important;
+}
+
+/* Tom Select create option styling */
+.ts-dropdown .create {
     color: hsl(var(--primary)) !important;
-    border: 1px solid hsl(var(--primary) / 0.2) !important;
+    background-color: transparent !important;
+}
+
+.ts-dropdown .create strong {
+    color: hsl(var(--primary)) !important;
+}
+
+/* Active/selected item in dropdown */
+.ts-dropdown .active {
+    background-color: hsl(var(--accent)) !important;
+    color: hsl(var(--accent-foreground)) !important;
+}
+
+/* Selected item in control */
+.ts-control .item.active {
+    background-color: hsl(var(--primary) / 0.15) !important;
+    color: hsl(var(--primary)) !important;
+}
+
+/* Plugin: dropdown_input */
+.ts-dropdown .dropdown-input {
+    background-color: hsl(var(--background)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+}
+
+/* Plugin: dropdown_input focus */
+.ts-dropdown .dropdown-input:focus {
+    border-color: hsl(var(--ring)) !important;
+    outline: none !important;
+}
+
+.ts-control .item {
+    background-color: hsl(var(--primary) / 0.15) !important;
+    color: hsl(var(--primary)) !important;
+    border: 1px solid hsl(var(--primary) / 0.3) !important;
+    border-radius: 4px !important;
 }
 
 .ts-control .remove {
     color: hsl(var(--primary)) !important;
-    border-left-color: hsl(var(--primary) / 0.2) !important;
+    border-left-color: hsl(var(--primary) / 0.3) !important;
+    border-radius: 0 3px 3px 0 !important;
 }
 
 .ts-control .remove:hover {
-    background-color: hsl(var(--primary) / 0.2) !important;
+    background-color: hsl(var(--primary) / 0.25) !important;
+}
+
+/* Single select mode styling */
+.ts-control.single .item {
+    background-color: transparent !important;
+    border: none !important;
+    color: hsl(var(--foreground)) !important;
+}
+
+/* Clear button styling */
+.ts-control .clear-button {
+    color: hsl(var(--muted-foreground)) !important;
+}
+
+.ts-control .clear-button:hover {
+    color: hsl(var(--foreground)) !important;
 }
 
 /* Dark mode select override */
 .dark-mode-select .ts-control {
     background-color: hsl(var(--background)) !important;
     border-color: hsl(var(--border)) !important;
+}
+
+/* File Upload Component */
+.file-upload-zone {
+    border: 2px dashed hsl(var(--border));
+    border-radius: 0.75rem;
+    background-color: hsl(var(--muted) / 0.3);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.file-upload-zone:hover {
+    border-color: hsl(var(--primary) / 0.5);
+    background-color: hsl(var(--primary) / 0.05);
+}
+
+.file-upload-zone.drag-over {
+    border-color: hsl(var(--primary));
+    background-color: hsl(var(--primary) / 0.1);
+    transform: scale(1.02);
+}
+
+.file-upload-zone.has-file {
+    border-style: solid;
+    border-color: hsl(var(--primary) / 0.3);
+    background-color: hsl(var(--primary) / 0.05);
+}
+
+.file-upload-icon {
+    width: 3rem;
+    height: 3rem;
+    color: hsl(var(--muted-foreground));
+    transition: color 0.2s ease;
+}
+
+.file-upload-zone:hover .file-upload-icon,
+.file-upload-zone.drag-over .file-upload-icon {
+    color: hsl(var(--primary));
+}
+
+.file-upload-zone.has-file .file-upload-icon {
+    color: hsl(var(--primary));
+}
+
+.file-upload-text {
+    color: hsl(var(--foreground));
+    font-weight: 500;
+}
+
+.file-upload-hint {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875rem;
+}
+
+.file-upload-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+}
+
+/* Hide native file input completely - Aggressive hiding */
+input[type="file"].file-upload-native,
+input[type="file"][id*="_input"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    position: absolute !important;
+    width: 0 !important;
+    height: 0 !important;
+    pointer-events: none !important;
+    z-index: -9999 !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    border: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+}
+
+/* Hide any file input that might be rendered by browser */
+input[type="file"]::-webkit-file-upload-button,
+input[type="file"]::file-selector-button {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.file-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background-color: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+}
+
+.file-preview-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: hsl(var(--primary) / 0.1);
+    border-radius: 0.5rem;
+    color: hsl(var(--primary));
+}
+
+.file-preview-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-preview-name {
+    font-weight: 500;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-preview-size {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.file-preview-remove {
+    padding: 0.375rem;
+    color: hsl(var(--muted-foreground));
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+}
+
+.file-preview-remove:hover {
+    color: hsl(var(--destructive));
+    background-color: hsl(var(--destructive) / 0.1);
 }
 
 /* Badge Colors */
