@@ -23,6 +23,7 @@ class BaseTTS(ABC):
         output_path: str, 
         language: str = "tr", 
         profile_path: Optional[str] = None,
+        user_id: Optional[str] = None,
         **kwargs
     ) -> bool:
         """

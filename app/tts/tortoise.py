@@ -108,6 +108,7 @@ class TortoiseEngine(BaseTTS):
         output_path: str, 
         language: str = "en", # Defaulting to en for Tortoise
         profile_path: Optional[str] = None,
+        user_id: Optional[str] = None,
         **kwargs
     ) -> bool:
         """Run Tortoise generation asynchronously in a separate thread/process to avoid blocking API."""

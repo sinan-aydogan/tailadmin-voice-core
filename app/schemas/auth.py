@@ -28,5 +28,16 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     created_at: datetime
+    theme: Optional[str] = "light"
+    language: Optional[str] = "tr"
 
     model_config = ConfigDict(from_attributes=True)
+
+# User preferences schemas
+class UserPreferencesResponse(BaseModel):
+    theme: str
+    language: str
+
+class UserPreferencesUpdate(BaseModel):
+    theme: Optional[str] = None
+    language: Optional[str] = None

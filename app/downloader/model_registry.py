@@ -3,6 +3,34 @@ Registry of available models for download.
 """
 from typing import List, Dict
 
+# Model categories for tabbed UI
+MODEL_CATEGORIES = {
+    "tts": {
+        "label": "TTS",
+        "label_tr": "Metin Okuma",
+        "description": "Text-to-Speech models",
+        "icon": "volume-2"
+    },
+    "stt": {
+        "label": "STT", 
+        "label_tr": "Sesten Metne",
+        "description": "Speech-to-Text models",
+        "icon": "mic"
+    },
+    "music": {
+        "label": "MUSIC",
+        "label_tr": "Müzik",
+        "description": "AI Music Generation models",
+        "icon": "music"
+    },
+    "llm": {
+        "label": "LLM",
+        "label_tr": "Dil Modeli",
+        "description": "Large Language Models for text generation",
+        "icon": "brain"
+    }
+}
+
 # Hardcoded list of supported models for the MVP
 AVAILABLE_MODELS = [
     {
@@ -124,14 +152,71 @@ AVAILABLE_MODELS = [
         "description": "Best accuracy, slowest.",
         "size_estimate_mb": 6000,
         "languages": ["multilingual"]
+    },
+    # LLM Models - Optimized for MacBook M4 Pro 24GB RAM
+    {
+        "id": "qwen2.5-7b-instruct",
+        "engine": "llm",
+        "name": "Qwen 2.5 7B Instruct",
+        "type": "llm",
+        "repo_id": "Qwen/Qwen2.5-7B-Instruct",
+        "description": "Alibaba's powerful multilingual LLM. Excellent for Turkish, English, and many other languages. Supports long context up to 128K tokens.",
+        "size_estimate_mb": 15000,
+        "languages": ["tr", "en", "zh", "ar", "de", "es", "fr", "it", "ja", "ko", "pt", "ru", "vi"],
+        "context_length": 32768,
+        "quantization": "Q4_K_M",
+        "ram_required_gb": 8,
+        "capabilities": ["chat", "text-generation", "translation", "summarization", "code"]
+    },
+    {
+        "id": "llama-3.1-8b-instruct",
+        "engine": "llm",
+        "name": "Llama 3.1 8B Instruct",
+        "type": "llm",
+        "repo_id": "unsloth/Llama-3.1-8B-Instruct",
+        "description": "Meta's Llama 3.1 model (via Unsloth). Strong reasoning and multilingual capabilities. Great for conversation and content creation.",
+        "size_estimate_mb": 16000,
+        "languages": ["en", "de", "fr", "it", "pt", "es", "tr", "ar", "hi", "th", "vi"],
+        "context_length": 128000,
+        "quantization": "Q4_K_M",
+        "ram_required_gb": 9,
+        "capabilities": ["chat", "text-generation", "reasoning", "code", "tool-use"]
+    },
+    {
+        "id": "mistral-7b-instruct-v0.3",
+        "engine": "llm",
+        "name": "Mistral 7B Instruct v0.3",
+        "type": "llm",
+        "repo_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "description": "Efficient and fast French-made LLM. Excellent performance for its size. Great for chat and creative writing.",
+        "size_estimate_mb": 15000,
+        "languages": ["en", "fr", "de", "es", "it", "pt", "tr", "ar", "zh", "ja", "ko"],
+        "context_length": 32768,
+        "quantization": "Q4_K_M",
+        "ram_required_gb": 8,
+        "capabilities": ["chat", "text-generation", "code", "reasoning"]
     }
 ]
 
 def get_available_models() -> List[Dict]:
+    """Get all available models."""
     return AVAILABLE_MODELS
 
+def get_models_by_type(model_type: str) -> List[Dict]:
+    """Get models filtered by type (tts, stt, music, llm)."""
+    return [m for m in AVAILABLE_MODELS if m.get("type") == model_type]
+
 def get_model_info(model_id: str) -> Dict:
+    """Get detailed info for a specific model."""
     for model in AVAILABLE_MODELS:
         if model["id"] == model_id:
             return model
     return None
+
+def get_model_categories() -> Dict:
+    """Get model category definitions for UI."""
+    return MODEL_CATEGORIES
+
+def get_llm_models() -> List[Dict]:
+    """Get only LLM models."""
+    return get_models_by_type("llm")

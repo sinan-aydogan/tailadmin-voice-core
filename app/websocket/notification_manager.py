@@ -38,6 +38,11 @@ class NotificationType(str, Enum):
     STT_COMPLETED = "stt_completed"
     STT_FAILED = "stt_failed"
     
+    # MusicGen specific
+    MUSICGEN_STARTED = "musicgen_started"
+    MUSICGEN_COMPLETED = "musicgen_completed"
+    MUSICGEN_FAILED = "musicgen_failed"
+    
     # System notifications
     SYSTEM_INFO = "system_info"
     SYSTEM_WARNING = "system_warning"
@@ -316,6 +321,58 @@ class NotificationManager:
             message=f"Görev #{task_id} başarısız oldu: {error}",
             data={"task_id": task_id, "task_type": task_type, "error": error},
             priority=NotificationPriority.HIGH
+        )
+    
+    # MusicGen specific notifications
+    async def notify_musicgen_started(self, user_id: str, text: str, model_size: str):
+        """Notify that MusicGen generation has started."""
+        await self.send_notification(
+            user_id=user_id,
+            notification_type=NotificationType.MUSICGEN_STARTED,
+            title="Müzik Üretimi Başladı",
+            message=f"'{text[:50]}...' için müzik üretiliyor",
+            data={"text": text, "model_size": model_size, "status": "started"},
+            priority=NotificationPriority.NORMAL
+        )
+    
+    def notify_musicgen_started_threadsafe(self, user_id: str, text: str, model_size: str):
+        """Thread-safe version for notifying MusicGen start."""
+        self._run_coroutine_threadsafe(
+            self.notify_musicgen_started(user_id, text, model_size)
+        )
+    
+    async def notify_musicgen_completed(self, user_id: str, text: str, model_size: str, output_path: str):
+        """Notify that MusicGen generation has completed."""
+        await self.send_notification(
+            user_id=user_id,
+            notification_type=NotificationType.MUSICGEN_COMPLETED,
+            title="Müzik Üretimi Tamamlandı",
+            message=f"'{text[:50]}...' için müzik başarıyla üretildi",
+            data={"text": text, "model_size": model_size, "output_path": output_path, "status": "completed"},
+            priority=NotificationPriority.NORMAL
+        )
+    
+    def notify_musicgen_completed_threadsafe(self, user_id: str, text: str, model_size: str, output_path: str):
+        """Thread-safe version for notifying MusicGen completion."""
+        self._run_coroutine_threadsafe(
+            self.notify_musicgen_completed(user_id, text, model_size, output_path)
+        )
+    
+    async def notify_musicgen_failed(self, user_id: str, text: str, model_size: str, error: str):
+        """Notify that MusicGen generation has failed."""
+        await self.send_notification(
+            user_id=user_id,
+            notification_type=NotificationType.MUSICGEN_FAILED,
+            title="Müzik Üretimi Başarısız",
+            message=f"'{text[:50]}...' için müzik üretilemedi: {error}",
+            data={"text": text, "model_size": model_size, "error": error, "status": "failed"},
+            priority=NotificationPriority.HIGH
+        )
+    
+    def notify_musicgen_failed_threadsafe(self, user_id: str, text: str, model_size: str, error: str):
+        """Thread-safe version for notifying MusicGen failure."""
+        self._run_coroutine_threadsafe(
+            self.notify_musicgen_failed(user_id, text, model_size, error)
         )
     
     def get_user_notifications(self, user_id: str, unread_only: bool = False) -> List[Dict]:

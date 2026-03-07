@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr" class="light">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Core - AI Ses Yönetimi</title>
+    <title>Voice Core - AI Ses Yönetim Sistemi</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -197,6 +197,18 @@
                 </div>
                 
                 <div class="flex items-center gap-3">
+                    <!-- Version Badge -->
+                    <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-xs text-muted-foreground">
+                        <i data-lucide="git-branch" class="w-3 h-3"></i>
+                        <span>v1.0.0</span>
+                    </div>
+                    
+                    <!-- WebSocket Status -->
+                    <div id="headerWsStatus" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-xs" title="WebSocket Bağlantı Durumu">
+                        <span id="headerWsIndicator" class="w-2 h-2 rounded-full bg-muted-foreground"></span>
+                        <span id="headerWsText" class="text-muted-foreground">Bağlanıyor...</span>
+                    </div>
+                    
                     <!-- Theme Toggle -->
                     <button id="themeToggle" class="p-2 rounded-lg hover:bg-accent transition-colors">
                         <i data-lucide="moon" class="w-5 h-5 hidden dark:block"></i>
@@ -290,6 +302,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="js/i18n.js"></script>
     <script src="js/api.js?v=2"></script>
     <script src="js/websocket.js"></script>
     <script src="js/notifications.js"></script>

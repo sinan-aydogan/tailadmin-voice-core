@@ -126,6 +126,17 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 | API | 5001 | FastAPI backend |
 | UI | 5002 | Web arayüzü |
 
+### 🔐 Varsayılan Giriş Bilgileri
+
+Uygulama ilk başlatıldığında otomatik olarak oluşturulan varsayılan kullanıcı:
+
+| Alan | Değer |
+|------|-------|
+| **Kullanıcı Adı** | `tailadmin.dev` |
+| **Şifre** | `admin` |
+
+> ⚠️ **Güvenlik:** İlk girişten sonra şifrenizi değiştirmeniz önemle tavsiye edilir!
+
 ### 📚 Dokümantasyon
 
 - [DOCKER.md](DOCKER.md) - Docker kurulum ve kullanım kılavuzu
@@ -246,6 +257,17 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 |---------|------|-------------|
 | API | 5001 | FastAPI backend |
 | UI | 5002 | Web interface |
+
+### 🔐 Default Login Credentials
+
+Default user automatically created on first startup:
+
+| Field | Value |
+|-------|-------|
+| **Username** | `tailadmin.dev` |
+| **Password** | `admin` |
+
+> ⚠️ **Security:** Please change your password after the first login!
 
 ### 📚 Documentation
 

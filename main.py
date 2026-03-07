@@ -7,6 +7,7 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.docs import get_swagger_ui_html
 from loguru import logger
 
 from app.config import settings
@@ -23,6 +24,7 @@ from app.routers.queue_router import router as queue_router
 from app.routers.settings_router import router as settings_router
 from app.routers.logs_router import router as logs_router
 from app.routers.tags_router import router as tags_router
+from app.routers.llm_router import router as llm_router
 from app.queue.worker import worker
 from app.websocket import manager, notification_manager
 import asyncio
@@ -79,8 +81,63 @@ app = FastAPI(
     title="TailAdmin Voice Core API",
     description="Multilingual Voice Cloning, TTS & STT Backend",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None,  # Disable default docs to use custom dark mode swagger
+    redoc_url=None
 )
+
+# Custom Swagger UI with dark mode support
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} - Swagger UI",
+        swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js",
+        swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css",
+        swagger_favicon_url="/static/favicon.ico",
+        init_oauth={},
+        swagger_ui_parameters={
+            "syntaxHighlight.theme": "monokai",
+            "tryItOutEnabled": True,
+            "persistAuthorization": True,
+        }
+    )
+
+# Dark mode CSS injection for Swagger
+@app.get("/docs-dark.css", include_in_schema=False)
+async def swagger_dark_css():
+    from fastapi.responses import PlainTextResponse
+    css = '''
+    /* Swagger Dark Mode */
+    html, body { background-color: #0f172a !important; }
+    .swagger-ui { background-color: #0f172a; filter: invert(88%) hue-rotate(180deg); }
+    .swagger-ui .topbar { display: none; }
+    .swagger-ui .info .title { color: #3b4151; }
+    .swagger-ui .scheme-container { background: #1e293b; }
+    .swagger-ui .opblock .opblock-summary-method { background: #3b4151; }
+    .swagger-ui .opblock { background: #1e293b; border-color: #334155; }
+    .swagger-ui .opblock .opblock-summary { border-color: #334155; }
+    .swagger-ui .btn { background: #3b82f6; color: white; }
+    .swagger-ui select { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+    .swagger-ui input[type=text] { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+    .swagger-ui textarea { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+    .swagger-ui .model-box { background: #1e293b; }
+    .swagger-ui .model { color: #e2e8f0; }
+    .swagger-ui .prop-type { color: #60a5fa; }
+    .swagger-ui .response-content-type { color: #e2e8f0; }
+    .swagger-ui table thead tr th { color: #e2e8f0; border-bottom-color: #334155; }
+    .swagger-ui table tbody tr td { color: #cbd5e1; border-bottom-color: #334155; }
+    .swagger-ui .parameter__name { color: #e2e8f0; }
+    .swagger-ui .parameter__type { color: #94a3b8; }
+    .swagger-ui .opblock-description-wrapper p { color: #cbd5e1; }
+    .swagger-ui .responses-inner h4 { color: #e2e8f0; }
+    .swagger-ui .responses-inner .response-col_status { color: #e2e8f0; }
+    .swagger-ui .microlight { filter: invert(100%) hue-rotate(180deg); }
+    .swagger-ui .curl-command { filter: invert(100%) hue-rotate(180deg); }
+    .swagger-ui .highlight-code { filter: invert(100%) hue-rotate(180deg); }
+    .swagger-ui .opblock-body pre.microlight { background: #1e1e1e !important; }
+    '''
+    return PlainTextResponse(content=css, media_type="text/css")
 
 # CORS configuration
 app.add_middleware(
@@ -101,6 +158,7 @@ app.include_router(queue_router)
 app.include_router(settings_router)
 app.include_router(logs_router)
 app.include_router(tags_router)
+app.include_router(llm_router)
 
 # Serve data directory for audio/model files
 app.mount("/data", StaticFiles(directory="data"), name="data")
@@ -152,8 +210,9 @@ async def websocket_notifications(websocket: WebSocket, token: str = None):
         # Keep the connection alive and handle incoming messages
         while True:
             try:
-                # Wait for messages from client (ping/acknowledgments)
-                data = await websocket.receive_json()
+                # Wait for messages from client with timeout
+                import asyncio
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=60.0)
                 
                 # Handle client messages
                 if data.get("action") == "ping":
@@ -167,8 +226,19 @@ async def websocket_notifications(websocket: WebSocket, token: str = None):
                 elif data.get("action") == "clear_notifications":
                     notification_manager.clear_notifications(user_id)
                     
+            except asyncio.TimeoutError:
+                # Send ping to keep connection alive
+                try:
+                    await websocket.send_json({"event": "ping"})
+                except Exception:
+                    break
             except Exception as e:
-                logger.error(f"Error handling WebSocket message: {e}")
+                error_code = getattr(e, 'code', None)
+                # 1001 is normal closure (page refresh, navigation)
+                if error_code == 1001:
+                    logger.debug(f"WebSocket normal closure for user {user_id}")
+                else:
+                    logger.error(f"Error handling WebSocket message: {e}")
                 break
                 
     except WebSocketDisconnect:

@@ -206,6 +206,19 @@ class ApiClient {
     async deleteHFToken() {
         return this.request('/settings/hf-token', 'DELETE');
     }
+
+    // Secret Key
+    async getSecretKeyStatus() {
+        return this.request('/settings/secret-key/status');
+    }
+
+    async updateSecretKey(secretKey) {
+        return this.request('/settings/secret-key/update', 'POST', { secret_key: secretKey });
+    }
+
+    async deleteSecretKey() {
+        return this.request('/settings/secret-key', 'DELETE');
+    }
 }
 
 const api = new ApiClient();

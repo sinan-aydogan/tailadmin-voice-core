@@ -147,6 +147,7 @@ class TaskWorker:
             output_path=output_path,
             language=language,
             profile_path=profile_path,
+            user_id=user_id,
             **kwargs
         )
         

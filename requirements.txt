@@ -1,10 +1,11 @@
 fastapi>=0.110.0
-uvicorn>=0.27.0
+uvicorn[standard]>=0.27.0  # Includes websockets and wsproto for WebSocket support
 sqlalchemy>=2.0.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.0
+cryptography>=41.0.0
 python-multipart
 aiofiles
 httpx
@@ -25,7 +26,7 @@ suno-bark
 # Pinned dependencies to resolve conflicts
 bangla<0.0.5  # Fixed Python 3.10 syntax error on Python 3.9
 transformers>=4.33.0,<4.40.0  # Compatible with TTS>=0.22.0
-bcrypt>=3.2.0  # Resolves passlib ValueError on password length detection
+bcrypt>=3.2.0,<4.0.0  # Resolves passlib ValueError on password length detection and bcrypt 4.x compatibility issues
 
 
 # STT Engines

@@ -39,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (api.token) {
             try {
                 currentUser = await api.getMe();
+                
+                // Load user preferences (theme and language)
+                await i18n.init();
+                
                 showApp();
                 handleRoute();
                 
@@ -117,6 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const hash = window.location.hash || '#dashboard';
         const page = hash.substring(1).split('?')[0];
         
+        // Parse URL parameters
+        const urlParams = new URLSearchParams(hash.split('?')[1] || '');
+        const tabParam = urlParams.get('tab');
+        
         // Update active sidebar item
         document.querySelectorAll('.sidebar-item').forEach(item => {
             item.classList.remove('active');
@@ -124,6 +132,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.classList.add('active');
             }
         });
+
+        // Set tab from URL parameter if available
+        if (tabParam) {
+            if (page === 'models' && ['all', 'tts', 'stt', 'music', 'llm'].includes(tabParam)) {
+                currentModelTab = tabParam;
+            } else if (page === 'settings' && ['general', 'api', 'services'].includes(tabParam)) {
+                currentSettingsTab = tabParam;
+            }
+        }
 
         // Render page
         if (routes[page]) {
@@ -459,16 +476,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="card-content space-y-6">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="space-y-2">
-                                        <label class="text-sm font-medium">Ses Profili *</label>
-                                        <select id="ttsProfile" required class="input">
-                                            <option value="">Profil seçin...</option>
-                                            ${profiles.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    
-                                    <div class="space-y-2">
-                                        <label class="text-sm font-medium">TTS Motoru</label>
-                                        <select id="ttsEngine" class="input" onchange="toggleMusicGenDuration()">
+                                        <label class="text-sm font-medium">TTS Motoru *</label>
+                                        <select id="ttsEngine" class="input" required onchange="onTtsEngineChange()">
+                                            <option value="">Motor seçin...</option>
                                             ${readyEngines.includes('xtts') ? '<option value="xtts">XTTS V2</option>' : ''}
                                             ${readyEngines.includes('bark') ? '<option value="bark">Bark</option>' : ''}
                                             ${readyEngines.includes('tortoise') ? '<option value="tortoise">Tortoise</option>' : ''}
@@ -486,8 +496,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                         ` : ''}
                                     </div>
                                     
+                                    <div class="space-y-2" id="profileSelectContainer">
+                                        <label class="text-sm font-medium">Ses Profili <span id="profileRequired" class="text-destructive">*</span></label>
+                                        <select id="ttsProfile" class="input">
+                                            <option value="">Profil seçin...</option>
+                                            ${profiles.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    
                                     <!-- MusicGen Duration Selector -->
-                                    <div id="musicGenDurationContainer" class="space-y-2" style="display: none;">
+                                    <div id="musicGenDurationContainer" class="space-y-2 md:col-span-2" style="display: none;">
                                         <label class="text-sm font-medium">Müzik Süresi (saniye)</label>
                                         <select id="musicGenDuration" class="input">
                                             <option value="256">5 saniye</option>
@@ -501,7 +519,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
 
                                 <div class="space-y-2">
-                                    <label class="text-sm font-medium">Etiketler</label>
+                                    <div class="flex items-center justify-between">
+                                        <label class="text-sm font-medium">Etiketler</label>
+                                        <button type="button" onclick="showTagManagerModal()" class="text-xs text-primary hover:underline">
+                                            <i data-lucide="settings" class="w-3 h-3 inline mr-1"></i>
+                                            Etiketleri Yönet
+                                        </button>
+                                    </div>
                                     <select id="ttsTags" multiple class="w-full">
                                         ${tags.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
                                     </select>
@@ -532,12 +556,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            // Initialize Tom Select for tags
+            // Initialize Tom Select for tags with dark mode support
             if (document.getElementById('ttsTags')) {
-                new TomSelect('#ttsTags', {
+                const tagSelect = new TomSelect('#ttsTags', {
                     plugins: ['remove_button'],
-                    placeholder: 'Etiket seçin...'
+                    placeholder: 'Etiket seçin...',
+                    create: false,
+                    onType: function(str) {
+                        // Store current input for create modal
+                        tagSelect.currentInput = str;
+                    },
+                    onKeyDown: function(e) {
+                        // Handle Enter key when no option is selected
+                        if (e.keyCode === 13) {
+                            const input = tagSelect.control_input.value.trim();
+                            const options = tagSelect.options;
+                            let exists = false;
+                            
+                            for (let key in options) {
+                                if (options[key].text.toLowerCase() === input.toLowerCase()) {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (input && !exists) {
+                                e.preventDefault();
+                                showCreateTagModal(input);
+                            }
+                        }
+                    },
+                    render: {
+                        option: function(data, escape) {
+                            return '<div class="px-3 py-2 hover:bg-accent cursor-pointer">' + escape(data.text) + '</div>';
+                        },
+                        item: function(data, escape) {
+                            return '<div class="px-2 py-1 bg-primary/10 text-primary rounded text-sm">' + escape(data.text) + '</div>';
+                        },
+                        no_results: function(data, escape) {
+                            const input = tagSelect.control_input.value.trim();
+                            return '<div class="px-3 py-2 text-muted-foreground cursor-pointer hover:bg-accent" onclick="showCreateTagModal(\'' + escape(input) + '\')">' +
+                                   '<i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>' +
+                                   '"' + escape(input) + '" etiketini oluştur' +
+                                   '</div>';
+                        }
+                    }
                 });
+                
+                // Apply dark mode styles to Tom Select
+                const tsControl = document.querySelector('#ttsTags').nextElementSibling;
+                if (tsControl) {
+                    tsControl.classList.add('dark-mode-select');
+                }
             }
 
             lucide.createIcons();
@@ -604,24 +674,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    window.toggleMusicGenDuration = () => {
+    window.onTtsEngineChange = () => {
         const engine = document.getElementById('ttsEngine')?.value || '';
         const durationContainer = document.getElementById('musicGenDurationContainer');
+        const profileContainer = document.getElementById('profileSelectContainer');
+        const profileSelect = document.getElementById('ttsProfile');
+        const profileRequired = document.getElementById('profileRequired');
         
+        // Show/hide duration selector for MusicGen
         if (engine.startsWith('musicgen')) {
             durationContainer.style.display = 'block';
         } else {
             durationContainer.style.display = 'none';
         }
+        
+        // Make profile optional for MusicGen models
+        if (engine.startsWith('musicgen')) {
+            profileContainer.style.opacity = '0.6';
+            profileSelect.required = false;
+            profileRequired.style.display = 'none';
+        } else {
+            profileContainer.style.opacity = '1';
+            profileSelect.required = true;
+            profileRequired.style.display = 'inline';
+        }
     };
+
+    // Keep old function name for backward compatibility
+    window.toggleMusicGenDuration = window.onTtsEngineChange;
 
     window.submitTts = async () => {
         const profileId = document.getElementById('ttsProfile').value;
         const text = document.getElementById('ttsText').value;
-        const engine = document.getElementById('ttsEngine')?.value || 'xtts';
+        const engine = document.getElementById('ttsEngine')?.value || '';
         
-        if (!profileId || !text) {
-            notificationSystem?.showToast('Lütfen profil ve metin girin', 'warning');
+        // Validate engine is selected
+        if (!engine) {
+            notificationSystem?.showToast('Lütfen bir TTS motoru seçin', 'warning');
+            return;
+        }
+        
+        // Validate text
+        if (!text) {
+            notificationSystem?.showToast('Lütfen metin girin', 'warning');
+            return;
+        }
+        
+        // Profile is required only for non-MusicGen engines
+        const isMusicGen = engine.startsWith('musicgen');
+        if (!isMusicGen && !profileId) {
+            notificationSystem?.showToast('Lütfen ses profili seçin', 'warning');
             return;
         }
 
@@ -637,10 +739,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Prepare request payload
             const payload = {
                 text,
-                profile_id: parseInt(profileId),
                 engine,
                 tag_ids: tagIds.map(id => parseInt(id))
             };
+            
+            // Add profile_id only if selected (optional for MusicGen)
+            if (profileId) {
+                payload.profile_id = parseInt(profileId);
+            }
             
             // Add MusicGen duration if applicable
             if (engine.startsWith('musicgen')) {
@@ -674,6 +780,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ==================== Models ====================
+    // Model category definitions
+    const MODEL_CATEGORIES = {
+        'tts': { label: 'TTS', label_tr: 'Metin Okuma', icon: 'volume-2', color: 'blue' },
+        'stt': { label: 'STT', label_tr: 'Sesten Metne', icon: 'mic', color: 'green' },
+        'music': { label: 'MUSIC', label_tr: 'Müzik', icon: 'music', color: 'purple' },
+        'llm': { label: 'LLM', label_tr: 'Dil Modeli', icon: 'brain', color: 'orange' }
+    };
+
+    let currentModelTab = 'all';
+
     async function renderModels() {
         mainContent.innerHTML = renderLoading();
 
@@ -690,6 +806,31 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                     </div>
 
+                    <!-- Category Tabs -->
+                    <div class="border-b border-border">
+                        <nav class="flex space-x-8 -mb-[2px]" aria-label="Model Categories">
+                            <button onclick="switchModelTab('all')" 
+                                class="model-tab ${currentModelTab === 'all' ? 'active' : ''} pb-4 px-1 font-medium text-sm relative z-10"
+                                data-tab="all">
+                                <span class="flex items-center gap-2">
+                                    <i data-lucide="layers" class="w-4 h-4"></i>
+                                    Tümü
+                                </span>
+                            </button>
+                            ${Object.entries(MODEL_CATEGORIES).map(([key, cat]) => `
+                                <button onclick="switchModelTab('${key}')" 
+                                    class="model-tab ${currentModelTab === key ? 'active' : ''} pb-4 px-1 font-medium text-sm relative z-10"
+                                    data-tab="${key}">
+                                    <span class="flex items-center gap-2">
+                                        <i data-lucide="${cat.icon}" class="w-4 h-4"></i>
+                                        ${cat.label_tr}
+                                    </span>
+                                </button>
+                            `).join('')}
+                        </nav>
+                    </div>
+
+                    <!-- Models Table -->
                     <div class="card">
                         <div class="table-container">
                             <table class="table">
@@ -702,35 +843,17 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <th>İşlem</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    ${models.map(m => `
-                                        <tr>
-                                            <td>
-                                                <div class="flex items-center gap-3">
-                                                    <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                                        <i data-lucide="${m.type === 'tts' ? 'volume-2' : 'mic'}" class="w-5 h-5 text-primary"></i>
-                                                    </div>
-                                                    <div>
-                                                        <p class="font-medium">${m.name}</p>
-                                                        <p class="text-xs text-muted-foreground">${m.id}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span class="badge badge-secondary text-xs">${m.type.toUpperCase()}</span>
-                                            </td>
-                                            <td class="text-muted-foreground">${m.size_estimate_mb} MB</td>
-                                            <td>
-                                                ${renderModelStatus(m)}
-                                            </td>
-                                            <td>
-                                                ${renderModelActions(m)}
-                                            </td>
-                                        </tr>
-                                    `).join('')}
+                                <tbody id="modelsTableBody">
+                                    ${renderModelsTable(models, currentModelTab)}
                                 </tbody>
                             </table>
                         </div>
+                        ${getFilteredModels(models, currentModelTab).length === 0 ? `
+                            <div class="p-8 text-center text-muted-foreground">
+                                <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-4 opacity-50"></i>
+                                <p>Bu kategoride model bulunmamaktadır.</p>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -739,6 +862,63 @@ document.addEventListener('DOMContentLoaded', () => {
             mainContent.innerHTML = renderError(e.message);
         }
     }
+
+    function getFilteredModels(models, tab) {
+        if (tab === 'all') return models;
+        return models.filter(m => m.type === tab);
+    }
+
+    function renderModelsTable(models, tab) {
+        const filtered = getFilteredModels(models, tab);
+        
+        if (filtered.length === 0) return '';
+        
+        return filtered.map(m => {
+            const cat = MODEL_CATEGORIES[m.type] || { icon: 'box', color: 'gray' };
+            return `
+                <tr>
+                    <td>
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-${cat.color}-100 flex items-center justify-center">
+                                <i data-lucide="${cat.icon}" class="w-5 h-5 text-${cat.color}-600"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium">${m.name}</p>
+                                <p class="text-xs text-muted-foreground">${m.id}</p>
+                                ${m.description ? `<p class="text-xs text-muted-foreground mt-1 max-w-md truncate">${m.description}</p>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-${cat.color} text-xs">${cat.label}</span>
+                    </td>
+                    <td class="text-muted-foreground">${formatFileSize(m.size_estimate_mb)}</td>
+                    <td>
+                        ${renderModelStatus(m)}
+                    </td>
+                    <td>
+                        ${renderModelActions(m)}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function formatFileSize(mb) {
+        if (mb >= 1000) {
+            return (mb / 1000).toFixed(1) + ' GB';
+        }
+        return mb + ' MB';
+    }
+
+    window.switchModelTab = (tab) => {
+        currentModelTab = tab;
+        // Update URL hash with tab parameter
+        const currentHash = window.location.hash;
+        const baseRoute = currentHash.split('?')[0];
+        window.location.hash = `${baseRoute}?tab=${tab}`;
+        renderModels();
+    };
 
     function renderModelStatus(model) {
         if (model.status === 'downloaded') {
@@ -950,128 +1130,242 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ==================== Settings ====================
+    let currentSettingsTab = 'general';
+
     async function renderSettings() {
         mainContent.innerHTML = renderLoading();
 
         try {
-            const [settings, hfTokenStatus] = await Promise.all([
+            const [settings, hfTokenStatus, secretKeyStatus] = await Promise.all([
                 api.getSettings(),
-                api.getHFTokenStatus()
+                api.getHFTokenStatus(),
+                api.getSecretKeyStatus()
             ]);
 
             mainContent.innerHTML = `
                 <div class="space-y-6">
                     <h2 class="text-2xl font-bold">Sistem Ayarları</h2>
 
-                    <!-- HuggingFace Token Card -->
-                    <div class="card max-w-2xl">
-                        <div class="card-header">
-                            <div class="flex items-center gap-2">
-                                <i data-lucide="key" class="w-5 h-5"></i>
-                                <h3 class="font-semibold">HuggingFace API Token</h3>
+                    <!-- Settings Tabs -->
+                    <div class="border-b border-border">
+                        <nav class="flex space-x-8 -mb-[2px]" aria-label="Settings Categories">
+                            <button onclick="switchSettingsTab('general')" 
+                                class="settings-tab ${currentSettingsTab === 'general' ? 'active' : ''} pb-4 px-1 font-medium text-sm relative z-10"
+                                data-tab="general">
+                                <span class="flex items-center gap-2">
+                                    <i data-lucide="settings" class="w-4 h-4"></i>
+                                    Genel
+                                </span>
+                            </button>
+                            <button onclick="switchSettingsTab('api')" 
+                                class="settings-tab ${currentSettingsTab === 'api' ? 'active' : ''} pb-4 px-1 font-medium text-sm relative z-10"
+                                data-tab="api">
+                                <span class="flex items-center gap-2">
+                                    <i data-lucide="shield" class="w-4 h-4"></i>
+                                    API & Güvenlik
+                                </span>
+                            </button>
+                            <button onclick="switchSettingsTab('services')" 
+                                class="settings-tab ${currentSettingsTab === 'services' ? 'active' : ''} pb-4 px-1 font-medium text-sm relative z-10"
+                                data-tab="services">
+                                <span class="flex items-center gap-2">
+                                    <i data-lucide="cloud" class="w-4 h-4"></i>
+                                    Harici Servisler
+                                </span>
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- General Tab -->
+                    <div id="settingsGeneralTab" class="${currentSettingsTab === 'general' ? '' : 'hidden'}">
+                        <div class="card max-w-2xl">
+                            <div class="card-header">
+                                <h3 class="font-semibold">Genel Ayarlar</h3>
                             </div>
-                            <p class="text-sm text-muted-foreground mt-1">
-                                Model indirme işlemlerinde rate limit sorununu önlemek için HuggingFace token ekleyin.
-                            </p>
-                        </div>
-                        <div class="card-content space-y-4">
-                            <div class="flex items-center gap-2 p-3 rounded-lg ${hfTokenStatus.has_token ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}">
-                                <i data-lucide="${hfTokenStatus.has_token ? 'check-circle' : 'alert-circle'}" class="w-5 h-5"></i>
-                                <span class="text-sm font-medium">${hfTokenStatus.message}</span>
-                            </div>
-                            
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium">HuggingFace Token</label>
-                                <div class="flex gap-2">
-                                    <input 
-                                        type="password" 
-                                        id="hfTokenInput" 
-                                        class="input flex-1" 
-                                        placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                        value="${hfTokenStatus.has_token ? '••••••••••••••••••••••••••••••••' : ''}"
-                                    >
-                                    <button id="toggleTokenVisibility" class="btn btn-outline btn-icon" title="Göster/Gizle">
-                                        <i data-lucide="eye" class="w-4 h-4"></i>
+                            <div class="card-content space-y-4">
+                                <div class="flex items-center justify-between py-3 border-b border-border">
+                                    <div>
+                                        <span class="text-muted-foreground">${t('app.version')}</span>
+                                        <p class="text-xs text-muted-foreground">${t('app.version')}</p>
+                                    </div>
+                                    <span class="font-medium">1.0.0</span>
+                                </div>
+                                <div class="flex items-center justify-between py-3 border-b border-border">
+                                    <div>
+                                        <span class="text-muted-foreground">${t('settings.language')}</span>
+                                        <p class="text-xs text-muted-foreground">${t('settings.language.desc')}</p>
+                                    </div>
+                                    <select id="languageSelect" class="input w-40">
+                                        <option value="tr" ${i18n.getLanguage() === 'tr' ? 'selected' : ''}>Türkçe</option>
+                                        <option value="en" ${i18n.getLanguage() === 'en' ? 'selected' : ''}>English</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center justify-between py-3">
+                                    <div>
+                                        <span class="text-muted-foreground">${t('settings.theme')}</span>
+                                        <p class="text-xs text-muted-foreground">${t('settings.theme.desc')}</p>
+                                    </div>
+                                    <button id="themeToggle" class="btn btn-outline btn-icon" title="${document.documentElement.classList.contains('dark') ? t('settings.theme.light') : t('settings.theme.dark')}">
+                                        <i data-lucide="${document.documentElement.classList.contains('dark') ? 'sun' : 'moon'}" class="w-4 h-4"></i>
                                     </button>
                                 </div>
-                                <p class="text-xs text-muted-foreground">
-                                    Token <a href="https://huggingface.co/settings/tokens" target="_blank" class="text-primary hover:underline">HuggingFace Settings</a> sayfasından alınabilir.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- API & Security Tab -->
+                    <div id="settingsApiTab" class="${currentSettingsTab === 'api' ? '' : 'hidden'}">
+                        <div class="space-y-6">
+                            <!-- Secret Key Card -->
+                            <div class="card max-w-2xl">
+                                <div class="card-header">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="key-round" class="w-5 h-5"></i>
+                                        <h3 class="font-semibold">API Secret Key</h3>
+                                    </div>
+                                    <p class="text-sm text-muted-foreground mt-1">
+                                        JWT token oluşturma ve API güvenliği için kullanılan gizli anahtar.
+                                    </p>
+                                </div>
+                                <div class="card-content space-y-4">
+                                    <div class="flex items-center gap-2 p-3 rounded-lg ${secretKeyStatus.has_key ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}">
+                                        <i data-lucide="${secretKeyStatus.has_key ? 'check-circle' : 'alert-circle'}" class="w-5 h-5"></i>
+                                        <span class="text-sm font-medium">${secretKeyStatus.message}</span>
+                                        ${secretKeyStatus.key_preview ? `<span class="ml-auto text-xs opacity-75">(${secretKeyStatus.key_preview})</span>` : ''}
+                                    </div>
+                                    
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-medium">Yeni Secret Key</label>
+                                        <div class="flex gap-2">
+                                            <input 
+                                                type="password" 
+                                                id="secretKeyInput" 
+                                                class="input flex-1" 
+                                                placeholder="En az 16 karakter..."
+                                                minlength="16"
+                                            >
+                                            <button id="toggleSecretKeyVisibility" class="btn btn-outline btn-icon" title="Göster/Gizle">
+                                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                            </button>
+                                            <button id="generateSecretKey" class="btn btn-outline btn-icon" title="Rastgele Oluştur">
+                                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                            </button>
+                                        </div>
+                                        <p class="text-xs text-muted-foreground">
+                                            Güçlü bir key için en az 16 karakter kullanın veya rastgele oluştur butonuna tıklayın.
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="flex gap-2">
+                                        <button id="saveSecretKey" class="btn btn-primary">
+                                            <i data-lucide="save" class="w-4 h-4 mr-2"></i>
+                                            Secret Key Kaydet
+                                        </button>
+                                        ${secretKeyStatus.has_key ? `
+                                            <button id="deleteSecretKey" class="btn btn-outline text-destructive hover:bg-destructive/10">
+                                                <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>
+                                                Key'i Kaldır
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- API Documentation Card -->
+                            <div class="card max-w-2xl">
+                                <div class="card-header">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="book-open" class="w-5 h-5"></i>
+                                        <h3 class="font-semibold">API Dokümantasyonu</h3>
+                                    </div>
+                                    <p class="text-sm text-muted-foreground mt-1">
+                                        Tüm API endpointlerini Swagger UI üzerinden inceleyin.
+                                    </p>
+                                </div>
+                                <div class="card-content">
+                                    <a href="http://localhost:5001/docs" target="_blank" class="btn btn-outline w-full">
+                                        <i data-lucide="external-link" class="w-4 h-4 mr-2"></i>
+                                        Swagger UI'yi Aç
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Services Tab -->
+                    <div id="settingsServicesTab" class="${currentSettingsTab === 'services' ? '' : 'hidden'}">
+                        <div class="card max-w-2xl">
+                            <div class="card-header">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="key" class="w-5 h-5"></i>
+                                    <h3 class="font-semibold">HuggingFace API Token</h3>
+                                </div>
+                                <p class="text-sm text-muted-foreground mt-1">
+                                    Model indirme işlemlerinde rate limit sorununu önlemek için HuggingFace token ekleyin.
                                 </p>
                             </div>
-                            
-                            <div class="flex gap-2">
-                                <button id="saveHFToken" class="btn btn-primary">
-                                    <i data-lucide="save" class="w-4 h-4 mr-2"></i>
-                                    Token Kaydet
-                                </button>
-                                ${hfTokenStatus.has_token ? `
-                                    <button id="deleteHFToken" class="btn btn-outline text-destructive hover:bg-destructive/10">
-                                        <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>
-                                        Tokeni Kaldır
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card max-w-2xl">
-                        <div class="card-header">
-                            <h3 class="font-semibold">Genel Ayarlar</h3>
-                        </div>
-                        <div class="card-content space-y-4">
-                            ${settings.map(s => `
-                                <div class="flex items-center justify-between py-3 border-b border-border last:border-0">
-                                    <div>
-                                        <p class="font-medium">${s.description || s.key}</p>
-                                        <p class="text-sm text-muted-foreground">${s.key}</p>
-                                    </div>
-                                    <code class="px-2 py-1 rounded bg-muted text-sm">${s.value}</code>
+                            <div class="card-content space-y-4">
+                                <div class="flex items-center gap-2 p-3 rounded-lg ${hfTokenStatus.has_token ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}">
+                                    <i data-lucide="${hfTokenStatus.has_token ? 'check-circle' : 'alert-circle'}" class="w-5 h-5"></i>
+                                    <span class="text-sm font-medium">${hfTokenStatus.message}</span>
                                 </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <div class="card max-w-2xl">
-                        <div class="card-header">
-                            <h3 class="font-semibold">Sistem Bilgisi</h3>
-                        </div>
-                        <div class="card-content space-y-4">
-                            <div class="flex items-center justify-between py-3 border-b border-border">
-                                <span class="text-muted-foreground">Versiyon</span>
-                                <span class="font-medium">1.0.0</span>
-                            </div>
-                            <div class="flex items-center justify-between py-3 border-b border-border">
-                                <span class="text-muted-foreground">WebSocket Bağlantısı</span>
-                                <span id="wsStatus" class="flex items-center gap-2">
-                                    <span class="w-2 h-2 rounded-full bg-muted-foreground"></span>
-                                    <span class="text-sm">Kontrol ediliyor...</span>
-                                </span>
+                                
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium">HuggingFace Token</label>
+                                    <div class="flex gap-2">
+                                        <input 
+                                            type="password" 
+                                            id="hfTokenInput" 
+                                            class="input flex-1" 
+                                            placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                            value="${hfTokenStatus.has_token ? '••••••••••••••••••••••••••••••••' : ''}"
+                                        >
+                                        <button id="toggleTokenVisibility" class="btn btn-outline btn-icon" title="Göster/Gizle">
+                                            <i data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-muted-foreground">
+                                        Token <a href="https://huggingface.co/settings/tokens" target="_blank" class="text-primary hover:underline">HuggingFace Settings</a> sayfasından alınabilir.
+                                    </p>
+                                </div>
+                                
+                                <div class="flex gap-2">
+                                    <button id="saveHFToken" class="btn btn-primary">
+                                        <i data-lucide="save" class="w-4 h-4 mr-2"></i>
+                                        Token Kaydet
+                                    </button>
+                                    ${hfTokenStatus.has_token ? `
+                                        <button id="deleteHFToken" class="btn btn-outline text-destructive hover:bg-destructive/10">
+                                            <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>
+                                            Tokeni Kaldır
+                                        </button>
+                                    ` : ''}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
 
-            // Setup HF Token handlers
+            // Setup all handlers
             setupHFTokenHandlers(hfTokenStatus.has_token);
-
-            // Update WebSocket status
-            setTimeout(() => {
-                const wsStatus = document.getElementById('wsStatus');
-                if (wsStatus) {
-                    const isConnected = wsClient?.isConnected;
-                    wsStatus.innerHTML = `
-                        <span class="w-2 h-2 rounded-full ${isConnected ? 'bg-success' : 'bg-destructive'}"></span>
-                        <span class="text-sm">${isConnected ? 'Bağlı' : 'Bağlı değil'}</span>
-                    `;
-                }
-            }, 500);
+            setupSecretKeyHandlers(secretKeyStatus.has_key);
+            setupGeneralSettingsHandlers();
 
             lucide.createIcons();
         } catch (e) {
             mainContent.innerHTML = renderError(e.message);
         }
     }
+
+    window.switchSettingsTab = (tab) => {
+        currentSettingsTab = tab;
+        // Update URL hash with tab parameter
+        const currentHash = window.location.hash;
+        const baseRoute = currentHash.split('?')[0];
+        window.location.hash = `${baseRoute}?tab=${tab}`;
+        renderSettings();
+    };
 
     function setupHFTokenHandlers(hasToken) {
         // Toggle token visibility
@@ -1137,6 +1431,140 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (e) {
                     notificationSystem?.showToast('Hata: ' + e.message, 'error');
                     deleteBtn.disabled = false;
+                }
+            });
+        }
+    }
+
+    function setupSecretKeyHandlers(hasKey) {
+        // Toggle visibility
+        const toggleBtn = document.getElementById('toggleSecretKeyVisibility');
+        const keyInput = document.getElementById('secretKeyInput');
+        
+        if (toggleBtn && keyInput) {
+            toggleBtn.addEventListener('click', () => {
+                const isPassword = keyInput.type === 'password';
+                keyInput.type = isPassword ? 'text' : 'password';
+                toggleBtn.innerHTML = `<i data-lucide="${isPassword ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>`;
+                lucide.createIcons();
+            });
+        }
+
+        // Generate random key
+        const generateBtn = document.getElementById('generateSecretKey');
+        if (generateBtn && keyInput) {
+            generateBtn.addEventListener('click', () => {
+                const array = new Uint8Array(32);
+                crypto.getRandomValues(array);
+                const randomKey = btoa(String.fromCharCode(...array)).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+                keyInput.value = randomKey;
+                keyInput.type = 'text';
+                toggleBtn.innerHTML = `<i data-lucide="eye-off" class="w-4 h-4"></i>`;
+                lucide.createIcons();
+            });
+        }
+
+        // Save key
+        const saveBtn = document.getElementById('saveSecretKey');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                const key = keyInput.value.trim();
+                if (!key) {
+                    notificationSystem?.showToast('Lütfen bir secret key girin', 'error');
+                    return;
+                }
+                
+                if (key.length < 16) {
+                    notificationSystem?.showToast('Secret key en az 16 karakter olmalıdır', 'error');
+                    return;
+                }
+
+                try {
+                    saveBtn.disabled = true;
+                    saveBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i>Kaydediliyor...';
+                    lucide.createIcons();
+
+                    await api.updateSecretKey(key);
+                    notificationSystem?.showToast('Secret key başarıyla kaydedildi ve şifrelendi', 'success');
+                    await renderSettings();
+                } catch (e) {
+                    notificationSystem?.showToast('Hata: ' + e.message, 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i data-lucide="save" class="w-4 h-4 mr-2"></i>Secret Key Kaydet';
+                    lucide.createIcons();
+                }
+            });
+        }
+
+        // Delete key
+        const deleteBtn = document.getElementById('deleteSecretKey');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async () => {
+                if (!confirm('Secret key\'i kaldırmak istediğinize emin misiniz? Bu işlem tüm oturumları sonlandıracaktır.')) {
+                    return;
+                }
+
+                try {
+                    deleteBtn.disabled = true;
+                    await api.deleteSecretKey();
+                    notificationSystem?.showToast('Secret key kaldırıldı', 'success');
+                    await renderSettings();
+                } catch (e) {
+                    notificationSystem?.showToast('Hata: ' + e.message, 'error');
+                    deleteBtn.disabled = false;
+                }
+            });
+        }
+    }
+
+    function setupGeneralSettingsHandlers() {
+        // Theme toggle
+        const themeBtn = document.getElementById('themeToggle');
+        if (themeBtn) {
+            themeBtn.addEventListener('click', async () => {
+                document.documentElement.classList.toggle('dark');
+                const isDark = document.documentElement.classList.contains('dark');
+                const newTheme = isDark ? 'dark' : 'light';
+                
+                // Save to API
+                const lang = i18n.getLanguage();
+                const success = await i18n.savePreferences(newTheme, lang);
+                
+                if (success) {
+                    localStorage.setItem('vc_theme', newTheme);
+                    themeBtn.innerHTML = `<i data-lucide="${isDark ? 'sun' : 'moon'}" class="w-4 h-4"></i>`;
+                    themeBtn.title = t(isDark ? 'settings.theme.light' : 'settings.theme.dark');
+                    lucide.createIcons();
+                    notificationSystem?.showToast(t('msg.saved'), 'success');
+                } else {
+                    notificationSystem?.showToast(t('msg.error'), 'error');
+                }
+            });
+            
+            // Set initial icon based on current theme
+            const isDark = document.documentElement.classList.contains('dark');
+            themeBtn.innerHTML = `<i data-lucide="${isDark ? 'sun' : 'moon'}" class="w-4 h-4"></i>`;
+        }
+
+        // Language select
+        const langSelect = document.getElementById('languageSelect');
+        if (langSelect) {
+            langSelect.value = i18n.getLanguage();
+            
+            langSelect.addEventListener('change', async (e) => {
+                const newLang = e.target.value;
+                const isDark = document.documentElement.classList.contains('dark');
+                const theme = isDark ? 'dark' : 'light';
+                
+                // Save to API
+                const success = await i18n.savePreferences(theme, newLang);
+                
+                if (success) {
+                    i18n.setLanguage(newLang);
+                    localStorage.setItem('vc_language', newLang);
+                    notificationSystem?.showToast(t('msg.saved') + '. ' + (newLang === 'tr' ? 'Sayfa yenilendiğinde aktif olacak.' : 'Will be active after page refresh.'), 'success');
+                } else {
+                    notificationSystem?.showToast(t('msg.error'), 'error');
                 }
             });
         }
@@ -1284,78 +1712,270 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // ==================== Tag Manager ====================
-    window.showTagManager = async () => {
+    // ==================== Tag Manager Modal ====================
+    window.showTagManagerModal = async () => {
         try {
             const tags = await api.getTags();
             
-            mainContent.innerHTML = `
-                <div class="max-w-2xl mx-auto">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-2xl font-bold">Etiket Yönetimi</h2>
-                        <button onclick="renderTts()" class="btn btn-outline">
-                            <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                            Geri Dön
+            // Create modal backdrop
+            const modal = document.createElement('div');
+            modal.id = 'tagManagerModal';
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm';
+            modal.innerHTML = `
+                <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b border-border">
+                        <h3 class="text-lg font-semibold">Etiket Yönetimi</h3>
+                        <button onclick="closeTagManagerModal()" class="p-1 rounded-lg hover:bg-accent transition-colors">
+                            <i data-lucide="x" class="w-5 h-5"></i>
                         </button>
                     </div>
-
-                    <div class="card">
-                        <div class="card-content space-y-4">
-                            <div class="flex gap-3">
-                                <input type="text" id="newTagName" placeholder="Etiket adı" class="input flex-1">
-                                <input type="color" id="newTagColor" value="#3b82f6" class="w-12 h-10 rounded-lg border border-input cursor-pointer">
-                                <button onclick="createTag()" class="btn btn-primary">
-                                    <i data-lucide="plus" class="w-4 h-4"></i>
-                                    Ekle
-                                </button>
-                            </div>
-
-                            <div class="flex flex-wrap gap-2 pt-4">
-                                ${tags.map(t => `
-                                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white" style="background-color: ${t.color}">
-                                        ${t.name}
-                                        <button onclick="deleteTag(${t.id})" class="hover:opacity-70">
-                                            <i data-lucide="x" class="w-3 h-3"></i>
-                                        </button>
-                                    </div>
-                                `).join('')}
-                            </div>
+                    
+                    <div class="p-4 space-y-4 overflow-y-auto">
+                        <div class="flex gap-3">
+                            <input type="text" id="modalNewTagName" placeholder="Etiket adı" class="input flex-1">
+                            <input type="color" id="modalNewTagColor" value="#3b82f6" class="w-12 h-10 rounded-lg border border-input cursor-pointer bg-transparent">
+                            <button onclick="createTagFromModal()" class="btn btn-primary">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
                         </div>
+
+                        <div id="modalTagList" class="flex flex-wrap gap-2">
+                            ${tags.map(t => `
+                                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white" style="background-color: ${t.color}">
+                                    ${t.name}
+                                    <button onclick="deleteTagFromModal(${t.id})" class="hover:opacity-70">
+                                        <i data-lucide="x" class="w-3 h-3"></i>
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border-t border-border flex justify-end">
+                        <button onclick="closeTagManagerModal()" class="btn btn-outline">Kapat</button>
                     </div>
                 </div>
             `;
+            
+            document.body.appendChild(modal);
             lucide.createIcons();
+            
+            // Focus on input
+            document.getElementById('modalNewTagName').focus();
+            
+            // Handle Enter key
+            document.getElementById('modalNewTagName').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    createTagFromModal();
+                }
+            });
+            
+            // Close on backdrop click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeTagManagerModal();
+                }
+            });
+            
+            // Close on Escape key
+            document.addEventListener('keydown', handleTagManagerEscape);
+            
         } catch (e) {
             notificationSystem?.showToast('Hata: ' + e.message, 'error');
         }
     };
 
-    window.createTag = async () => {
-        const name = document.getElementById('newTagName').value;
-        const color = document.getElementById('newTagColor').value;
+    window.closeTagManagerModal = () => {
+        const modal = document.getElementById('tagManagerModal');
+        if (modal) {
+            modal.remove();
+            document.removeEventListener('keydown', handleTagManagerEscape);
+        }
+    };
+
+    function handleTagManagerEscape(e) {
+        if (e.key === 'Escape') {
+            closeTagManagerModal();
+        }
+    }
+
+    window.createTagFromModal = async () => {
+        const nameInput = document.getElementById('modalNewTagName');
+        const colorInput = document.getElementById('modalNewTagColor');
+        const name = nameInput.value.trim();
+        const color = colorInput.value;
         
-        if (!name) return;
+        if (!name) {
+            notificationSystem?.showToast('Etiket adı girin', 'warning');
+            return;
+        }
 
         try {
             await api.createTag({ name, color });
             notificationSystem?.showToast('Etiket oluşturuldu', 'success');
-            showTagManager();
+            nameInput.value = '';
+            nameInput.focus();
+            // Refresh modal content
+            await refreshTagManagerModal();
+            // Also refresh the TTS form tag select
+            await refreshTtsTagSelect();
         } catch (e) {
             notificationSystem?.showToast('Hata: ' + e.message, 'error');
         }
     };
 
-    window.deleteTag = async (id) => {
+    window.deleteTagFromModal = async (id) => {
         if (!confirm('Bu etiketi silmek istediğinize emin misiniz?')) return;
         
         try {
             await api.deleteTag(id);
             notificationSystem?.showToast('Etiket silindi', 'success');
-            showTagManager();
+            await refreshTagManagerModal();
+            await refreshTtsTagSelect();
         } catch (e) {
             notificationSystem?.showToast('Hata: ' + e.message, 'error');
         }
     };
+
+    async function refreshTagManagerModal() {
+        const tags = await api.getTags();
+        const tagList = document.getElementById('modalTagList');
+        if (tagList) {
+            tagList.innerHTML = tags.map(t => `
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-white" style="background-color: ${t.color}">
+                    ${t.name}
+                    <button onclick="deleteTagFromModal(${t.id})" class="hover:opacity-70">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+    }
+
+    async function refreshTtsTagSelect() {
+        // If we're on TTS page, refresh the tag select
+        if (window.location.hash.includes('tts')) {
+            const tags = await api.getTags();
+            const select = document.getElementById('ttsTags');
+            if (select && select.tomselect) {
+                const currentValue = select.tomselect.getValue();
+                select.tomselect.clearOptions();
+                tags.forEach(t => {
+                    select.tomselect.addOption({ value: t.id, text: t.name });
+                });
+                select.tomselect.setValue(currentValue);
+            }
+        }
+    }
+
+    // ==================== Create Tag Modal (for inline creation) ====================
+    window.showCreateTagModal = (tagName) => {
+        // Close any existing modal
+        const existingModal = document.getElementById('createTagModal');
+        if (existingModal) existingModal.remove();
+        
+        const modal = document.createElement('div');
+        modal.id = 'createTagModal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm';
+        modal.innerHTML = `
+            <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4">
+                <div class="p-4 border-b border-border">
+                    <h3 class="text-lg font-semibold">Yeni Etiket Oluştur</h3>
+                </div>
+                
+                <div class="p-4 space-y-4">
+                    <p class="text-sm text-muted-foreground">
+                        "<span class="font-medium text-foreground">${tagName}</span>" etiketi mevcut değil. Oluşturmak istiyor musunuz?
+                    </p>
+                    
+                    <div class="flex items-center gap-3">
+                        <label class="text-sm font-medium whitespace-nowrap">Renk:</label>
+                        <input type="color" id="quickTagColor" value="#3b82f6" class="w-12 h-10 rounded-lg border border-input cursor-pointer bg-transparent">
+                    </div>
+                </div>
+                
+                <div class="p-4 border-t border-border flex justify-end gap-2">
+                    <button id="cancelCreateTag" class="btn btn-outline">İptal</button>
+                    <button id="confirmCreateTag" class="btn btn-primary">
+                        <i data-lucide="plus" class="w-4 h-4 mr-2"></i>
+                        Oluştur
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        lucide.createIcons();
+        
+        // Focus on create button for Enter key
+        const confirmBtn = document.getElementById('confirmCreateTag');
+        const cancelBtn = document.getElementById('cancelCreateTag');
+        const colorInput = document.getElementById('quickTagColor');
+        
+        confirmBtn.focus();
+        
+        // Handle button clicks
+        confirmBtn.addEventListener('click', async () => {
+            await createQuickTag(tagName, colorInput.value);
+            closeCreateTagModal();
+        });
+        
+        cancelBtn.addEventListener('click', () => {
+            closeCreateTagModal();
+        });
+        
+        // Handle Enter (create) and Escape (cancel)
+        const handleKeyDown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmBtn.click();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeCreateTagModal();
+            }
+        };
+        
+        document.addEventListener('keydown', handleKeyDown);
+        
+        // Store handler for cleanup
+        modal.keyHandler = handleKeyDown;
+        
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeCreateTagModal();
+            }
+        });
+    };
+
+    window.closeCreateTagModal = () => {
+        const modal = document.getElementById('createTagModal');
+        if (modal) {
+            document.removeEventListener('keydown', modal.keyHandler);
+            modal.remove();
+        }
+    };
+
+    async function createQuickTag(name, color) {
+        try {
+            const newTag = await api.createTag({ name, color });
+            notificationSystem?.showToast(`"${name}" etiketi oluşturuldu`, 'success');
+            
+            // Add to current TTS form if present
+            const select = document.getElementById('ttsTags');
+            if (select && select.tomselect) {
+                select.tomselect.addOption({ value: newTag.id, text: newTag.name });
+                select.tomselect.addItem(newTag.id);
+                select.tomselect.refreshOptions();
+            }
+        } catch (e) {
+            notificationSystem?.showToast('Hata: ' + e.message, 'error');
+        }
+    }
+
+    // Legacy functions for backward compatibility
+    window.showTagManager = window.showTagManagerModal;
 
     // Listen for TTS completion to refresh history
     if (typeof wsClient !== 'undefined') {

@@ -13,3 +13,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # User preferences
+    theme = Column(String, default="light")  # 'light' or 'dark'
+    language = Column(String, default="tr")  # 'tr' or 'en'

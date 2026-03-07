@@ -11,6 +11,7 @@ from loguru import logger
 from app.tts.base import BaseTTS
 from app.config import settings
 from app.core.device import detect_device
+from app.websocket.notification_manager import notification_manager
 
 class MusicGenEngine(BaseTTS):
     def __init__(self, model_size="small"):
@@ -57,7 +58,7 @@ class MusicGenEngine(BaseTTS):
             logger.error(f"Failed to load MusicGen model: {e}")
             raise
 
-    def _generate_sync(self, text: str, output_path: str, language: str, profile_path: Optional[str], **kwargs):
+    def _generate_sync(self, text: str, output_path: str, language: str, profile_path: Optional[str], user_id: Optional[str] = None, **kwargs):
         """Synchronous generation logic to be run in an executor."""
         self._load_model()
             
@@ -104,12 +105,21 @@ class MusicGenEngine(BaseTTS):
         output_path: str, 
         language: str = "tr", 
         profile_path: Optional[str] = None,
+        user_id: Optional[str] = None,
         **kwargs
     ) -> bool:
         """Run MusicGen generation asynchronously in a separate thread/process to avoid blocking API."""
         if not self.is_model_downloaded():
             logger.error(f"MusicGen model not ready")
             return False
+        
+        # Send initial notification
+        if user_id:
+            await notification_manager.notify_musicgen_started(
+                user_id=user_id,
+                text=text,
+                model_size=self.model_size
+            )
             
         loop = asyncio.get_event_loop()
         sync_func = partial(
@@ -118,7 +128,26 @@ class MusicGenEngine(BaseTTS):
             output_path,
             language,
             profile_path,
+            user_id,
             **kwargs
         )
         result = await loop.run_in_executor(None, sync_func)
+        
+        # Send completion notification
+        if user_id:
+            if result:
+                await notification_manager.notify_musicgen_completed(
+                    user_id=user_id,
+                    text=text,
+                    model_size=self.model_size,
+                    output_path=output_path
+                )
+            else:
+                await notification_manager.notify_musicgen_failed(
+                    user_id=user_id,
+                    text=text,
+                    model_size=self.model_size,
+                    error="Music generation failed"
+                )
+        
         return result

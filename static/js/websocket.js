@@ -29,6 +29,7 @@ class WebSocketClient {
             return;
         }
 
+        this.currentToken = token;
         this.isConnecting = true;
         const wsUrl = `ws://localhost:5001/ws/notifications?token=${token}`;
 
@@ -41,6 +42,9 @@ class WebSocketClient {
                 this.isConnecting = false;
                 this.reconnectAttempts = 0;
                 this.emit('connected', {});
+                
+                // Update header status
+                this.updateHeaderStatus(true);
                 
                 // Start heartbeat
                 this.startHeartbeat();
@@ -56,13 +60,24 @@ class WebSocketClient {
             };
 
             this.ws.onclose = (event) => {
-                console.log('WebSocket closed:', event.code, event.reason);
+                console.log('WebSocket closed:', event.code, event.reason, 'wasClean:', event.wasClean);
                 this.isConnected = false;
                 this.isConnecting = false;
                 this.stopHeartbeat();
                 
-                if (!event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
+                // Update header status
+                this.updateHeaderStatus(false);
+                
+                // 1001 = Going Away (normal closure like page refresh)
+                // 1000 = Normal closure
+                // Don't reconnect immediately for normal closures
+                const isNormalClosure = event.code === 1000 || event.code === 1001;
+                
+                if (!event.wasClean && !isNormalClosure && this.reconnectAttempts < this.maxReconnectAttempts) {
                     this.scheduleReconnect();
+                } else if (isNormalClosure && this.reconnectAttempts < this.maxReconnectAttempts) {
+                    // For normal closures, wait a bit longer before reconnecting
+                    setTimeout(() => this.connect(), 2000);
                 }
                 
                 this.emit('disconnected', { code: event.code, reason: event.reason });
@@ -91,7 +106,13 @@ class WebSocketClient {
                 break;
                 
             case 'pong':
-                // Heartbeat response
+                // Heartbeat response - connection is alive
+                this.lastPongTime = Date.now();
+                break;
+                
+            case 'ping':
+                // Server is checking if we're alive, respond with pong
+                this.send({ action: 'ping' });
                 break;
                 
             case 'notification':
@@ -287,6 +308,35 @@ class WebSocketClient {
             reconnectAttempts: this.reconnectAttempts
         };
     }
+
+    /**
+     * Update WebSocket status in header
+     */
+    updateHeaderStatus(isConnected) {
+        const indicator = document.getElementById('headerWsIndicator');
+        const text = document.getElementById('headerWsText');
+        const container = document.getElementById('headerWsStatus');
+        
+        if (indicator && text) {
+            if (isConnected) {
+                indicator.className = 'w-2 h-2 rounded-full bg-success animate-pulse';
+                indicator.style.backgroundColor = 'hsl(142, 76%, 36%)';
+                text.textContent = 'Canlı';
+                text.className = 'text-success';
+                if (container) {
+                    container.className = 'hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-success/10 text-xs';
+                }
+            } else {
+                indicator.className = 'w-2 h-2 rounded-full bg-destructive';
+                indicator.style.backgroundColor = 'hsl(0, 84%, 60%)';
+                text.textContent = 'Bağlı Değil';
+                text.className = 'text-destructive';
+                if (container) {
+                    container.className = 'hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-destructive/10 text-xs';
+                }
+            }
+        }
+    }
 }
 
 // Global WebSocket client instance
@@ -301,12 +351,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Reconnect when token changes
+// Reconnect when token changes (but avoid reconnecting if already connected with same token)
 window.addEventListener('storage', (e) => {
     if (e.key === 'vc_token') {
         if (e.newValue) {
-            wsClient.connect();
+            // Only reconnect if not already connected or token actually changed
+            if (!wsClient.isConnected || wsClient.currentToken !== e.newValue) {
+                wsClient.currentToken = e.newValue;
+                wsClient.disconnect();
+                setTimeout(() => wsClient.connect(), 100);
+            }
         } else {
+            wsClient.currentToken = null;
             wsClient.disconnect();
         }
     }

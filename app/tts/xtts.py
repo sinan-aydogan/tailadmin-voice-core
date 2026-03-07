@@ -145,6 +145,7 @@ class XTTSEngine(BaseTTS):
         output_path: str, 
         language: str = "tr", 
         profile_path: Optional[str] = None,
+        user_id: Optional[str] = None,
         **kwargs
     ) -> bool:
         """Run XTTS generation asynchronously in a separate thread/process to avoid blocking API."""
