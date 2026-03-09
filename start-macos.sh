@@ -173,11 +173,11 @@ fi
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 echo -e "${GREEN}✓ Python version: $PYTHON_VERSION${NC}"
 
-# Check if virtual environment exists
-VENV_DIR=".venv"
+# Set up virtual environment in data/venvies/main
+VENV_DIR="data/venvies/main"
 if [ ! -d "$VENV_DIR" ]; then
     echo ""
-    echo "📦 Creating virtual environment..."
+    echo "📦 Creating virtual environment in $VENV_DIR..."
     python3 -m venv "$VENV_DIR"
 fi
 
@@ -185,13 +185,18 @@ fi
 echo "📦 Activating virtual environment..."
 source "$VENV_DIR/bin/activate"
 
+# Set pip cache and temp directories to project directory to avoid system disk space issues
+export PIP_CACHE_DIR="/Volumes/sinan/projeler/tailadmin-voice-core/.pip-cache"
+export TMPDIR="/Volumes/sinan/projeler/tailadmin-voice-core/.tmp"
+mkdir -p "$PIP_CACHE_DIR" "$TMPDIR"
+
 # Upgrade pip
 echo "📦 Upgrading pip..."
-pip install --quiet --upgrade pip
+pip install --quiet --upgrade pip --cache-dir "$PIP_CACHE_DIR" --no-warn-script-location
 
 # Install requirements
 echo "📦 Installing dependencies..."
-pip install --quiet -r requirements.txt
+pip install --quiet -r requirements.txt --cache-dir "$PIP_CACHE_DIR" --no-warn-script-location
 
 # Create necessary directories
 echo "📁 Creating directories..."

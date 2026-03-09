@@ -19,8 +19,23 @@ venv/
 env/
 .python-version
 
+# Pip cache and temp
+.pip-cache/
+.tmp/
+
 # Data (indirilen modeller, üretilen sesler, kullanıcı yüklemeleri)
-data/
+# Keep venvies directory but ignore its contents
+data/models/
+data/outputs/
+data/profiles/
+data/uploads/
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Virtual environments in data/venvies
+data/venvies/*/
+!.gitkeep
 
 # Logs
 logs/
