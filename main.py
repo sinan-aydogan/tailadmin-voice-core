@@ -268,4 +268,11 @@ if __name__ == "__main__":
     import uvicorn
     # If run directly via python main.py
     logger.info(f"Starting API Server on port {settings.API_PORT}...")
-    uvicorn.run("main:app", host="0.0.0.0", port=settings.API_PORT, reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=settings.API_PORT,
+        reload=True,
+        loop="uvloop",   # Faster event loop, reduces blocking
+        workers=1        # Single worker to share model state
+    )

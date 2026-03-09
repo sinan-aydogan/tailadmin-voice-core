@@ -122,6 +122,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const hash = window.location.hash || '#dashboard';
         const page = hash.substring(1).split('?')[0];
         
+        // Clear playlist refresh interval when leaving playlists page
+        if (page !== 'playlists' && window.playlistRefreshInterval) {
+            clearInterval(window.playlistRefreshInterval);
+            window.playlistRefreshInterval = null;
+        }
+        
         // Parse URL parameters
         const urlParams = new URLSearchParams(hash.split('?')[1] || '');
         const tabParam = urlParams.get('tab');
@@ -352,82 +358,237 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.showCreateProfileModal = () => {
-        // Simple inline form instead of modal for now
-        mainContent.innerHTML = `
-            <div class="max-w-2xl mx-auto">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="font-semibold">Yeni Ses Profili</h3>
+        let currentTab = 'upload'; // 'upload' or 'record'
+        let recordedBlob = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        const renderForm = () => {
+            mainContent.innerHTML = `
+                <div class="max-w-2xl mx-auto">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="font-semibold">Yeni Ses Profili</h3>
+                        </div>
+                        <form id="createProfileForm" class="card-content space-y-4">
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium">Profil Adı</label>
+                                <input type="text" id="profileName" required class="input" placeholder="Örn: Benim Sesim">
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium">TTS Motoru</label>
+                                <select id="profileEngine" class="input">
+                                    <option value="">Seçiniz</option>
+                                    <option value="xtts">XTTS V2</option>
+                                    <option value="bark">Bark</option>
+                                    <option value="tortoise">Tortoise</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Tabs -->
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium">Referans Ses</label>
+                                <div class="flex gap-2 p-1 bg-muted rounded-lg">
+                                    <button type="button" id="tabUpload" class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${currentTab === 'upload' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">
+                                        <i data-lucide="upload" class="w-4 h-4 inline mr-2"></i>
+                                        Dosya Yükle
+                                    </button>
+                                    <button type="button" id="tabRecord" class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${currentTab === 'record' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">
+                                        <i data-lucide="mic" class="w-4 h-4 inline mr-2"></i>
+                                        Ses Kaydet
+                                    </button>
+                                </div>
+                                
+                                <!-- Upload Tab Content -->
+                                <div id="uploadContent" class="${currentTab === 'upload' ? '' : 'hidden'}">
+                                    <div id="profileAudioUpload"></div>
+                                </div>
+                                
+                                <!-- Record Tab Content -->
+                                <div id="recordContent" class="${currentTab === 'record' ? '' : 'hidden'}">
+                                    <div class="flex flex-col items-center gap-4 p-6 border-2 border-dashed border-border rounded-lg">
+                                        <!-- Record Button -->
+                                        <button type="button" id="recordBtn" class="relative w-24 h-24 rounded-full bg-primary hover:bg-primary/90 transition-all flex items-center justify-center group">
+                                            <div id="recordPulse" class="absolute inset-0 rounded-full bg-primary opacity-0"></div>
+                                            <i data-lucide="mic" class="w-10 h-10 text-primary-foreground relative z-10"></i>
+                                        </button>
+                                        <p id="recordStatus" class="text-sm text-muted-foreground">Kaydetmek için tıklayın</p>
+                                        
+                                        <!-- Audio Preview -->
+                                        <div id="audioPreview" class="hidden w-full">
+                                            <audio id="recordedAudio" controls class="w-full"></audio>
+                                            <button type="button" id="deleteRecording" class="mt-2 text-sm text-destructive hover:underline">
+                                                <i data-lucide="trash-2" class="w-4 h-4 inline mr-1"></i>
+                                                Kaydı Sil
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Sample Text Collapsible -->
+                                    <div class="mt-4 border border-border rounded-lg overflow-hidden">
+                                        <button type="button" id="toggleSampleText" class="w-full px-4 py-3 flex items-center justify-between bg-muted/50 hover:bg-muted transition-colors">
+                                            <span class="text-sm font-medium">Örnek Ses Profili Metni</span>
+                                            <i data-lucide="chevron-down" class="w-4 h-4 transition-transform" id="sampleTextIcon"></i>
+                                        </button>
+                                        <div id="sampleTextContent" class="hidden px-4 py-3 text-sm text-muted-foreground bg-card">
+                                            <p class="mb-2">Ses kaydı için aşağıdaki metni okuyabilirsiniz:</p>
+                                            <blockquote class="border-l-2 border-primary pl-4 italic">
+                                                "Merhaba, benim adım... Bu ses kaydı, yapay zeka tarafından sesimi taklit etmek için kullanılacak. 
+                                                Ses tonumun doğal ve net bir şekilde duyulması için sessiz bir ortamda kayıt yapıyorum. 
+                                                Türkçe karakterleri doğru telaffuz ettiğimden emin olmak için şu cümleleri okuyorum: 
+                                                ç, ğ, ı, ö, ş, ü harfleri Türk alfabesinin önemli karakterleridir."
+                                            </blockquote>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex gap-3 pt-4">
+                                <button type="button" onclick="renderProfiles()" class="btn btn-outline flex-1">İptal</button>
+                                <button type="submit" class="btn btn-primary flex-1">
+                                    <i data-lucide="save" class="w-4 h-4"></i>
+                                    Kaydet
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    <form id="createProfileForm" class="card-content space-y-4">
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">Profil Adı</label>
-                            <input type="text" id="profileName" required class="input" placeholder="Örn: Benim Sesim">
-                        </div>
-                        
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">TTS Motoru</label>
-                            <select id="profileEngine" class="input">
-                                <option value="">Seçiniz</option>
-                                <option value="xtts">XTTS V2</option>
-                                <option value="bark">Bark</option>
-                                <option value="tortoise">Tortoise</option>
-                            </select>
-                        </div>
-                        
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">Referans Ses</label>
-                            <div id="profileAudioUpload"></div>
-                        </div>
-                        
-                        <div class="flex gap-3 pt-4">
-                            <button type="button" onclick="renderProfiles()" class="btn btn-outline flex-1">İptal</button>
-                            <button type="submit" class="btn btn-primary flex-1">
-                                <i data-lucide="save" class="w-4 h-4"></i>
-                                Kaydet
-                            </button>
-                        </div>
-                    </form>
                 </div>
-            </div>
-        `;
-        lucide.createIcons();
-
-        // Initialize file upload component
-        const fileUpload = createFileUploadComponent('profileAudioUpload', {
-            accept: 'audio/*',
-            maxSize: 10 * 1024 * 1024, // 10MB
-            onChange: (file) => {
-                console.log('Selected file:', file?.name);
-            }
-        });
-
-        document.getElementById('createProfileForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]');
-            btn.disabled = true;
-            btn.innerHTML = '<div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div> Kaydediliyor...';
-
-            try {
-                const profile = await api.createProfile({
-                    name: document.getElementById('profileName').value,
-                    engine: document.getElementById('profileEngine').value,
-                    description: ''
+            `;
+            lucide.createIcons();
+            setupEventListeners();
+        };
+        
+        const setupEventListeners = () => {
+            // Tab switching
+            document.getElementById('tabUpload')?.addEventListener('click', () => {
+                currentTab = 'upload';
+                renderForm();
+            });
+            document.getElementById('tabRecord')?.addEventListener('click', () => {
+                currentTab = 'record';
+                renderForm();
+            });
+            
+            // Initialize file upload component if on upload tab
+            let fileUpload = null;
+            if (currentTab === 'upload') {
+                fileUpload = createFileUploadComponent('profileAudioUpload', {
+                    accept: 'audio/*',
+                    maxSize: 10 * 1024 * 1024,
+                    onChange: (file) => {
+                        console.log('Selected file:', file?.name);
+                    }
                 });
-
-                if (fileUpload.getFile()) {
-                    await api.uploadProfileAudio(profile.id, fileUpload.getFile());
-                }
-
-                notificationSystem?.showToast('Profil oluşturuldu', 'success');
-                renderProfiles();
-            } catch (error) {
-                notificationSystem?.showToast('Hata: ' + error.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> Kaydet';
-                lucide.createIcons();
             }
-        });
+            
+            // Sample text toggle
+            document.getElementById('toggleSampleText')?.addEventListener('click', () => {
+                const content = document.getElementById('sampleTextContent');
+                const icon = document.getElementById('sampleTextIcon');
+                content.classList.toggle('hidden');
+                icon.style.transform = content.classList.contains('hidden') ? '' : 'rotate(180deg)';
+            });
+            
+            // Recording functionality
+            const recordBtn = document.getElementById('recordBtn');
+            const recordPulse = document.getElementById('recordPulse');
+            const recordStatus = document.getElementById('recordStatus');
+            const audioPreview = document.getElementById('audioPreview');
+            const recordedAudio = document.getElementById('recordedAudio');
+            const deleteRecording = document.getElementById('deleteRecording');
+            
+            recordBtn?.addEventListener('click', async () => {
+                if (!isRecording) {
+                    // Start recording
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorder = new MediaRecorder(stream);
+                        audioChunks = [];
+                        
+                        mediaRecorder.ondataavailable = (event) => {
+                            audioChunks.push(event.data);
+                        };
+                        
+                        mediaRecorder.onstop = () => {
+                            recordedBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                            const audioUrl = URL.createObjectURL(recordedBlob);
+                            recordedAudio.src = audioUrl;
+                            audioPreview.classList.remove('hidden');
+                            recordBtn.classList.add('hidden');
+                            recordStatus.textContent = 'Kayıt tamamlandı';
+                        };
+                        
+                        mediaRecorder.start();
+                        isRecording = true;
+                        
+                        // Update UI
+                        recordPulse.classList.remove('opacity-0');
+                        recordPulse.classList.add('animate-ping', 'opacity-75');
+                        recordBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                        recordBtn.classList.remove('bg-primary', 'hover:bg-primary/90');
+                        recordStatus.textContent = 'Kaydediliyor... (Durdurmak için tıklayın)';
+                        
+                    } catch (err) {
+                        notificationSystem?.showToast('Mikrofon erişimi reddedildi: ' + err.message, 'error');
+                    }
+                } else {
+                    // Stop recording
+                    mediaRecorder?.stop();
+                    mediaRecorder?.stream.getTracks().forEach(track => track.stop());
+                    isRecording = false;
+                    
+                    // Update UI
+                    recordPulse.classList.add('opacity-0');
+                    recordPulse.classList.remove('animate-ping', 'opacity-75');
+                    recordBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                    recordBtn.classList.add('bg-primary', 'hover:bg-primary/90');
+                }
+            });
+            
+            deleteRecording?.addEventListener('click', () => {
+                recordedBlob = null;
+                audioPreview.classList.add('hidden');
+                recordBtn.classList.remove('hidden');
+                recordStatus.textContent = 'Kaydetmek için tıklayın';
+                recordedAudio.src = '';
+            });
+            
+            // Form submission
+            document.getElementById('createProfileForm')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = e.target.querySelector('button[type="submit"]');
+                btn.disabled = true;
+                btn.innerHTML = '<div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div> Kaydediliyor...';
+
+                try {
+                    const profile = await api.createProfile({
+                        name: document.getElementById('profileName').value,
+                        engine: document.getElementById('profileEngine').value,
+                        description: ''
+                    });
+
+                    // Upload audio based on selected tab
+                    if (currentTab === 'upload' && fileUpload?.getFile()) {
+                        await api.uploadProfileAudio(profile.id, fileUpload.getFile());
+                    } else if (currentTab === 'record' && recordedBlob) {
+                        const file = new File([recordedBlob], 'recording.wav', { type: 'audio/wav' });
+                        await api.uploadProfileAudio(profile.id, file);
+                    }
+
+                    notificationSystem?.showToast('Profil oluşturuldu', 'success');
+                    renderProfiles();
+                } catch (error) {
+                    notificationSystem?.showToast('Hata: ' + error.message, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> Kaydet';
+                    lucide.createIcons();
+                }
+            });
+        };
+        
+        renderForm();
     };
 
     window.deleteProfile = async (id) => {
@@ -651,10 +812,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${history.map(h => `
                         <div class="card">
                             <div class="card-content">
-                                <div class="flex items-start justify-between gap-4">
+                                <div class="flex items-start justify-between gap-4 mb-3">
                                     <div class="flex-1 min-w-0">
-                                        <div class="flex items-center gap-2 mb-2">
+                                        <div class="flex items-center gap-2 mb-2 flex-wrap">
                                             <span class="badge badge-secondary text-xs">${h.engine?.toUpperCase()}</span>
+                                            ${h.profile_name ? `<span class="badge badge-primary text-xs"><i data-lucide="user" class="w-3 h-3 inline mr-1"></i>${h.profile_name}</span>` : ''}
                                             ${h.tags?.map(t => `<span class="badge text-xs" style="background-color: ${t.color}; color: white;">${t.name}</span>`).join('') || ''}
                                         </div>
                                         <p class="text-sm text-foreground line-clamp-2">${h.text}</p>
@@ -662,14 +824,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                             ${new Date(h.created_at).toLocaleString('tr-TR')}
                                         </p>
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <audio controls class="h-8 w-32">
-                                            <source src="${API_BASE}/${h.output_path}" type="audio/wav">
-                                        </audio>
-                                        <button onclick="deleteTtsOutput(${h.id})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
-                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                        </button>
-                                    </div>
+                                    <button onclick="deleteTtsOutput(${h.id})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors flex-shrink-0">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                                <div class="w-full">
+                                    <audio controls class="h-10 w-full">
+                                        <source src="${API_BASE}/${h.output_path}" type="audio/wav">
+                                    </audio>
                                 </div>
                             </div>
                         </div>
@@ -2264,10 +2426,69 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             lucide.createIcons();
+            
+            // Auto-refresh if any playlist is processing
+            const hasProcessing = playlists.some(p => p.status === 'processing');
+            if (hasProcessing) {
+                if (window.playlistRefreshInterval) {
+                    clearInterval(window.playlistRefreshInterval);
+                }
+                window.playlistRefreshInterval = setInterval(async () => {
+                    // Refresh only if still on playlists page
+                    if (document.querySelector('[data-playlist-id]')) {
+                        await window.refreshPlaylistsData();
+                    }
+                }, 2000); // Refresh every 2 seconds
+            } else {
+                if (window.playlistRefreshInterval) {
+                    clearInterval(window.playlistRefreshInterval);
+                    window.playlistRefreshInterval = null;
+                }
+            }
+            
         } catch (e) {
             mainContent.innerHTML = renderError('Listeler yüklenirken hata oluştu');
         }
     }
+    
+    // Function to refresh playlists data without full re-render
+    window.refreshPlaylistsData = async function() {
+        try {
+            const newPlaylists = await api.getPlaylists();
+            
+            // Update status badges and progress
+            newPlaylists.forEach(playlist => {
+                const badge = document.querySelector(`[data-playlist-id="${playlist.id}"] .badge`);
+                if (badge) {
+                    badge.outerHTML = window.getPlaylistStatusBadge(playlist);
+                }
+                
+                // Update status text
+                const statusText = document.querySelector(`[data-playlist-id="${playlist.id}"] .text-muted-foreground`);
+                if (statusText) {
+                    const statusLabel = playlist.status === 'completed' ? 'Tamamlandı' : 
+                                       playlist.status === 'processing' ? 'İşleniyor' :
+                                       playlist.status === 'paused' ? 'Duraklatıldı' : 'Bekliyor';
+                    statusText.innerHTML = `${playlist.total_items} iş • ${statusLabel}${playlist.duration_seconds ? ` • ${window.formatDuration(playlist.duration_seconds)}` : ''}`;
+                }
+                
+                // Refresh items if playlist is expanded
+                const itemsDiv = document.getElementById(`playlist-items-${playlist.id}`);
+                if (itemsDiv && !itemsDiv.classList.contains('hidden')) {
+                    window.loadPlaylistItems(playlist.id);
+                }
+            });
+            
+            // Stop auto-refresh if no longer processing
+            const hasProcessing = newPlaylists.some(p => p.status === 'processing');
+            if (!hasProcessing && window.playlistRefreshInterval) {
+                clearInterval(window.playlistRefreshInterval);
+                window.playlistRefreshInterval = null;
+            }
+        } catch (e) {
+            console.error('Failed to refresh playlists:', e);
+        }
+    };
 
     window.getPlaylistStatusBadge = function(playlist) {
         const progress = playlist.progress_percentage;
@@ -2716,13 +2937,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.startPlaylist = async function(playlistId) {
+        console.log('startPlaylist called for playlist:', playlistId);
         try {
+            notificationSystem?.showToast('Liste başlatılıyor...', 'info');
             const result = await api.processPlaylist(playlistId);
+            console.log('processPlaylist result:', result);
             notificationSystem?.showToast(result.message || 'Liste işleme alındı', 'success');
             renderPlaylists();
         } catch (e) {
-            notificationSystem?.showToast('Başlatılırken hata: ' + (e.message || 'Bilinmeyen hata'), 'error');
             console.error('Start playlist error:', e);
+            notificationSystem?.showToast('Başlatılırken hata: ' + (e.message || 'Bilinmeyen hata'), 'error');
         }
     };
 

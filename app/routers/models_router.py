@@ -103,8 +103,11 @@ async def list_downloads(
     """List all active or completed model downloads."""
     return DownloadManager.get_all_downloads(db, skip=skip, limit=limit)
 
-from fastapi import BackgroundTasks
+from concurrent.futures import ThreadPoolExecutor
 import asyncio
+
+# Dedicated thread pool for model downloads (doesn't block TTS worker)
+_download_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="model_download")
 
 async def real_download_task(model_id: str, user_id: str = None):
     """Real background task to download a model using huggingface_hub."""
@@ -125,11 +128,11 @@ async def real_download_task(model_id: str, user_id: str = None):
             user_id, model_id, model_info.get("name", model_id)
         )
     
-    # Run the blocking download in a thread to not block the event loop
+    # Run the blocking download in dedicated thread pool (doesn't block TTS worker)
     loop = asyncio.get_event_loop()
     try:
         await loop.run_in_executor(
-            None, 
+            _download_executor, 
             download_hf_model, 
             SessionLocal, 
             model_id, 
@@ -172,7 +175,6 @@ async def real_download_task(model_id: str, user_id: str = None):
 @router.post("/download/{model_id}", response_model=ModelDownloadResponse)
 async def request_model_download(
     model_id: str,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -186,8 +188,9 @@ async def request_model_download(
         download = DownloadManager.request_download(db, model_id)
         
         if download.status == "pending":
-            # Schedule the real download task with user_id for notifications
-            background_tasks.add_task(real_download_task, model_id, str(current_user.id))
+            # Start download in background using asyncio.create_task
+            # This runs independently of the TTS worker
+            asyncio.create_task(real_download_task(model_id, str(current_user.id)))
             
         return download
     except ValueError as e:

@@ -20,8 +20,8 @@ pydub
 # TTS Engines
 TTS>=0.22.0
 suno-bark
-# tortoise-tts temporarily disabled due to transformers conflict with TTS
-# tortoise-tts
+# tortoise-tts moved to separate environment (see requirements-tortoise.txt)
+piper-tts  # Lightweight TTS for fast inference
 
 # Pinned dependencies to resolve conflicts
 bangla<0.0.5  # Fixed Python 3.10 syntax error on Python 3.9

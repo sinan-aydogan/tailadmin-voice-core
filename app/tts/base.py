@@ -3,6 +3,12 @@ Base abstract class for TTS Engines.
 """
 from abc import ABC, abstractmethod
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor
+
+# Dedicated thread pool for TTS inference
+# Each engine gets its own thread so they don't block each other or the event loop
+_TTS_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tts_inference")
+
 
 class BaseTTS(ABC):
     """

@@ -10,12 +10,14 @@ from app.database import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User
 from app.models.playlist import Playlist, PlaylistItem, PlaylistStatus, PlaylistItemStatus
+from sqlalchemy.orm import joinedload
 from app.schemas.playlist import (
     PlaylistCreate, PlaylistUpdate, PlaylistResponse, PlaylistListResponse,
     PlaylistItemCreate, PlaylistItemUpdate, PlaylistItemResponse,
     PlaylistReorderRequest, PlaylistStatusResponse
 )
 from app.queue.worker import submit_tts_task
+from sqlalchemy import func
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
 
@@ -312,7 +314,9 @@ async def process_playlist(
     current_user: User = Depends(get_current_user)
 ):
     """Start processing a playlist."""
-    playlist = db.query(Playlist).filter(
+    playlist = db.query(Playlist).options(
+        joinedload(Playlist.items)
+    ).filter(
         Playlist.id == playlist_id,
         Playlist.user_id == current_user.id
     ).first()
@@ -337,11 +341,20 @@ async def process_playlist(
     playlist.started_at = datetime.utcnow()
     db.commit()
     
-    logger.info(f"Started processing playlist '{playlist.name}' with {len(playlist.items)} items")
+    # Re-query items after commit to ensure fresh data
+    items = db.query(PlaylistItem).filter(
+        PlaylistItem.playlist_id == playlist_id
+    ).all()
+    
+    logger.info(f"Started processing playlist '{playlist.name}' with {len(items)} items")
     
     # Submit each item to the queue
     processed_count = 0
-    for item in playlist.items:
+    queued_items = [item for item in items if item.status == PlaylistItemStatus.QUEUED]
+    logger.info(f"Found {len(queued_items)} items with QUEUED status")
+    
+    for item in items:
+        logger.info(f"Checking item {item.id}: status={item.status}, text={item.text[:30]}...")
         if item.status == PlaylistItemStatus.QUEUED:
             try:
                 # Determine model and profile to use
@@ -354,7 +367,7 @@ async def process_playlist(
                     item.error_message = "No TTS model specified"
                     continue
                 
-                # Submit to queue
+                # Submit to queue - item stays QUEUED until worker starts processing
                 task = submit_tts_task(
                     text=item.text,
                     model_id=model_id,
@@ -363,9 +376,9 @@ async def process_playlist(
                     playlist_item_id=item.id
                 )
                 
-                item.status = PlaylistItemStatus.PROCESSING
+                # Item remains QUEUED - worker will change to PROCESSING when it starts
                 processed_count += 1
-                logger.info(f"Submitted playlist item {item.id} to queue as task {task.id}")
+                logger.info(f"Submitted playlist item {item.id} to queue as task {task.id} (status remains QUEUED)")
                 
             except Exception as e:
                 logger.error(f"Failed to submit playlist item {item.id}: {e}")
@@ -424,11 +437,57 @@ async def resume_playlist(
     if playlist.status != PlaylistStatus.PAUSED:
         raise HTTPException(status_code=400, detail="Playlist is not paused")
     
+    # Reset failed items to queued before resuming
+    failed_items = db.query(PlaylistItem).filter(
+        PlaylistItem.playlist_id == playlist_id,
+        PlaylistItem.status == PlaylistItemStatus.FAILED
+    ).all()
+    for item in failed_items:
+        item.status = PlaylistItemStatus.QUEUED
+        item.error_message = None
+    
     playlist.status = PlaylistStatus.PROCESSING
     db.commit()
     
-    logger.info(f"Resumed playlist '{playlist.name}'")
-    return {"message": "Playlist resumed", "playlist_id": playlist_id}
+    # Re-query items and submit any remaining QUEUED items
+    items = db.query(PlaylistItem).filter(
+        PlaylistItem.playlist_id == playlist_id,
+        PlaylistItem.status == PlaylistItemStatus.QUEUED
+    ).all()
+    
+    processed_count = 0
+    for item in items:
+        try:
+            model_id = item.model_id or playlist.single_model_id
+            profile_id = item.profile_id or playlist.single_profile_id
+            
+            if not model_id:
+                logger.warning(f"Skipping item {item.id}: no model specified")
+                item.status = PlaylistItemStatus.FAILED
+                item.error_message = "No TTS model specified"
+                continue
+            
+            task = submit_tts_task(
+                text=item.text,
+                model_id=model_id,
+                profile_id=profile_id,
+                user_id=current_user.id,
+                playlist_item_id=item.id
+            )
+            
+            item.status = PlaylistItemStatus.PROCESSING
+            processed_count += 1
+            logger.info(f"Submitted playlist item {item.id} to queue as task {task.id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to submit playlist item {item.id}: {e}")
+            item.status = PlaylistItemStatus.FAILED
+            item.error_message = str(e)
+    
+    db.commit()
+    
+    logger.info(f"Resumed playlist '{playlist.name}' with {processed_count} new items queued")
+    return {"message": f"Playlist resumed ({processed_count} new items queued)", "playlist_id": playlist_id, "queued_items": processed_count}
 
 
 @router.post("/{playlist_id}/stop")
@@ -454,6 +513,52 @@ async def stop_playlist(
     
     logger.info(f"Stopped playlist '{playlist.name}'")
     return {"message": "Playlist stopped", "playlist_id": playlist_id}
+
+
+@router.get("/{playlist_id}/debug")
+async def debug_playlist(
+    playlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Debug endpoint to check playlist and items status."""
+    playlist = db.query(Playlist).filter(
+        Playlist.id == playlist_id,
+        Playlist.user_id == current_user.id
+    ).first()
+    
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Get item status counts
+    status_counts = db.query(
+        PlaylistItem.status,
+        func.count(PlaylistItem.id)
+    ).filter(
+        PlaylistItem.playlist_id == playlist_id
+    ).group_by(PlaylistItem.status).all()
+    
+    items = db.query(PlaylistItem).filter(
+        PlaylistItem.playlist_id == playlist_id
+    ).all()
+    
+    return {
+        "playlist_id": playlist_id,
+        "playlist_status": playlist.status,
+        "playlist_name": playlist.name,
+        "total_items": playlist.total_items,
+        "status_counts": {status: count for status, count in status_counts},
+        "items": [
+            {
+                "id": item.id,
+                "text": item.text[:50] + "..." if len(item.text) > 50 else item.text,
+                "status": item.status,
+                "model_id": item.model_id,
+                "profile_id": item.profile_id
+            }
+            for item in items
+        ]
+    }
 
 
 from datetime import datetime

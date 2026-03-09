@@ -8,7 +8,7 @@ from functools import partial
 from typing import Optional
 from loguru import logger
 
-from app.tts.base import BaseTTS
+from app.tts.base import BaseTTS, _TTS_EXECUTOR
 from app.config import settings
 from app.core.device import detect_device
 from app.websocket.notification_manager import notification_manager
@@ -131,7 +131,7 @@ class MusicGenEngine(BaseTTS):
             user_id,
             **kwargs
         )
-        result = await loop.run_in_executor(None, sync_func)
+        result = await loop.run_in_executor(_TTS_EXECUTOR, sync_func)
         
         # Send completion notification
         if user_id:

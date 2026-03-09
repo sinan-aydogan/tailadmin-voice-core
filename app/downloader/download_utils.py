@@ -63,6 +63,81 @@ class WebSocketProgressTqdm(hf_tqdm):
                         break
 
 
+def download_piper_model(model_id: str, model_info: dict, local_dir: str, db_factory, user_id: str = None):
+    """Download Piper TTS model files (.onnx and .onnx.json)."""
+    import requests
+    from pathlib import Path
+    from app.websocket import notification_manager
+    
+    model_name = model_info.get("name", model_id)
+    download_url = model_info.get("download_url")
+    json_url = model_info.get("json_url")
+    
+    if not download_url:
+        logger.error(f"No download_url for Piper model {model_id}")
+        return
+    
+    # Derive JSON config URL from ONNX URL if not provided
+    if not json_url:
+        json_url = download_url.replace(".onnx", ".onnx.json")
+    
+    # Create directory
+    Path(local_dir).mkdir(parents=True, exist_ok=True)
+    
+    try:
+        with db_factory() as db:
+            DownloadManager.update_progress(db, model_id, "downloading", progress=1.0)
+        
+        if user_id:
+            notification_manager.notify_download_started_threadsafe(user_id, model_id, model_name)
+        
+        # Download ONNX file
+        logger.info(f"Downloading Piper model: {model_id}")
+        onnx_path = os.path.join(local_dir, os.path.basename(download_url))
+        
+        response = requests.get(download_url, stream=True, timeout=300)
+        response.raise_for_status()
+        
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded = 0
+        
+        with open(onnx_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        progress = (downloaded / total_size) * 50  # First 50% for ONNX
+                        notify_progress(model_id, progress, os.path.basename(download_url), downloaded, total_size * 2)
+        
+        # Download JSON config file
+        logger.info(f"Downloading Piper config: {model_id}")
+        json_path = os.path.join(local_dir, os.path.basename(json_url))
+        
+        response = requests.get(json_url, stream=True, timeout=60)
+        response.raise_for_status()
+        
+        with open(json_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        
+        with db_factory() as db:
+            DownloadManager.update_progress(db, model_id, "completed", progress=100.0)
+            logger.success(f"Finished downloading Piper model {model_id}")
+        
+        if user_id:
+            notification_manager.notify_download_completed_threadsafe(user_id, model_id, model_name)
+            
+    except Exception as e:
+        logger.error(f"Failed to download Piper model {model_id}: {e}")
+        with db_factory() as db:
+            DownloadManager.update_progress(db, model_id, "failed", error=str(e))
+        
+        if user_id:
+            notification_manager.notify_download_failed_threadsafe(user_id, model_id, model_name, str(e))
+
+
 def download_hf_model(db_factory, model_id: str, repo_id: str, local_dir: str, 
                      user_id: Optional[str] = None):
     """
@@ -77,6 +152,13 @@ def download_hf_model(db_factory, model_id: str, repo_id: str, local_dir: str,
     """
     from app.utils.tqdm_handler import StatusTqdm
     from app.websocket import notification_manager
+    
+    # Check if this is a Piper model (special handling)
+    model_info = get_model_info(model_id)
+    if model_info and model_info.get("engine", "").startswith("piper"):
+        logger.info(f"Using Piper download method for {model_id}")
+        download_piper_model(model_id, model_info, local_dir, db_factory, user_id)
+        return
     
     logger.info(f"Starting real download for {model_id} from {repo_id} to {local_dir}")
     

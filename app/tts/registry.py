@@ -8,8 +8,8 @@ from app.tts.base import BaseTTS
 from app.tts.xtts import XTTSEngine
 from app.tts.bark import BarkEngine
 from app.tts.musicgen import MusicGenEngine
-# Tortoise temporarily disabled due to dependency conflicts
-# from app.tts.tortoise import TortoiseEngine
+from app.tts.tortoise import TortoiseEngine
+from app.tts.piper import PiperEngine
 from app.config import settings
 
 class TTSRegistry:
@@ -22,7 +22,11 @@ class TTSRegistry:
         "musicgen-medium": lambda: MusicGenEngine("medium"),
         "musicgen-large": lambda: MusicGenEngine("large"),
         "musicgen-melody": lambda: MusicGenEngine("melody"),
-        # "tortoise": TortoiseEngine,  # Temporarily disabled
+        "tortoise": TortoiseEngine,
+        "piper-tr": lambda: PiperEngine("tr_TR-dfki-medium"),
+        "piper-en": lambda: PiperEngine("en_US-lessac-medium"),
+        "piper-de": lambda: PiperEngine("de_DE-thorsten-medium"),
+        "piper-fr": lambda: PiperEngine("fr_FR-siwis-medium"),
     }
     
     _instances: Dict[str, BaseTTS] = {}

@@ -16,9 +16,12 @@ from app.stt.registry import get_stt_engine
 from app.websocket import notification_manager
 
 class TaskWorker:
-    def __init__(self):
+    def __init__(self, max_concurrent=3):
         self.is_running = False
         self._task = None
+        self.max_concurrent = max_concurrent
+        self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._running_tasks = set()
 
     async def start(self):
         """Start the background worker loop."""
@@ -30,7 +33,7 @@ class TaskWorker:
         from app.utils.tqdm_handler import patch_huggingface_tqdm
         patch_huggingface_tqdm()
         
-        logger.info("Starting background task worker...")
+        logger.info(f"Starting background task worker (max concurrent: {self.max_concurrent})...")
         self._task = asyncio.create_task(self._process_loop())
 
     async def stop(self):
@@ -43,32 +46,77 @@ class TaskWorker:
     async def _process_loop(self):
         while self.is_running:
             try:
-                await self._process_next_task()
+                # Check if we can start more tasks
+                if len(self._running_tasks) < self.max_concurrent:
+                    # Try to get a pending task
+                    task_id = await self._get_pending_task()
+                    if task_id:
+                        # Start task in background (doesn't block)
+                        task_coro = self._process_task_with_semaphore(task_id)
+                        task_future = asyncio.create_task(task_coro)
+                        self._running_tasks.add(task_future)
+                        task_future.add_done_callback(self._running_tasks.discard)
+                
+                # Clean up completed tasks
+                done_tasks = [t for t in self._running_tasks if t.done()]
+                for t in done_tasks:
+                    self._running_tasks.discard(t)
+                    try:
+                        await t  # Get any exceptions
+                    except Exception as e:
+                        logger.error(f"Task error: {e}")
+                        
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"Worker loop error: {e}")
             
-            # Prevent hot loop
-            await asyncio.sleep(2)
-
-    async def _process_next_task(self):
+            # Prevent hot loop - check more frequently when tasks are running
+            await asyncio.sleep(0.5 if self._running_tasks else 2)
+    
+    async def _get_pending_task(self):
+        """Get next pending task from DB, returns task ID only."""
         db = SessionLocal()
         try:
-            # Find next pending task
-            # In a real distributed system, you'd use row locking (SELECT ... FOR UPDATE SKIP LOCKED)
             task = db.query(Task).filter(Task.status == "pending").order_by(Task.created_at.asc()).first()
+            if task:
+                # Mark as running immediately to prevent other workers from picking it up
+                task_id = task.id
+                task.status = "running"
+                task.started_at = datetime.utcnow()
+                db.commit()
+                return task_id  # Return only the ID, not the ORM object
+            return None
+        finally:
+            db.close()
+    
+    async def _process_task_with_semaphore(self, task_id: int):
+        """Process a task with semaphore control."""
+        async with self._semaphore:
+            await self._execute_task(task_id)
+
+    async def _execute_task(self, task_id: int):
+        """Execute a single task (called by semaphore-controlled wrapper)."""
+        db = SessionLocal()
+        try:
+            # Fetch task fresh from DB using the ID
+            task = db.query(Task).filter(Task.id == task_id).first()
             if not task:
                 return
-                
-            # Mark as running
-            task.status = "running"
-            task.started_at = datetime.utcnow()
-            db.commit()
             
             logger.info(f"Worker picked up task {task.id} (type: {task.type})")
             
+            # Update playlist item status to PROCESSING if this is a playlist task
             payload = json.loads(task.payload)
+            playlist_item_id = payload.get("playlist_item_id")
+            if playlist_item_id:
+                from app.models.playlist import PlaylistItem, PlaylistItemStatus
+                playlist_item = db.query(PlaylistItem).filter(PlaylistItem.id == playlist_item_id).first()
+                if playlist_item:
+                    playlist_item.status = PlaylistItemStatus.PROCESSING
+                    db.commit()
+                    logger.info(f"Updated playlist item {playlist_item_id} to PROCESSING")
+            
             success = False
             result_data = None
             
@@ -251,18 +299,26 @@ def submit_tts_task(text: str, model_id: str, profile_id: int = None, user_id: i
     Returns:
         Created Task object
     """
+    import json
+    import uuid
     db = SessionLocal()
     try:
+        # Generate output path
+        output_filename = f"{uuid.uuid4().hex}.wav"
+        output_path = f"data/outputs/tts/{output_filename}"
+        
+        payload = {
+            "text": text,
+            "model_id": model_id,
+            "profile_id": profile_id,
+            "playlist_item_id": playlist_item_id,
+            "output_path": output_path
+        }
+        
         task = Task(
-            task_type="tts",
+            type="tts",
             status="pending",
-            user_id=user_id,
-            params={
-                "text": text,
-                "model_id": model_id,
-                "profile_id": profile_id,
-                "playlist_item_id": playlist_item_id
-            }
+            payload=json.dumps(payload)
         )
         db.add(task)
         db.commit()

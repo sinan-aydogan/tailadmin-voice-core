@@ -54,6 +54,9 @@ cd tailadmin-voice-core
 
 # 2. macOS başlatma script'ini çalıştır
 ./start-macos.sh
+
+# Masaüstü kısayolu oluştur (isteğe bağlı)
+./start-macos.sh --create-shortcut
 ```
 
 #### Windows (NVIDIA GPU - CUDA)
@@ -186,6 +189,9 @@ cd tailadmin-voice-core
 
 # 2. Run macOS startup script
 ./start-macos.sh
+
+# Create Desktop shortcut (optional)
+./start-macos.sh --create-shortcut
 ```
 
 #### Windows (NVIDIA GPU - CUDA)

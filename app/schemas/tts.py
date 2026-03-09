@@ -18,6 +18,7 @@ class TTSOutputResponse(BaseModel):
     text: str
     engine: str
     profile_id: Optional[int] = None
+    profile_name: Optional[str] = None  # Added for display
     language: str
     output_path: str
     duration_sec: Optional[float] = None

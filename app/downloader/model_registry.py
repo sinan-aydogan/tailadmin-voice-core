@@ -64,6 +64,30 @@ AVAILABLE_MODELS = [
         "languages": ["en"]
     },
     {
+        "id": "piper-tr",
+        "engine": "piper-tr",
+        "name": "Piper TTS (Turkish)",
+        "type": "tts",
+        "repo_id": "rhasspy/piper-voices",
+        "description": "Fast, lightweight TTS optimized for Turkish. Great for real-time applications.",
+        "size_estimate_mb": 70,
+        "languages": ["tr"],
+        "download_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR-dfki-medium/tr_TR-dfki-medium.onnx",
+        "json_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR-dfki-medium/tr_TR-dfki-medium.onnx.json"
+    },
+    {
+        "id": "piper-en",
+        "engine": "piper-en",
+        "name": "Piper TTS (English)",
+        "type": "tts",
+        "repo_id": "rhasspy/piper-voices",
+        "description": "Fast, lightweight TTS optimized for English. Great for real-time applications.",
+        "size_estimate_mb": 70,
+        "languages": ["en"],
+        "download_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US-lessac-medium/en_US-lessac-medium.onnx",
+        "json_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US-lessac-medium/en_US-lessac-medium.onnx.json"
+    },
+    {
         "id": "musicgen-small",
         "engine": "musicgen",
         "name": "MusicGen (Small)",

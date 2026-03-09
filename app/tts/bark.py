@@ -7,7 +7,7 @@ from functools import partial
 from typing import Optional
 from loguru import logger
 
-from app.tts.base import BaseTTS
+from app.tts.base import BaseTTS, _TTS_EXECUTOR
 from app.config import settings
 from app.core.device import detect_device
 
@@ -31,9 +31,29 @@ class BarkEngine(BaseTTS):
             return
             
         try:
+            # Set environment variables BEFORE importing bark
+            import torch
+            
+            # Enable GPU for Bark - MUST be set BEFORE importing bark
+            os.environ["BARK_USE_SMALL_MODELS"] = "True" # Memory optimization
+            
+            if self._device == "mps" and torch.backends.mps.is_available():
+                os.environ["SUNO_USE_GPU"] = "True"
+                os.environ["SUNO_OFFLOAD_CPU"] = "False"
+                os.environ["SUNO_ENABLE_MPS"] = "True"  # Critical for MPS support
+                os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+                # Set PyTorch default device to MPS BEFORE loading bark
+                torch.set_default_device("mps")
+                torch.set_default_tensor_type(torch.FloatTensor)
+                logger.info("Bark MPS environment configured")
+            elif self._device == "cuda" and torch.cuda.is_available():
+                os.environ["SUNO_USE_GPU"] = "True"
+                os.environ["SUNO_OFFLOAD_CPU"] = "False"
+                torch.set_default_device("cuda")
+                logger.info("Bark CUDA environment configured")
+            
             # Fix for PyTorch 2.6+ weights_only default change
             # Monkey-patch torch.load to use weights_only=False for compatibility
-            import torch
             _original_torch_load = torch.load
             def _patched_torch_load(*args, **kwargs):
                 if 'weights_only' not in kwargs:
@@ -41,11 +61,10 @@ class BarkEngine(BaseTTS):
                 return _original_torch_load(*args, **kwargs)
             torch.load = _patched_torch_load
             
+            # Now import bark (environment variables are already set)
             from bark import SAMPLE_RATE, generate_audio, preload_models
             
             logger.info(f"Preloading Bark models on {self._device}...")
-            # We enforce HuggingFace to use our custom directories if defined
-            os.environ["BARK_USE_SMALL_MODELS"] = "True" # Memory optimization
             
             # If we downloaded it via our UI, it will be in self.model_path
             # Bark/Transformers usually look at XDG_CACHE_HOME or HUGGINGFACE_HUB_CACHE
@@ -123,5 +142,5 @@ class BarkEngine(BaseTTS):
             profile_path,
             **kwargs
         )
-        result = await loop.run_in_executor(None, sync_func)
+        result = await loop.run_in_executor(_TTS_EXECUTOR, sync_func)
         return result

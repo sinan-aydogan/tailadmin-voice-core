@@ -1,0 +1,20 @@
+# Tortoise TTS isolated environment requirements
+# This environment is used to run Tortoise TTS separately to avoid dependency conflicts
+# Note: torch, torchaudio, llvmlite are symlinked from main .venv to save ~435MB
+
+# Core dependencies (if not symlinked from main venv)
+torch>=2.1.0
+torchaudio>=2.1.0
+
+# Tortoise-specific
+tortoise-tts
+transformers>=4.25.0
+scipy
+numpy
+numba
+tokenizers
+tqdm
+regex
+requests
+huggingface-hub
+psutil  # Required by tortoise for GPU batch size detection

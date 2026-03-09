@@ -147,7 +147,33 @@ async def get_tts_history(
         query = query.filter(TTSOutput.profile_id == profile_id)
         
     outputs = query.order_by(TTSOutput.created_at.desc()).offset(skip).limit(limit).all()
-    return outputs
+    
+    # Enrich with profile names
+    result = []
+    for output in outputs:
+        output_dict = {
+            "id": output.id,
+            "text": output.text,
+            "engine": output.engine,
+            "profile_id": output.profile_id,
+            "profile_name": None,
+            "language": output.language,
+            "output_path": output.output_path,
+            "duration_sec": output.duration_sec,
+            "created_at": output.created_at,
+            "tags": output.tags
+        }
+        
+        # Get profile name if profile_id exists
+        if output.profile_id:
+            from app.models.profile import VoiceProfile
+            profile = db.query(VoiceProfile).filter(VoiceProfile.id == output.profile_id).first()
+            if profile:
+                output_dict["profile_name"] = profile.name
+        
+        result.append(output_dict)
+    
+    return result
 
 @router.get("/{output_id}", response_model=TTSOutputResponse)
 async def get_tts_output(
