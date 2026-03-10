@@ -186,8 +186,9 @@ echo "📦 Activating virtual environment..."
 source "$VENV_DIR/bin/activate"
 
 # Set pip cache and temp directories to project directory to avoid system disk space issues
-export PIP_CACHE_DIR="/Volumes/sinan/projeler/tailadmin-voice-core/.pip-cache"
-export TMPDIR="/Volumes/sinan/projeler/tailadmin-voice-core/.tmp"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+export PIP_CACHE_DIR="$SCRIPT_DIR/.pip-cache"
+export TMPDIR="$SCRIPT_DIR/.tmp"
 mkdir -p "$PIP_CACHE_DIR" "$TMPDIR"
 
 # Upgrade pip
@@ -202,6 +203,10 @@ pip install --quiet -r requirements.txt --cache-dir "$PIP_CACHE_DIR" --no-warn-s
 echo "📁 Creating directories..."
 mkdir -p data/models data/outputs data/profiles data/uploads logs
 
+# Initialize database
+echo "🗄️  Initializing database..."
+python3 migrate.py
+
 # Check PyTorch MPS availability
 echo ""
 echo "🔍 Checking PyTorch and GPU support..."
@@ -215,10 +220,6 @@ print(f"macOS version: {platform.mac_ver()[0]}")
 if torch.backends.mps.is_available():
     print("✅ MPS (Metal Performance Shaders) is available!")
     print(f"   GPU: Apple M-Series")
-    # Test MPS
-    device = torch.device("mps")
-    test_tensor = torch.randn(100, 100).to(device)
-    print("✅ MPS test passed")
 else:
     print("⚠️  MPS not available, will use CPU")
     if platform.machine() == 'arm64':

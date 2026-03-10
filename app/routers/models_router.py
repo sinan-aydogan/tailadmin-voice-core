@@ -27,30 +27,67 @@ async def list_available_models(
     db: Session = Depends(get_db)
 ):
     """List all models available for download and their download status."""
-    models = get_available_models()
+    from concurrent.futures import ThreadPoolExecutor
     
-    # Check actual download status with integrity checker
+    models = get_available_models()
     result = []
-    for model in models:
-        m = dict(model)
+    
+    def check_model_status(model_id):
+        """Check model status in a separate thread."""
+        try:
+            return verify_model_files(model_id)
+        except Exception as e:
+            logger.error(f"Error checking model {model_id}: {e}")
+            return None
+    
+    # Use thread pool to check models concurrently
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(check_model_status, m["id"]): m["id"] for m in models}
         
-        # Use integrity checker for accurate status
-        integrity_result = verify_model_files(m["id"])
-        m["status"] = integrity_result.status.value
-        m["is_downloaded"] = integrity_result.is_healthy
-        m["integrity_details"] = {
-            "missing_files": integrity_result.missing_files,
-            "corrupted_files": integrity_result.corrupted_files,
-            "total_size_mb": round(integrity_result.total_size_mb, 2)
-        }
-        
-        # Also check DB status for downloading state
-        download = DownloadManager.get_download(db, m["id"])
-        if download and download.status == "downloading":
-            m["status"] = "downloading"
-            m["download_progress"] = download.progress_pct
-                
-        result.append(m)
+        for model in models:
+            m = dict(model)
+            model_id = m["id"]
+            
+            # Get integrity result from thread pool
+            future = futures.get(model_id)
+            if future:
+                try:
+                    integrity_result = future.result(timeout=3.0)  # 3 second timeout per model
+                    if integrity_result:
+                        m["status"] = integrity_result.status.value
+                        m["is_downloaded"] = integrity_result.is_healthy
+                        m["integrity_details"] = {
+                            "missing_files": integrity_result.missing_files,
+                            "corrupted_files": integrity_result.corrupted_files,
+                            "total_size_mb": round(integrity_result.total_size_mb, 2)
+                        }
+                        
+                        # Update DB if file check shows downloaded but DB doesn't
+                        if integrity_result.is_healthy:
+                            download = DownloadManager.get_download(db, model_id)
+                            if download and download.status != "completed":
+                                DownloadManager.update_progress(db, model_id, "completed", progress=100.0)
+                                logger.info(f"Updated DB status for {model_id} to completed based on file check")
+                    else:
+                        m["status"] = "not_downloaded"
+                        m["is_downloaded"] = False
+                        m["integrity_details"] = {}
+                except Exception as e:
+                    logger.warning(f"Timeout checking model {model_id}: {e}")
+                    m["status"] = "unknown"
+                    m["is_downloaded"] = False
+                    m["integrity_details"] = {"error": "Check timeout"}
+            
+            # Also check DB status for downloading state
+            download = DownloadManager.get_download(db, model_id)
+            if download and download.status == "downloading":
+                m["status"] = "downloading"
+                m["download_progress"] = download.progress_pct
+            elif download and download.status == "completed":
+                m["status"] = "downloaded"
+                m["is_downloaded"] = True
+                    
+            result.append(m)
         
     return result
 

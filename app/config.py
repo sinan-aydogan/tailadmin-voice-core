@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     DEFAULT_PASSWORD: str = "admin"
     
     # Paths
+    DATA_DIR: Path = Path("./data")
     MODELS_DIR: Path = Path("./data/models")
     OUTPUTS_DIR: Path = Path("./data/outputs")
     PROFILES_DIR: Path = Path("./data/profiles")

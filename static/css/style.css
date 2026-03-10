@@ -247,16 +247,20 @@ nav button.settings-tab.active {
 
 /* File Upload Component */
 .file-upload-zone {
-    border: 2px dashed hsl(var(--border));
+    border: 2px dashed hsl(var(--primary) / 0.4) !important;
     border-radius: 0.75rem;
-    background-color: hsl(var(--muted) / 0.3);
+    background-color: hsl(var(--muted) / 0.6) !important;
     transition: all 0.2s ease;
     cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .file-upload-zone:hover {
-    border-color: hsl(var(--primary) / 0.5);
-    background-color: hsl(var(--primary) / 0.05);
+    border-color: hsl(var(--primary)) !important;
+    border-style: solid !important;
+    background-color: hsl(var(--primary) / 0.15) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
 }
 
 .file-upload-zone.drag-over {

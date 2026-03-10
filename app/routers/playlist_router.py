@@ -36,7 +36,19 @@ async def list_playlists(
     result = []
     for playlist in playlists:
         data = {
-            **playlist.__dict__,
+            'id': playlist.id,
+            'name': playlist.name,
+            'description': playlist.description,
+            'status': playlist.status,
+            'total_items': playlist.total_items,
+            'completed_items': playlist.completed_items,
+            'failed_items': playlist.failed_items,
+            'use_single_model': playlist.use_single_model,
+            'single_model_id': playlist.single_model_id,
+            'single_language': playlist.single_language,
+            'created_at': playlist.created_at,
+            'started_at': playlist.started_at,
+            'completed_at': playlist.completed_at,
             'progress_percentage': playlist.get_progress_percentage(),
             'duration_seconds': playlist.get_duration_seconds()
         }
@@ -59,6 +71,8 @@ async def create_playlist(
         use_single_model=playlist_data.use_single_model,
         single_model_id=playlist_data.single_model_id,
         single_profile_id=playlist_data.single_profile_id,
+        single_language=playlist_data.single_language,
+        single_tag_id=playlist_data.single_tag_id,
         user_id=current_user.id,
         total_items=len(playlist_data.items)
     )
@@ -73,7 +87,8 @@ async def create_playlist(
             text=item_data.text,
             position=idx,
             model_id=item_data.model_id if not playlist_data.use_single_model else None,
-            profile_id=item_data.profile_id if not playlist_data.use_single_model else None
+            profile_id=item_data.profile_id if not playlist_data.use_single_model else None,
+            language=item_data.language if not playlist_data.use_single_model else None
         )
         db.add(item)
     
@@ -199,7 +214,8 @@ async def add_playlist_item(
         text=item_data.text,
         position=max_position,
         model_id=item_data.model_id if not playlist.use_single_model else None,
-        profile_id=item_data.profile_id if not playlist.use_single_model else None
+        profile_id=item_data.profile_id if not playlist.use_single_model else None,
+        language=item_data.language if not playlist.use_single_model else None
     )
     
     db.add(item)

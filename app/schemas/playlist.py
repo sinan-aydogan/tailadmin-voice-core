@@ -12,6 +12,7 @@ class PlaylistItemBase(BaseModel):
     position: int = 0
     model_id: Optional[str] = None
     profile_id: Optional[int] = None
+    language: Optional[str] = None
 
 
 class PlaylistItemCreate(PlaylistItemBase):
@@ -25,6 +26,7 @@ class PlaylistItemUpdate(BaseModel):
     position: Optional[int] = None
     model_id: Optional[str] = None
     profile_id: Optional[int] = None
+    language: Optional[str] = None
 
 
 class PlaylistItemResponse(PlaylistItemBase):
@@ -50,6 +52,7 @@ class PlaylistBase(BaseModel):
     single_model_id: Optional[str] = None
     single_profile_id: Optional[int] = None
     single_tag_id: Optional[int] = None
+    single_language: Optional[str] = None
 
 
 class PlaylistCreate(PlaylistBase):
@@ -65,6 +68,7 @@ class PlaylistUpdate(BaseModel):
     single_model_id: Optional[str] = None
     single_profile_id: Optional[int] = None
     single_tag_id: Optional[int] = None
+    single_language: Optional[str] = None
 
 
 class PlaylistResponse(PlaylistBase):
@@ -97,6 +101,8 @@ class PlaylistListResponse(BaseModel):
     failed_items: int
     progress_percentage: int
     use_single_model: bool
+    single_model_id: Optional[str] = None
+    single_language: Optional[str] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

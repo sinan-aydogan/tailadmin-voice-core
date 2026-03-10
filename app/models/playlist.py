@@ -38,6 +38,7 @@ class Playlist(Base):
     single_model_id = Column(String, nullable=True)    # Model ID if single_model is True
     single_profile_id = Column(Integer, nullable=True) # Profile ID if single_model is True
     single_tag_id = Column(Integer, nullable=True)     # Tag ID if single_model is True
+    single_language = Column(String, nullable=True)    # Language code if single_model is True
     
     # Status tracking
     status = Column(String, default=PlaylistStatus.PENDING)
@@ -85,6 +86,7 @@ class PlaylistItem(Base):
     # TTS Configuration (if use_single_model is False)
     model_id = Column(String, nullable=True)
     profile_id = Column(Integer, nullable=True)
+    language = Column(String, nullable=True)
     
     # Status
     status = Column(String, default=PlaylistItemStatus.QUEUED)

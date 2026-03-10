@@ -64,6 +64,46 @@ async def lifespan(app: FastAPI):
     from app.utils.tqdm_handler import patch_huggingface_tqdm
     patch_huggingface_tqdm()
     
+    # Pre-load all downloaded TTS models to avoid first-request delay
+    # This runs in a separate thread to not block startup
+    logger.info("Pre-loading downloaded TTS models (this may take a minute)...")
+    import asyncio
+    from app.tts.registry import get_tts_engine, TTS_ENGINES
+    from app.downloader.integrity_checker import is_model_healthy
+    
+    async def preload_models():
+        try:
+            # Get list of ready TTS models
+            from app.downloader.integrity_checker import get_ready_for_tts
+            ready_models = get_ready_for_tts()
+            
+            # Map model IDs to engine names
+            model_to_engine = {
+                "xtts-v2": "xtts",
+                "bark": "bark",
+                "tortoise": "tortoise",
+                "piper": "piper"
+            }
+            
+            for model_id in ready_models:
+                engine_name = model_to_engine.get(model_id)
+                if engine_name:
+                    try:
+                        logger.info(f"Pre-loading {engine_name} engine...")
+                        engine = get_tts_engine(engine_name)
+                        if hasattr(engine, 'load_model'):
+                            await asyncio.to_thread(engine.load_model)
+                            logger.success(f"{engine_name} model pre-loaded successfully")
+                    except Exception as e:
+                        logger.warning(f"Could not pre-load {engine_name}: {e}")
+                        
+            logger.success("Model pre-loading completed")
+        except Exception as e:
+            logger.warning(f"Could not pre-load models: {e}")
+    
+    # Start pre-loading in background
+    preload_task = asyncio.create_task(preload_models())
+    
     # Start background worker
     worker_task = asyncio.create_task(worker.start())
     
@@ -162,7 +202,8 @@ app.include_router(tags_router)
 app.include_router(llm_router)
 app.include_router(playlist_router)
 
-# Serve data directory for audio/model files
+# Serve data directory for audio/model files only
+# Static UI files are served by a separate frontend server on port 5002
 app.mount("/data", StaticFiles(directory="data"), name="data")
 
 

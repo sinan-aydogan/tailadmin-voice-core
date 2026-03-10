@@ -666,9 +666,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                     
                                     <div class="space-y-2" id="profileSelectContainer">
-                                        <label class="text-sm font-medium">Ses Profili <span id="profileRequired" class="text-destructive">*</span></label>
+                                        <label class="text-sm font-medium">Ses Profili (İsteğe bağlı)</label>
                                         <select id="ttsProfile" class="input">
-                                            <option value="">Profil seçin...</option>
+                                            <option value="">Varsayılan ses kullan</option>
                                             ${profiles.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
                                         </select>
                                     </div>
@@ -847,26 +847,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.onTtsEngineChange = () => {
         const engine = document.getElementById('ttsEngine')?.value || '';
         const durationContainer = document.getElementById('musicGenDurationContainer');
-        const profileContainer = document.getElementById('profileSelectContainer');
-        const profileSelect = document.getElementById('ttsProfile');
-        const profileRequired = document.getElementById('profileRequired');
         
         // Show/hide duration selector for MusicGen
         if (engine.startsWith('musicgen')) {
             durationContainer.style.display = 'block';
         } else {
             durationContainer.style.display = 'none';
-        }
-        
-        // Make profile optional for MusicGen models
-        if (engine.startsWith('musicgen')) {
-            profileContainer.style.opacity = '0.6';
-            profileSelect.required = false;
-            profileRequired.style.display = 'none';
-        } else {
-            profileContainer.style.opacity = '1';
-            profileSelect.required = true;
-            profileRequired.style.display = 'inline';
         }
     };
 
@@ -887,13 +873,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Validate text
         if (!text) {
             notificationSystem?.showToast('Lütfen metin girin', 'warning');
-            return;
-        }
-        
-        // Profile is required only for non-MusicGen engines
-        const isMusicGen = engine.startsWith('musicgen');
-        if (!isMusicGen && !profileId) {
-            notificationSystem?.showToast('Lütfen ses profili seçin', 'warning');
             return;
         }
 
@@ -1193,7 +1172,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             mainContent.innerHTML = `
                 <div class="space-y-6">
-                    <h2 class="text-2xl font-bold">İşlem Kuyruğu</h2>
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-2xl font-bold">İşlem Kuyruğu</h2>
+                        <button onclick="refreshQueue()" class="btn btn-outline btn-sm">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i>
+                            Yenile
+                        </button>
+                    </div>
 
                     <div class="card">
                         <div class="table-container">
@@ -1209,7 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </thead>
                                 <tbody>
                                     ${allTasks.length > 0 ? allTasks.map(t => `
-                                        <tr>
+                                        <tr class="cursor-pointer hover:bg-muted/50 transition-colors" onclick="showTaskLogsModal(${t.id}, '${t.type || 'İşlem'}')">
                                             <td>
                                                 <div>
                                                     <p class="font-medium">${t.type || 'İşlem'}</p>
@@ -1232,11 +1217,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                             </td>
                                             <td>
                                                 ${t.status === 'pending' || t.status === 'running' || t.status === 'downloading' ? `
-                                                    <button onclick="cancelTask('${t.id}', ${t.itemType === 'download'})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
+                                                    <button onclick="event.stopPropagation(); cancelTask('${t.id}', ${t.itemType === 'download'})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
                                                         <i data-lucide="x" class="w-4 h-4"></i>
                                                     </button>
                                                 ` : `
-                                                    <button onclick="deleteTask('${t.id}', ${t.itemType === 'download'})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
+                                                    <button onclick="event.stopPropagation(); deleteTask('${t.id}', ${t.itemType === 'download'})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
                                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                                                     </button>
                                                 `}
@@ -1298,6 +1283,142 @@ document.addEventListener('DOMContentLoaded', () => {
             notificationSystem?.showToast('Hata: ' + e.message, 'error');
         }
     };
+
+    window.refreshQueue = async () => {
+        const btn = document.querySelector('button[onclick="refreshQueue()"]');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline mr-2"></div> Yenileniyor...';
+        }
+        
+        await renderQueue();
+        
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i> Yenile';
+            lucide.createIcons();
+        }
+    };
+
+    // Task Logs Modal
+    window.showTaskLogsModal = async (taskId, taskType) => {
+        // Create modal HTML
+        const modal = document.createElement('div');
+        modal.id = 'taskLogsModal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm';
+        modal.innerHTML = `
+            <div class="bg-card border border-border rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-border">
+                    <div>
+                        <h3 class="text-lg font-semibold">İşlem Logları</h3>
+                        <p class="text-sm text-muted-foreground">${taskType} - ID: ${taskId}</p>
+                    </div>
+                    <button onclick="closeTaskLogsModal()" class="p-2 rounded-lg hover:bg-muted transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-auto p-4">
+                    <div id="taskLogsContent" class="space-y-2">
+                        <div class="flex items-center justify-center py-8">
+                            <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-border flex justify-end gap-2">
+                    <button onclick="refreshTaskLogs(${taskId}, '${taskType}')" class="btn btn-outline btn-sm">
+                        <i data-lucide="refresh-cw" class="w-4 h-4 mr-1"></i>
+                        Yenile
+                    </button>
+                    <button onclick="closeTaskLogsModal()" class="btn btn-secondary btn-sm">
+                        Kapat
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        lucide.createIcons();
+        
+        // Load logs
+        await loadTaskLogs(taskId);
+    };
+
+    async function loadTaskLogs(taskId) {
+        const content = document.getElementById('taskLogsContent');
+        if (!content) return;
+        
+        try {
+            const logs = await api.getTaskLogs(taskId);
+            
+            if (logs.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center py-8 text-muted-foreground">
+                        <i data-lucide="file-text" class="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+                        <p>Henüz log kaydı bulunmuyor</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+            
+            content.innerHTML = `
+                <div class="space-y-1">
+                    ${logs.map((log, index) => {
+                        const levelColors = {
+                            'INFO': 'text-blue-500',
+                            'SUCCESS': 'text-green-500',
+                            'WARNING': 'text-yellow-500',
+                            'ERROR': 'text-red-500',
+                            'DEBUG': 'text-gray-500'
+                        };
+                        const color = levelColors[log.level] || 'text-foreground';
+                        const time = new Date(log.timestamp).toLocaleTimeString('tr-TR');
+                        
+                        return `
+                            <div class="flex items-start gap-3 py-1 px-2 rounded hover:bg-muted/50 text-sm font-mono ${index % 2 === 0 ? 'bg-muted/20' : ''}">
+                                <span class="text-muted-foreground text-xs whitespace-nowrap">${time}</span>
+                                <span class="${color} font-semibold text-xs whitespace-nowrap w-16">${log.level}</span>
+                                <span class="text-foreground break-all">${escapeHtml(log.message)}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        } catch (e) {
+            content.innerHTML = `
+                <div class="text-center py-8 text-destructive">
+                    <i data-lucide="alert-circle" class="w-12 h-12 mx-auto mb-2"></i>
+                    <p>Loglar yüklenirken hata oluştu</p>
+                    <p class="text-sm text-muted-foreground">${e.message}</p>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+    }
+
+    window.refreshTaskLogs = async (taskId, taskType) => {
+        const content = document.getElementById('taskLogsContent');
+        if (content) {
+            content.innerHTML = `
+                <div class="flex items-center justify-center py-8">
+                    <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            `;
+        }
+        await loadTaskLogs(taskId);
+    };
+
+    window.closeTaskLogsModal = () => {
+        const modal = document.getElementById('taskLogsModal');
+        if (modal) {
+            modal.remove();
+        }
+    };
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
     // ==================== Settings ====================
     let currentSettingsTab = 'general';
@@ -2368,13 +2489,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                             <div class="flex items-center gap-3">
                                                 <i data-lucide="chevron-right" class="w-5 h-5 transition-transform playlist-toggle-icon" id="toggle-icon-${playlist.id}"></i>
                                                 <div>
-                                                    <h3 class="font-semibold">${playlist.name}</h3>
+                                                    <div class="flex items-center gap-2">
+                                                        <h3 class="font-semibold">${playlist.name}</h3>
+                                                        ${playlist.use_single_model ? 
+                                                            `<span class="badge badge-primary text-xs">Tek Tip</span>` : 
+                                                            `<span class="badge badge-secondary text-xs">Çok Tipli</span>`
+                                                        }
+                                                    </div>
                                                     <p class="text-sm text-muted-foreground">
                                                         ${playlist.total_items} iş • 
                                                         ${playlist.status === 'completed' ? 'Tamamlandı' : 
                                                           playlist.status === 'processing' ? 'İşleniyor' :
                                                           playlist.status === 'paused' ? 'Duraklatıldı' : 'Bekliyor'}
                                                         ${playlist.duration_seconds ? ` • ${formatDuration(playlist.duration_seconds)}` : ''}
+                                                        ${playlist.use_single_model ? ` • ${getModelDisplayName(playlist.single_model_id || 'xtts-v2')}` : ''}
+                                                        ${playlist.use_single_model && playlist.single_language ? ` • ${getLanguageDisplayName(playlist.single_language)}` : ''}
                                                     </p>
                                                 </div>
                                             </div>
@@ -2512,6 +2641,37 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${hours}s ${mins}dk`;
     }
 
+    window.getModelDisplayName = function(modelId) {
+        const modelNames = {
+            'xtts-v2': 'XTTS v2',
+            'bark': 'Bark',
+            'tortoise': 'Tortoise',
+            'piper': 'Piper',
+            'xtts': 'XTTS'
+        };
+        return modelNames[modelId] || modelId;
+    }
+
+    window.getLanguageDisplayName = function(langCode) {
+        const languageNames = {
+            'tr': 'TR',
+            'en': 'EN',
+            'de': 'DE',
+            'fr': 'FR',
+            'es': 'ES',
+            'it': 'IT',
+            'pt': 'PT',
+            'pl': 'PL',
+            'ru': 'RU',
+            'nl': 'NL',
+            'ar': 'AR',
+            'zh': 'ZH',
+            'ja': 'JA',
+            'ko': 'KO'
+        };
+        return languageNames[langCode] || langCode;
+    }
+
     window.togglePlaylist = async function(playlistId) {
         const itemsDiv = document.getElementById(`playlist-items-${playlistId}`);
         const icon = document.getElementById(`toggle-icon-${playlistId}`);
@@ -2547,6 +2707,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${item.status === 'completed' ? '✓ Tamamlandı' : 
                               item.status === 'processing' ? '⏳ İşleniyor' :
                               item.status === 'failed' ? '✗ Hata' : '⏸ Sırada'}
+                            ${!playlist.use_single_model && item.model_id ? ` • ${getModelDisplayName(item.model_id)}` : ''}
+                            ${!playlist.use_single_model && item.language ? ` • ${getLanguageDisplayName(item.language)}` : ''}
                         </p>
                     </div>
                     <button onclick="deletePlaylistItem(${playlistId}, ${item.id})" class="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
@@ -2668,6 +2830,25 @@ document.addEventListener('DOMContentLoaded', () => {
                             </select>
                         </div>
                         <div>
+                            <label class="block text-sm font-medium mb-1">Dil</label>
+                            <select id="singleLanguage" class="input w-full">
+                                <option value="tr">Türkçe</option>
+                                <option value="en">English</option>
+                                <option value="de">Deutsch</option>
+                                <option value="fr">Français</option>
+                                <option value="es">Español</option>
+                                <option value="it">Italiano</option>
+                                <option value="pt">Português</option>
+                                <option value="pl">Polski</option>
+                                <option value="ru">Русский</option>
+                                <option value="nl">Nederlands</option>
+                                <option value="ar">العربية</option>
+                                <option value="zh">中文</option>
+                                <option value="ja">日本語</option>
+                                <option value="ko">한국어</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-sm font-medium mb-1">Etiket</label>
                             <select id="singleTagId" class="input w-full">
                                 <option value="">Etiket seçin (isteğe bağlı)</option>
@@ -2739,6 +2920,25 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </select>
                             </div>
                             <div>
+                                <label class="block text-sm font-medium mb-1">Dil</label>
+                                <select id="editSingleLanguage" class="input w-full">
+                                    <option value="tr" ${playlist.single_language === 'tr' ? 'selected' : ''}>Türkçe</option>
+                                    <option value="en" ${playlist.single_language === 'en' ? 'selected' : ''}>English</option>
+                                    <option value="de" ${playlist.single_language === 'de' ? 'selected' : ''}>Deutsch</option>
+                                    <option value="fr" ${playlist.single_language === 'fr' ? 'selected' : ''}>Français</option>
+                                    <option value="es" ${playlist.single_language === 'es' ? 'selected' : ''}>Español</option>
+                                    <option value="it" ${playlist.single_language === 'it' ? 'selected' : ''}>Italiano</option>
+                                    <option value="pt" ${playlist.single_language === 'pt' ? 'selected' : ''}>Português</option>
+                                    <option value="pl" ${playlist.single_language === 'pl' ? 'selected' : ''}>Polski</option>
+                                    <option value="ru" ${playlist.single_language === 'ru' ? 'selected' : ''}>Русский</option>
+                                    <option value="nl" ${playlist.single_language === 'nl' ? 'selected' : ''}>Nederlands</option>
+                                    <option value="ar" ${playlist.single_language === 'ar' ? 'selected' : ''}>العربية</option>
+                                    <option value="zh" ${playlist.single_language === 'zh' ? 'selected' : ''}>中文</option>
+                                    <option value="ja" ${playlist.single_language === 'ja' ? 'selected' : ''}>日本語</option>
+                                    <option value="ko" ${playlist.single_language === 'ko' ? 'selected' : ''}>한국어</option>
+                                </select>
+                            </div>
+                            <div>
                                 <label class="block text-sm font-medium mb-1">Etiket</label>
                                 <select id="editSingleTagId" class="input w-full">
                                     <option value="">Etiket seçin (isteğe bağlı)</option>
@@ -2796,12 +2996,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (useSingleModel) {
             const modelSelect = document.getElementById('editSingleModelId');
+            const languageSelect = document.getElementById('editSingleLanguage');
             const tagSelect = document.getElementById('editSingleTagId');
             if (modelSelect) data.single_model_id = modelSelect.value;
+            if (languageSelect) data.single_language = languageSelect.value;
             if (tagSelect) data.single_tag_id = tagSelect.value ? parseInt(tagSelect.value) : null;
         } else {
             data.single_model_id = null;
             data.single_profile_id = null;
+            data.single_language = null;
             data.single_tag_id = null;
         }
         
@@ -2834,15 +3037,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (useSingleModel) {
             const modelSelect = document.getElementById('singleModelId');
+            const languageSelect = document.getElementById('singleLanguage');
             const tagSelect = document.getElementById('singleTagId');
             if (modelSelect) data.single_model_id = modelSelect.value;
+            if (languageSelect) data.single_language = languageSelect.value;
             if (tagSelect) data.single_tag_id = tagSelect.value ? parseInt(tagSelect.value) : null;
         }
         
         try {
             await api.createPlaylist(data);
             
-            closeModal(document.querySelector('.fixed.z-50'));
+            // Close the modal
+            const modal = document.querySelector('.fixed.z-50');
+            if (modal) modal.remove();
+            
             notificationSystem?.showToast('Liste oluşturuldu', 'success');
             renderPlaylists();
         } catch (e) {
@@ -2898,6 +3106,25 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         document.body.appendChild(modal);
         lucide.createIcons();
+        
+        // Add paste event listener to trim whitespace
+        const textArea = document.getElementById('itemText');
+        if (textArea) {
+            textArea.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                const trimmedText = pastedText.trim();
+                
+                // Insert trimmed text at cursor position
+                const start = textArea.selectionStart;
+                const end = textArea.selectionEnd;
+                const currentValue = textArea.value;
+                textArea.value = currentValue.substring(0, start) + trimmedText + currentValue.substring(end);
+                
+                // Move cursor to end of inserted text
+                textArea.selectionStart = textArea.selectionEnd = start + trimmedText.length;
+            });
+        }
     };
 
     window.addPlaylistItem = async function(playlistId) {
@@ -2917,7 +3144,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             await api.addPlaylistItem(playlistId, data);
-            closeModal(document.querySelector('.fixed.z-50'));
+            
+            // Close the modal
+            const modal = document.querySelector('.fixed.z-50');
+            if (modal) modal.remove();
+            
             notificationSystem?.showToast('İş eklendi', 'success');
             
             // Refresh playlist view to update item count

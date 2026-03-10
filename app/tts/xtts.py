@@ -27,10 +27,17 @@ class XTTSEngine(BaseTTS):
         # Simple check - could be expanded to verify all necessary files
         return os.path.exists(self.model_path) and os.listdir(self.model_path)
 
+    def load_model(self):
+        """Public method to load the model. Can be called for pre-loading."""
+        self._load_model()
+    
     def _load_model(self):
         """Lazy load the model to save memory until generation."""
         if self._model is not None:
+            logger.info("XTTS model already loaded, skipping initialization")
             return
+        
+        logger.info(f"Starting XTTS model load from {self.model_path}...")
             
         # Fix for PyTorch 2.6+ safe loading (weights_only=True)
         # We need to allowlist XttsConfig and related classes because the TTS library uses torch.load internally
@@ -60,21 +67,26 @@ class XTTSEngine(BaseTTS):
             from TTS.tts.configs.xtts_config import XttsConfig
             from TTS.tts.models.xtts import Xtts
             
-            logger.info(f"Loading XTTS v2 model from {self.model_path} on {self._device}...")
+            logger.info(f"Loading XTTS v2 config from {self.model_path}...")
             config = XttsConfig()
             config.load_json(os.path.join(self.model_path, "config.json"))
+            logger.info("XTTS config loaded, initializing model...")
             
             self._model = Xtts.init_from_config(config)
+            logger.info("XTTS model initialized, loading checkpoint...")
+            
             self._model.load_checkpoint(
                 config, 
                 checkpoint_dir=self.model_path, 
                 eval=True,
                 use_deepspeed=False # Set to True if DeepSpeed is configured
             )
+            logger.info("XTTS checkpoint loaded, moving to device...")
             
             # Use appropriate device
             if self._device in ["cuda", "mps"]:
                 self._model.cuda() # Coqui maps to appropriate hardware if configured right
+                logger.info(f"XTTS model moved to {self._device}")
             
             logger.success("XTTS v2 model loaded successfully")
             
@@ -85,17 +97,91 @@ class XTTSEngine(BaseTTS):
             logger.error(f"Failed to load XTTS model: {e}")
             raise
 
+    def _load_model_with_yield(self):
+        """Load model with periodic yielding to allow other threads to run."""
+        import time
+        
+        if self._model is not None:
+            return
+        
+        logger.info(f"[XTTS] Loading model with yield points from {self.model_path}...")
+        
+        # Fix for PyTorch 2.6+ safe loading
+        try:
+            from TTS.tts.configs.xtts_config import XttsConfig, XttsAudioConfig, XttsArgs
+            from TTS.tts.models.xtts import XttsAudioConfig as XttsAudioConfigModel, XttsArgs as XttsArgsModel
+            from TTS.config.shared_configs import BaseDatasetConfig, BaseAudioConfig
+            from TTS.tts.models.xtts import Xtts
+            
+            if hasattr(torch.serialization, 'add_safe_globals'):
+                torch.serialization.add_safe_globals([
+                    XttsConfig, XttsAudioConfig, XttsArgs,
+                    XttsAudioConfigModel, XttsArgsModel,
+                    BaseDatasetConfig, BaseAudioConfig
+                ])
+        except ImportError:
+            pass
+        
+        # Small yield to allow event loop to process other tasks
+        time.sleep(0.01)
+        
+        try:
+            from TTS.tts.configs.xtts_config import XttsConfig
+            from TTS.tts.models.xtts import Xtts
+            
+            logger.info("[XTTS] Loading config...")
+            config = XttsConfig()
+            time.sleep(0.01)  # Yield
+            
+            config.load_json(os.path.join(self.model_path, "config.json"))
+            time.sleep(0.01)  # Yield
+            
+            logger.info("[XTTS] Initializing model...")
+            self._model = Xtts.init_from_config(config)
+            time.sleep(0.01)  # Yield
+            
+            logger.info("[XTTS] Loading checkpoint (this may take a while)...")
+            self._model.load_checkpoint(
+                config, 
+                checkpoint_dir=self.model_path, 
+                eval=True,
+                use_deepspeed=False
+            )
+            time.sleep(0.01)  # Yield
+            
+            logger.info("[XTTS] Moving model to device...")
+            if self._device in ["cuda", "mps"]:
+                self._model.cuda()
+            time.sleep(0.01)  # Yield
+            
+            logger.success("[XTTS] Model loaded successfully")
+            
+        except ImportError:
+            logger.error("TTS package not installed. Cannot load XTTS.")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to load XTTS model: {e}")
+            raise
+
     def _generate_sync(self, text: str, output_path: str, language: str, profile_path: Optional[str], **kwargs):
-        """Synchronous generation logic to be run in an executor."""
-        self._load_model()
+        """Synchronous generation logic to be run in a separate thread."""
+        logger.info(f"[XTTS] Starting _generate_sync - text length: {len(text)}, language: {language}")
+        
+        # Model loading is CPU/GPU intensive - run it in a way that yields control
+        # Use a short sleep to allow other threads to run during model loading
+        import time
+        self._load_model_with_yield()
+        logger.info("[XTTS] Model loaded, preparing speaker reference...")
         
         # Determine speaker reference
         speaker_wav = profile_path or os.path.join(self.model_path, "samples", "default.wav")
         if not os.path.exists(speaker_wav):
             logger.warning(f"Speaker profile not found at {speaker_wav}, falling back to built-in generation if possible")
             speaker_wav = None
+        else:
+            logger.info(f"[XTTS] Using speaker reference: {speaker_wav}")
             
-        logger.info(f"Generating XTTS audio for text: '{text[:20]}...' in {language} to {output_path}")
+        logger.info(f"[XTTS] Generating audio for text: '{text[:30]}...' in {language}")
         
         try:
             # Low-level inference approach to avoid 'gpt_inference' attribute error in higher level synthesize()
@@ -107,16 +193,19 @@ class XTTSEngine(BaseTTS):
                 gpt_cond_latent, speaker_embedding = None, None
 
             # 2. Run inference
+            logger.info("[XTTS] Getting conditioning latents...")
             # Sanitize kwargs for the inference method
             inference_kwargs = kwargs.copy()
             
             # Map speed_factor to speed if present (common across our API)
             if "speed_factor" in inference_kwargs:
                 inference_kwargs["speed"] = inference_kwargs.pop("speed_factor")
+                logger.info(f"[XTTS] Speed factor mapped to: {inference_kwargs.get('speed')}")
                 
             # Filter out None values or other non-supported keys if necessary
             # For now, just ensuring speed is correctly mapped
             
+            logger.info("[XTTS] Running model inference...")
             out = self._model.inference(
                 text,
                 language,
@@ -124,6 +213,7 @@ class XTTSEngine(BaseTTS):
                 speaker_embedding,
                 **inference_kwargs
             )
+            logger.info("[XTTS] Inference completed, saving audio...")
             
             # Save the file
             import torchaudio
@@ -148,15 +238,14 @@ class XTTSEngine(BaseTTS):
         user_id: Optional[str] = None,
         **kwargs
     ) -> bool:
-        """Run XTTS generation asynchronously in a separate thread/process to avoid blocking API."""
+        """Run XTTS generation asynchronously in a separate thread to avoid blocking API."""
         if not self.is_model_downloaded():
             logger.error(f"XTTS model not found at {self.model_path}")
             return False
-            
-        loop = asyncio.get_event_loop()
-        # Non-blocking execution for heavy CPU/GPU workload
-        # Use partial to pass kwargs correctly to the sync method
-        sync_func = partial(
+        
+        # Use asyncio.to_thread for better event loop handling
+        # This runs the sync function in a separate thread without blocking the event loop
+        result = await asyncio.to_thread(
             self._generate_sync,
             text,
             output_path,
@@ -164,5 +253,4 @@ class XTTSEngine(BaseTTS):
             profile_path,
             **kwargs
         )
-        result = await loop.run_in_executor(_TTS_EXECUTOR, sync_func)
         return result

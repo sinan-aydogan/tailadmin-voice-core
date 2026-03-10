@@ -16,7 +16,7 @@ from app.stt.registry import get_stt_engine
 from app.websocket import notification_manager
 
 class TaskWorker:
-    def __init__(self, max_concurrent=3):
+    def __init__(self, max_concurrent=1):
         self.is_running = False
         self._task = None
         self.max_concurrent = max_concurrent
@@ -191,6 +191,8 @@ class TaskWorker:
         playlist_item_id = payload.get("playlist_item_id")
         kwargs = payload.get("kwargs", {})
         
+        logger.info(f"[Task {task_id}] Starting TTS processing - Engine: {engine_name}, Text length: {len(text) if text else 0}, Profile: {profile_id}")
+        
         # Update playlist item status if applicable
         playlist_item = None
         if playlist_item_id:
@@ -200,7 +202,10 @@ class TaskWorker:
                 db.commit()
         
         try:
+            logger.info(f"[Task {task_id}] Initializing TTS engine: {engine_name}")
             engine = get_tts_engine(engine_name)
+            logger.info(f"[Task {task_id}] Engine initialized, starting audio generation...")
+            
             success = await engine.generate_audio(
                 text=text,
                 output_path=output_path,
@@ -209,6 +214,7 @@ class TaskWorker:
                 user_id=user_id,
                 **kwargs
             )
+            logger.info(f"[Task {task_id}] Audio generation completed with success={success}")
             
             if success:
                 # Create TTSOutput record

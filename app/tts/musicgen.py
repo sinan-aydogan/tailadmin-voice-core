@@ -33,6 +33,10 @@ class MusicGenEngine(BaseTTS):
         except ImportError:
             return False
 
+    def load_model(self):
+        """Public method to load the model. Can be called for pre-loading."""
+        self._load_model()
+    
     def _load_model(self):
         """Lazy load the model to save memory until generation."""
         if self._model is not None:

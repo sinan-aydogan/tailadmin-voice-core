@@ -31,10 +31,7 @@ def kill_processes_on_ports(ports):
         logger.error(f"Error checking ports: {e}")
 
 def start_servers():
-    commands = [
-        ("API Server", [sys.executable, "main.py"]),
-        ("UI Server", [sys.executable, "frontend_server.py"])
-    ]
+    """Start API and UI servers as completely separate processes."""
     
     # Kill any existing processes on our ports before starting
     kill_processes_on_ports([5001, 5002])
@@ -42,24 +39,70 @@ def start_servers():
     processes = []
     
     try:
-        for name, cmd in commands:
-            logger.info(f"Starting {name}...")
-            p = subprocess.Popen(cmd)
-            processes.append((name, p))
-            time.sleep(1)  # Stagger startup
-            
-        logger.success("Both servers started. Press Ctrl+C to stop.")
+        # Start UI Server first (it's lightweight)
+        logger.info("Starting UI Server on port 5002...")
+        ui_process = subprocess.Popen(
+            [sys.executable, "frontend_server.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        processes.append(("UI Server", ui_process))
+        time.sleep(0.5)  # Short delay for UI to start
         
-        # Keep main thread alive
+        # Start API Server (this runs the heavy ML workloads)
+        logger.info("Starting API Server on port 5001...")
+        api_process = subprocess.Popen(
+            [sys.executable, "main.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        processes.append(("API Server", api_process))
+        time.sleep(1)  # Give API time to initialize
+        
+        logger.success("=" * 60)
+        logger.success("Voice Core is running!")
+        logger.success("API Server:  http://localhost:5001")
+        logger.success("UI Server:   http://localhost:5002")
+        logger.success("=" * 60)
+        logger.info("Press Ctrl+C to stop both servers.")
+        
+        # Monitor processes and keep main thread alive
         while True:
             time.sleep(1)
+            # Check if any process died
+            for name, p in processes:
+                if p.poll() is not None:
+                    logger.error(f"{name} exited unexpectedly with code {p.returncode}")
+                    # Restart the dead process
+                    if name == "API Server":
+                        logger.info("Restarting API Server...")
+                        api_process = subprocess.Popen(
+                            [sys.executable, "main.py"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                        )
+                        processes[1] = ("API Server", api_process)
+                    else:
+                        logger.info("Restarting UI Server...")
+                        ui_process = subprocess.Popen(
+                            [sys.executable, "frontend_server.py"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                        )
+                        processes[0] = ("UI Server", ui_process)
             
     except KeyboardInterrupt:
-        logger.info("\nShutting down servers...")
+        logger.info("\n" + "=" * 60)
+        logger.info("Shutting down servers...")
         for name, p in processes:
             logger.info(f"Terminating {name}...")
             p.terminate()
-            p.wait()
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                logger.warning(f"{name} did not terminate gracefully, forcing...")
+                p.kill()
+                p.wait()
         logger.success("All servers stopped successfully.")
         sys.exit(0)
 

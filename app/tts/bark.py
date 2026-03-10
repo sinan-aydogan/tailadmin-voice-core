@@ -25,6 +25,10 @@ class BarkEngine(BaseTTS):
         """Check if Bark model exists in local directory."""
         return os.path.exists(self.model_path) and os.listdir(self.model_path)
 
+    def load_model(self):
+        """Public method to load the model. Can be called for pre-loading."""
+        self._load_model()
+    
     def _load_model(self):
         """Lazy load the model to save memory until generation."""
         if self._model is not None:

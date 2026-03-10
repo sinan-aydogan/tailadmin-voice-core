@@ -181,6 +181,10 @@ class ApiClient {
         return this.request('/queue/');
     }
 
+    async getTaskLogs(taskId) {
+        return this.request(`/queue/${taskId}/logs`);
+    }
+
     // Settings & Logs
     async getSettings() {
         return this.request('/settings/');
