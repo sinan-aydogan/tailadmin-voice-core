@@ -104,24 +104,30 @@ async def get_available_engines(
 ):
     """Get list of TTS engines that are ready to use (downloaded and verified)."""
     ready_models = get_ready_for_tts()
-    
-    # Map model IDs back to engine names
+
+    # Map model IDs back to engine names. For piper the model_id IS the engine name
+    # (e.g. "piper-tr"); for others they differ (xtts-v2 -> xtts).
     model_to_engine = {
         "xtts-v2": "xtts",
         "bark": "bark",
         "tortoise": "tortoise",
+        "piper-tr": "piper-tr",
+        "piper-en": "piper-en",
+        "piper-de": "piper-de",
+        "piper-fr": "piper-fr",
         "musicgen-small": "musicgen-small",
         "musicgen-medium": "musicgen-medium",
         "musicgen-large": "musicgen-large",
         "musicgen-melody": "musicgen-melody"
     }
-    
+
     ready_engines = []
     for model_id in ready_models:
-        engine = model_to_engine.get(model_id)
+        # Fall back to the model_id itself so a new model can't silently vanish.
+        engine = model_to_engine.get(model_id, model_id)
         if engine:
             ready_engines.append(engine)
-    
+
     return ready_engines
 
 @router.get("/history", response_model=list[TTSOutputResponse])

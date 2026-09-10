@@ -17,6 +17,10 @@ class XTTSEngine(BaseTTS):
         self._model = None
         self._device = detect_device()
         self.model_path = os.path.join(settings.MODELS_DIR, "xtts-v2")
+        # Cache of speaker conditioning latents keyed by (speaker_wav, mtime).
+        # Recomputing these on every generation is expensive; the reference audio
+        # rarely changes, so caching gives a big speedup for repeated same-profile runs.
+        self._latent_cache = {}
         
     @property
     def engine_name(self) -> str:
@@ -97,80 +101,13 @@ class XTTSEngine(BaseTTS):
             logger.error(f"Failed to load XTTS model: {e}")
             raise
 
-    def _load_model_with_yield(self):
-        """Load model with periodic yielding to allow other threads to run."""
-        import time
-        
-        if self._model is not None:
-            return
-        
-        logger.info(f"[XTTS] Loading model with yield points from {self.model_path}...")
-        
-        # Fix for PyTorch 2.6+ safe loading
-        try:
-            from TTS.tts.configs.xtts_config import XttsConfig, XttsAudioConfig, XttsArgs
-            from TTS.tts.models.xtts import XttsAudioConfig as XttsAudioConfigModel, XttsArgs as XttsArgsModel
-            from TTS.config.shared_configs import BaseDatasetConfig, BaseAudioConfig
-            from TTS.tts.models.xtts import Xtts
-            
-            if hasattr(torch.serialization, 'add_safe_globals'):
-                torch.serialization.add_safe_globals([
-                    XttsConfig, XttsAudioConfig, XttsArgs,
-                    XttsAudioConfigModel, XttsArgsModel,
-                    BaseDatasetConfig, BaseAudioConfig
-                ])
-        except ImportError:
-            pass
-        
-        # Small yield to allow event loop to process other tasks
-        time.sleep(0.01)
-        
-        try:
-            from TTS.tts.configs.xtts_config import XttsConfig
-            from TTS.tts.models.xtts import Xtts
-            
-            logger.info("[XTTS] Loading config...")
-            config = XttsConfig()
-            time.sleep(0.01)  # Yield
-            
-            config.load_json(os.path.join(self.model_path, "config.json"))
-            time.sleep(0.01)  # Yield
-            
-            logger.info("[XTTS] Initializing model...")
-            self._model = Xtts.init_from_config(config)
-            time.sleep(0.01)  # Yield
-            
-            logger.info("[XTTS] Loading checkpoint (this may take a while)...")
-            self._model.load_checkpoint(
-                config, 
-                checkpoint_dir=self.model_path, 
-                eval=True,
-                use_deepspeed=False
-            )
-            time.sleep(0.01)  # Yield
-            
-            logger.info("[XTTS] Moving model to device...")
-            if self._device in ["cuda", "mps"]:
-                self._model.cuda()
-            time.sleep(0.01)  # Yield
-            
-            logger.success("[XTTS] Model loaded successfully")
-            
-        except ImportError:
-            logger.error("TTS package not installed. Cannot load XTTS.")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to load XTTS model: {e}")
-            raise
-
     def _generate_sync(self, text: str, output_path: str, language: str, profile_path: Optional[str], **kwargs):
         """Synchronous generation logic to be run in a separate thread."""
         logger.info(f"[XTTS] Starting _generate_sync - text length: {len(text)}, language: {language}")
-        
-        # Model loading is CPU/GPU intensive - run it in a way that yields control
-        # Use a short sleep to allow other threads to run during model loading
-        import time
-        self._load_model_with_yield()
+
+        # Load the model (runs in the worker process; GIL isolation is handled at the
+        # process level now, so the previous time.sleep(0.01) "yield" hack is gone).
+        self._load_model()
         logger.info("[XTTS] Model loaded, preparing speaker reference...")
         
         # Determine speaker reference
@@ -185,9 +122,19 @@ class XTTSEngine(BaseTTS):
         
         try:
             # Low-level inference approach to avoid 'gpt_inference' attribute error in higher level synthesize()
-            # 1. Get speaker latents
+            # 1. Get speaker latents (cached per reference audio + mtime)
             if speaker_wav:
-                gpt_cond_latent, speaker_embedding = self._model.get_conditioning_latents(audio_path=[speaker_wav])
+                try:
+                    cache_key = (speaker_wav, os.path.getmtime(speaker_wav))
+                except OSError:
+                    cache_key = (speaker_wav, None)
+                cached = self._latent_cache.get(cache_key)
+                if cached is not None:
+                    logger.info("[XTTS] Using cached speaker conditioning latents")
+                    gpt_cond_latent, speaker_embedding = cached
+                else:
+                    gpt_cond_latent, speaker_embedding = self._model.get_conditioning_latents(audio_path=[speaker_wav])
+                    self._latent_cache[cache_key] = (gpt_cond_latent, speaker_embedding)
             else:
                 # Fallback to no latents if no speaker_wav, though XTTS usually needs it
                 gpt_cond_latent, speaker_embedding = None, None

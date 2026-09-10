@@ -47,6 +47,16 @@ MODEL_INTEGRITY_CHECKS = {
         "min_size_mb": 1500,
         "optional_files": ["clvp2.pth", "diffusion_decoder.pth", "hifidecoder.pth"]
     },
+    "piper-tr": {
+        "required_files": ["tr_TR-dfki-medium.onnx", "tr_TR-dfki-medium.onnx.json"],
+        "min_size_mb": 50,
+        "optional_files": []
+    },
+    "piper-en": {
+        "required_files": ["en_US-lessac-medium.onnx", "en_US-lessac-medium.onnx.json"],
+        "min_size_mb": 50,
+        "optional_files": []
+    },
     "musicgen-small": {
         "required_files": ["config.json", "pytorch_model.bin"],
         "min_size_mb": 1000,
@@ -252,7 +262,8 @@ def get_ready_for_tts() -> List[str]:
     Returns:
         List of healthy TTS model IDs
     """
-    tts_models = ["xtts-v2", "bark", "tortoise", "musicgen-small", "musicgen-medium", "musicgen-large", "musicgen-melody"]
+    tts_models = ["xtts-v2", "bark", "tortoise", "piper-tr", "piper-en",
+                  "musicgen-small", "musicgen-medium", "musicgen-large", "musicgen-melody"]
     ready = []
     for model_id in tts_models:
         if is_model_healthy(model_id):

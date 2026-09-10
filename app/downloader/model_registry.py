@@ -72,8 +72,8 @@ AVAILABLE_MODELS = [
         "description": "Fast, lightweight TTS optimized for Turkish. Great for real-time applications.",
         "size_estimate_mb": 70,
         "languages": ["tr"],
-        "download_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR-dfki-medium/tr_TR-dfki-medium.onnx",
-        "json_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR-dfki-medium/tr_TR-dfki-medium.onnx.json"
+        "download_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR/dfki/medium/tr_TR-dfki-medium.onnx",
+        "json_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR/dfki/medium/tr_TR-dfki-medium.onnx.json"
     },
     {
         "id": "piper-en",
@@ -84,8 +84,8 @@ AVAILABLE_MODELS = [
         "description": "Fast, lightweight TTS optimized for English. Great for real-time applications.",
         "size_estimate_mb": 70,
         "languages": ["en"],
-        "download_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US-lessac-medium/en_US-lessac-medium.onnx",
-        "json_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US-lessac-medium/en_US-lessac-medium.onnx.json"
+        "download_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
+        "json_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
     },
     {
         "id": "musicgen-small",

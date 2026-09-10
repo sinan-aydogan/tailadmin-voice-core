@@ -10,10 +10,12 @@ class Task(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     type = Column(String, nullable=False) # "tts" or "stt"
-    status = Column(String, default="pending") # pending, running, done, failed, cancelled
+    # Indexed: the worker polls WHERE status='pending' ORDER BY created_at on every
+    # loop iteration; without these it degrades to a full scan as the queue grows.
+    status = Column(String, default="pending", index=True) # pending, running, done, failed, cancelled
     payload = Column(String, nullable=False) # JSON string
     result = Column(String) # JSON string (result or error)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 

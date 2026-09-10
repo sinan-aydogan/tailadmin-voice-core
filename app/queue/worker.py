@@ -16,11 +16,13 @@ from app.stt.registry import get_stt_engine
 from app.websocket import notification_manager
 
 class TaskWorker:
-    def __init__(self, max_concurrent=1):
+    def __init__(self, caps=None):
         self.is_running = False
         self._task = None
-        self.max_concurrent = max_concurrent
-        self._semaphore = asyncio.Semaphore(max_concurrent)
+        # Per-type concurrency caps so a quick STT job isn't stuck behind a long
+        # TTS job (and vice-versa). Each type runs on its own budget.
+        self.caps = caps or {"tts": 1, "stt": 1}
+        self._running_by_type = {t: 0 for t in self.caps}
         self._running_tasks = set()
 
     async def start(self):
@@ -32,8 +34,22 @@ class TaskWorker:
         # Patch HF for captured downloads in worker process
         from app.utils.tqdm_handler import patch_huggingface_tqdm
         patch_huggingface_tqdm()
-        
-        logger.info(f"Starting background task worker (max concurrent: {self.max_concurrent})...")
+
+        # Recover tasks left "running" by a previously crashed worker/API, otherwise
+        # they stay locked forever (never re-picked because status != "pending").
+        db = SessionLocal()
+        try:
+            stale = db.query(Task).filter(Task.status == "running").all()
+            for t in stale:
+                t.status = "pending"
+                t.started_at = None
+            if stale:
+                db.commit()
+                logger.warning(f"Reset {len(stale)} stale 'running' task(s) to 'pending' on worker start")
+        finally:
+            db.close()
+
+        logger.info(f"Starting background task worker (caps: {self.caps})...")
         self._task = asyncio.create_task(self._process_loop())
 
     async def stop(self):
@@ -46,54 +62,56 @@ class TaskWorker:
     async def _process_loop(self):
         while self.is_running:
             try:
-                # Check if we can start more tasks
-                if len(self._running_tasks) < self.max_concurrent:
-                    # Try to get a pending task
-                    task_id = await self._get_pending_task()
-                    if task_id:
-                        # Start task in background (doesn't block)
-                        task_coro = self._process_task_with_semaphore(task_id)
-                        task_future = asyncio.create_task(task_coro)
-                        self._running_tasks.add(task_future)
-                        task_future.add_done_callback(self._running_tasks.discard)
-                
-                # Clean up completed tasks
-                done_tasks = [t for t in self._running_tasks if t.done()]
-                for t in done_tasks:
-                    self._running_tasks.discard(t)
-                    try:
-                        await t  # Get any exceptions
-                    except Exception as e:
-                        logger.error(f"Task error: {e}")
-                        
+                # For every task type that still has free capacity, try to pull the
+                # oldest pending task of that type and start it.
+                for task_type, cap in self.caps.items():
+                    if self._running_by_type[task_type] < cap:
+                        task_id = await self._get_pending_task(task_type)
+                        if task_id is not None:
+                            self._running_by_type[task_type] += 1
+                            task_future = asyncio.create_task(
+                                self._run_task(task_id, task_type)
+                            )
+                            self._running_tasks.add(task_future)
+                            task_future.add_done_callback(self._running_tasks.discard)
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"Worker loop error: {e}")
-            
+
             # Prevent hot loop - check more frequently when tasks are running
             await asyncio.sleep(0.5 if self._running_tasks else 2)
-    
-    async def _get_pending_task(self):
-        """Get next pending task from DB, returns task ID only."""
+
+    async def _get_pending_task(self, task_type: str):
+        """Get next pending task of `task_type` from DB, returns task ID only."""
         db = SessionLocal()
         try:
-            task = db.query(Task).filter(Task.status == "pending").order_by(Task.created_at.asc()).first()
+            task = (
+                db.query(Task)
+                .filter(Task.status == "pending", Task.type == task_type)
+                .order_by(Task.created_at.asc())
+                .first()
+            )
             if task:
-                # Mark as running immediately to prevent other workers from picking it up
+                # Mark as running immediately so it isn't picked up again.
                 task_id = task.id
                 task.status = "running"
                 task.started_at = datetime.utcnow()
                 db.commit()
-                return task_id  # Return only the ID, not the ORM object
+                return task_id
             return None
         finally:
             db.close()
-    
-    async def _process_task_with_semaphore(self, task_id: int):
-        """Process a task with semaphore control."""
-        async with self._semaphore:
+
+    async def _run_task(self, task_id: int, task_type: str):
+        """Execute a task and release its per-type slot when done."""
+        try:
             await self._execute_task(task_id)
+        except Exception as e:
+            logger.error(f"Task error: {e}")
+        finally:
+            self._running_by_type[task_type] = max(0, self._running_by_type[task_type] - 1)
 
     async def _execute_task(self, task_id: int):
         """Execute a single task (called by semaphore-controlled wrapper)."""
@@ -318,7 +336,10 @@ def submit_tts_task(text: str, model_id: str, profile_id: int = None, user_id: i
             "model_id": model_id,
             "profile_id": profile_id,
             "playlist_item_id": playlist_item_id,
-            "output_path": output_path
+            "output_path": output_path,
+            # Without this the worker can't send task-progress WS notifications for
+            # playlist-submitted TTS jobs.
+            "user_id": user_id,
         }
         
         task = Task(

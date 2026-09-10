@@ -65,10 +65,43 @@ class NotificationManager:
         self.max_notifications_per_user = 100
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
-    
+        # Remote mode: when enabled (in a separate worker process), notifications are
+        # forwarded to the API process over HTTP instead of delivered locally — because
+        # the WebSocket connections live in the API process, not here.
+        self._remote_mode = False
+        self._remote_url: Optional[str] = None
+        self._remote_token: Optional[str] = None
+
     def set_event_loop(self, loop: asyncio.AbstractEventLoop):
         """Set the event loop for thread-safe operations."""
         self._loop = loop
+
+    def enable_remote_mode(self, api_notify_url: str, token: str):
+        """Route notifications to the API process (call this only in the worker process)."""
+        self._remote_mode = True
+        self._remote_url = api_notify_url
+        self._remote_token = token
+        logger.info(f"NotificationManager remote mode enabled -> {api_notify_url}")
+
+    async def _forward_to_api(self, user_id, notification_type, title, message, data, priority, store):
+        """POST a notification to the API's /internal/notify (worker -> API bridge)."""
+        try:
+            import httpx
+            payload = {
+                "user_id": user_id,
+                "type": notification_type.value if hasattr(notification_type, "value") else str(notification_type),
+                "title": title,
+                "message": message,
+                "data": data or {},
+                "priority": priority.value if hasattr(priority, "value") else str(priority),
+                "store": store,
+            }
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(self._remote_url, json=payload,
+                                  headers={"X-Internal-Token": self._remote_token or ""})
+        except Exception as e:
+            # A dropped notification must never fail the task that emitted it.
+            logger.debug(f"Notification forward to API failed: {e}")
     
     def _run_coroutine_threadsafe(self, coro):
         """Run a coroutine in the main event loop from a thread."""
@@ -130,6 +163,11 @@ class NotificationManager:
         store: bool = True
     ):
         """Send a notification to a specific user."""
+        # In a separate worker process, hand off to the API which owns the WS sockets.
+        if self._remote_mode:
+            await self._forward_to_api(user_id, notification_type, title, message, data, priority, store)
+            return
+
         notification = self._create_notification(
             notification_type=notification_type,
             title=title,
@@ -137,15 +175,15 @@ class NotificationManager:
             data=data,
             priority=priority
         )
-        
+
         if store:
             self._store_notification(user_id, notification)
-        
+
         await manager.send_personal_message({
             "event": "notification",
             "payload": notification
         }, user_id)
-        
+
         logger.debug(f"Sent {notification_type.value} notification to user {user_id}")
     
     async def broadcast_notification(
@@ -215,6 +253,19 @@ class NotificationManager:
             store=False  # Don't store progress updates to avoid flooding
         )
     
+    def notify_download_progress_threadsafe(
+        self,
+        user_id: str,
+        model_id: str,
+        model_name: str,
+        progress: float,
+        current_file: Optional[str] = None
+    ):
+        """Thread-safe version for notifying download progress (from tqdm threads)."""
+        self._run_coroutine_threadsafe(
+            self.notify_download_progress(user_id, model_id, model_name, progress, current_file)
+        )
+
     async def notify_download_file_progress(
         self,
         user_id: str,

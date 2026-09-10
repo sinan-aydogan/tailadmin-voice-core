@@ -3,6 +3,7 @@ Piper TTS Engine Implementation.
 Lightweight, fast TTS optimized for Raspberry Pi and local inference.
 """
 import os
+import sys
 import asyncio
 import subprocess
 import tempfile
@@ -16,35 +17,17 @@ from app.config import settings
 
 
 class PiperEngine(BaseTTS):
-    def __init__(self, model_name: str = "tr_TR-dfki-medium"):
+    def __init__(self, model_name: str = "tr_TR-dfki-medium", model_id: str = "piper-tr"):
         self._model_name = model_name
-        self.model_path = os.path.join(settings.MODELS_DIR, "piper", model_name)
-        self._piper_binary = self._find_piper_binary()
-        
+        # Models are downloaded to MODELS_DIR/<model_id>/ (e.g. data/models/piper-tr/),
+        # so the engine must look there — NOT under a "piper/<model_name>" subdir.
+        self._model_id = model_id
+        self.model_path = os.path.join(settings.MODELS_DIR, model_id, model_name)
+
     @property
     def engine_name(self) -> str:
-        return f"piper-{self._model_name}"
-        
-    def _find_piper_binary(self) -> Optional[str]:
-        """Find piper binary in PATH or common locations."""
-        # Check PATH
-        import shutil
-        piper_path = shutil.which("piper")
-        if piper_path:
-            return piper_path
-            
-        # Check common locations
-        common_paths = [
-            "/usr/local/bin/piper",
-            "/usr/bin/piper",
-            os.path.expanduser("~/.local/bin/piper"),
-            os.path.join(settings.MODELS_DIR, "piper", "piper"),
-        ]
-        for path in common_paths:
-            if os.path.exists(path):
-                return path
-        return None
-        
+        return self._model_id
+
     def is_model_downloaded(self) -> bool:
         """Check if Piper model exists."""
         onnx_path = f"{self.model_path}.onnx"
@@ -52,86 +35,79 @@ class PiperEngine(BaseTTS):
         return os.path.exists(onnx_path) and os.path.exists(json_path)
 
     def _generate_sync(self, text: str, output_path: str, language: str, profile_path: Optional[str], **kwargs):
-        """Synchronous generation using piper command line."""
-        if not self._piper_binary:
-            logger.error("Piper binary not found. Install with: pip install piper-tts")
-            return False
-            
+        """Synchronous generation via `python -m piper`.
+
+        Invoking the module through the current interpreter avoids depending on a
+        `piper` binary being on PATH (which it isn't when the venv isn't activated).
+        """
         if not self.is_model_downloaded():
             logger.error(f"Piper model not found at {self.model_path}")
             return False
-            
+
         logger.info(f"Generating Piper audio for text: '{text[:30]}...' to {output_path}")
-        
+
+        text_file = None
         try:
-            # Create temp file for text input
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
                 f.write(text)
                 text_file = f.name
-            
-            # Build piper command
+
             model_file = f"{self.model_path}.onnx"
+            # piper-tts 1.4.x CLI uses hyphenated flags; input is --input-file (not --file).
             cmd = [
-                self._piper_binary,
+                sys.executable, "-m", "piper",
                 "--model", model_file,
-                "--file", text_file,
-                "--output_file", output_path,
-                "--sentence_silence", str(kwargs.get("sentence_silence", 0.2)),
+                "--input-file", text_file,
+                "--output-file", output_path,
+                "--sentence-silence", str(kwargs.get("sentence_silence", 0.2)),
             ]
-            
-            # Add speaker if specified (for multi-speaker models)
+
             speaker_id = kwargs.get("speaker_id")
             if speaker_id is not None:
                 cmd.extend(["--speaker", str(speaker_id)])
-            
-            # Add length scale (speed)
+
             length_scale = kwargs.get("length_scale", 1.0)
             if length_scale != 1.0:
-                cmd.extend(["--length_scale", str(length_scale)])
-            
-            # Run piper
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minute timeout
-            )
-            
-            # Cleanup temp file
-            os.unlink(text_file)
-            
+                cmd.extend(["--length-scale", str(length_scale)])
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
             if result.returncode != 0:
-                logger.error(f"Piper failed: {result.stderr}")
+                logger.error(f"Piper failed: {result.stderr[-1000:]}")
                 return False
-                
+
             logger.success(f"Successfully generated Piper audio: {output_path}")
             return True
-            
+
         except subprocess.TimeoutExpired:
             logger.error("Piper generation timed out")
             return False
         except Exception as e:
             logger.error(f"Piper Generation Error: {e}")
             return False
+        finally:
+            if text_file and os.path.exists(text_file):
+                try:
+                    os.unlink(text_file)
+                except OSError:
+                    pass
 
     async def generate_audio(
-        self, 
-        text: str, 
-        output_path: str, 
-        language: str = "tr", 
+        self,
+        text: str,
+        output_path: str,
+        language: str = "tr",
         profile_path: Optional[str] = None,
         user_id: Optional[str] = None,
         **kwargs
     ) -> bool:
         """Run Piper generation asynchronously."""
-        if not self._piper_binary:
-            logger.error("Piper binary not found. Install with: pip install piper-tts")
-            return False
-            
         if not self.is_model_downloaded():
             logger.error(f"Piper model not found at {self.model_path}")
             return False
-            
+
         loop = asyncio.get_event_loop()
         sync_func = partial(
             self._generate_sync,

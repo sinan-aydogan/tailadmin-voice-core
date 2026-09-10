@@ -4,7 +4,7 @@ Serves API endpoints on port 5001.
 """
 import sys
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Request, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -26,9 +26,9 @@ from app.routers.logs_router import router as logs_router
 from app.routers.tags_router import router as tags_router
 from app.routers.llm_router import router as llm_router
 from app.routers.playlist_router import router as playlist_router
+from app.routers.system_router import router as system_router
 from app.queue.worker import worker
 from app.websocket import manager, notification_manager
-import asyncio
 
 # Configure logging
 logger.remove()
@@ -51,72 +51,126 @@ from contextlib import asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle events for the FastAPI application."""
     logger.info("Initializing TailAdmin Voice Core API...")
-    
+
     # Set event loop for notification manager (for thread-safe operations)
-    notification_manager.set_event_loop(asyncio.get_event_loop())
-    
+    notification_manager.set_event_loop(asyncio.get_running_loop())
+
     # Initialize Database
     init_db()
     # Create default user if not exists
     create_default_admin()
-    
+
+    # Recover from an unclean shutdown: any download left in "downloading" was
+    # interrupted, and any model whose files disagree with its DB status gets fixed.
+    try:
+        from app.downloader.download_manager import DownloadManager
+        from app.downloader.integrity_checker import repair_model_status, MODEL_INTEGRITY_CHECKS
+        db = SessionLocal()
+        try:
+            DownloadManager.reset_interrupted_downloads(db)
+        finally:
+            db.close()
+        for model_id in MODEL_INTEGRITY_CHECKS.keys():
+            try:
+                repair_model_status(model_id)
+            except Exception as e:
+                logger.debug(f"repair_model_status({model_id}) failed: {e}")
+    except Exception as e:
+        logger.warning(f"Startup download recovery failed: {e}")
+
     # Global patches
     from app.utils.tqdm_handler import patch_huggingface_tqdm
     patch_huggingface_tqdm()
-    
-    # Pre-load all downloaded TTS models to avoid first-request delay
-    # This runs in a separate thread to not block startup
-    logger.info("Pre-loading downloaded TTS models (this may take a minute)...")
-    import asyncio
-    from app.tts.registry import get_tts_engine, TTS_ENGINES
-    from app.downloader.integrity_checker import is_model_healthy
-    
+
+    # Pre-load selected TTS models into RAM to avoid first-request delay. Controlled
+    # by PRELOAD_MODELS ("" = none, "all" = every healthy model, else a CSV of ids).
     async def preload_models():
         try:
-            # Get list of ready TTS models
+            from app.tts.registry import get_tts_engine
             from app.downloader.integrity_checker import get_ready_for_tts
+
+            spec = (settings.PRELOAD_MODELS or "").strip()
+            if not spec:
+                return
+
             ready_models = get_ready_for_tts()
-            
-            # Map model IDs to engine names
+            if spec.lower() != "all":
+                wanted = {s.strip() for s in spec.split(",") if s.strip()}
+                ready_models = [m for m in ready_models if m in wanted]
+
+            if not ready_models:
+                return
+
+            logger.info(f"Pre-loading TTS models: {ready_models}")
+            # Model id -> registry engine name.
             model_to_engine = {
                 "xtts-v2": "xtts",
                 "bark": "bark",
                 "tortoise": "tortoise",
-                "piper": "piper"
+                "piper-tr": "piper-tr",
+                "piper-en": "piper-en",
             }
-            
             for model_id in ready_models:
                 engine_name = model_to_engine.get(model_id)
-                if engine_name:
-                    try:
-                        logger.info(f"Pre-loading {engine_name} engine...")
-                        engine = get_tts_engine(engine_name)
-                        if hasattr(engine, 'load_model'):
-                            await asyncio.to_thread(engine.load_model)
-                            logger.success(f"{engine_name} model pre-loaded successfully")
-                    except Exception as e:
-                        logger.warning(f"Could not pre-load {engine_name}: {e}")
-                        
+                if not engine_name:
+                    continue
+                try:
+                    logger.info(f"Pre-loading {engine_name} engine...")
+                    engine = get_tts_engine(engine_name)
+                    if hasattr(engine, 'load_model'):
+                        await asyncio.to_thread(engine.load_model)
+                        logger.success(f"{engine_name} model pre-loaded successfully")
+                except Exception as e:
+                    logger.warning(f"Could not pre-load {engine_name}: {e}")
             logger.success("Model pre-loading completed")
         except Exception as e:
             logger.warning(f"Could not pre-load models: {e}")
-    
+
     # Start pre-loading in background
     preload_task = asyncio.create_task(preload_models())
-    
-    # Start background worker
-    worker_task = asyncio.create_task(worker.start())
-    
+
+    # Start background worker — only when running in-process. In "separate" mode the
+    # worker is its own OS process (`python -m app.queue`) so heavy inference never
+    # blocks this event loop; here we just skip starting it.
+    worker_task = None
+    if settings.WORKER_MODE == "separate":
+        logger.info("WORKER_MODE=separate: in-process worker disabled (expecting standalone worker).")
+    else:
+        worker_task = asyncio.create_task(worker.start())
+
+    # Periodically broadcast system resource stats to the UI footer (only while
+    # at least one client is connected, to avoid needless work).
+    async def system_stats_loop():
+        from app.routers.system_router import collect_system_stats
+        interval = max(1.0, settings.SYSTEM_STATS_INTERVAL_SEC)
+        while True:
+            try:
+                if manager.get_connection_count() > 0:
+                    stats = await asyncio.to_thread(collect_system_stats)
+                    await manager.broadcast({"event": "system_stats", "payload": stats})
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug(f"system_stats_loop error: {e}")
+            await asyncio.sleep(interval)
+
+    stats_task = None
+    if settings.SYSTEM_STATS_ENABLED:
+        stats_task = asyncio.create_task(system_stats_loop())
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down TailAdmin Voice Core API...")
-    await worker.stop()
-    worker_task.cancel()
-    try:
-        await worker_task
-    except asyncio.CancelledError:
-        pass
+    if stats_task:
+        stats_task.cancel()
+    if worker_task:
+        await worker.stop()
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
 
 app = FastAPI(
     title="TailAdmin Voice Core API",
@@ -201,6 +255,7 @@ app.include_router(logs_router)
 app.include_router(tags_router)
 app.include_router(llm_router)
 app.include_router(playlist_router)
+app.include_router(system_router)
 
 # Serve data directory for audio/model files only
 # Static UI files are served by a separate frontend server on port 5002
@@ -254,7 +309,6 @@ async def websocket_notifications(websocket: WebSocket, token: str = None):
         while True:
             try:
                 # Wait for messages from client with timeout
-                import asyncio
                 data = await asyncio.wait_for(websocket.receive_json(), timeout=60.0)
                 
                 # Handle client messages
@@ -305,15 +359,54 @@ def health_check():
         "websocket_connections": manager.get_connection_count()
     }
 
+
+@app.post("/internal/notify")
+async def internal_notify(request: Request, x_internal_token: str = Header(default=None)):
+    """Internal bridge: a separate worker process pushes WS notifications through here.
+
+    Protected by a shared token AND restricted to loopback callers. The API owns the
+    WebSocket connections, so it re-emits the notification locally via the same path a
+    normal in-process notification would take.
+    """
+    if x_internal_token != settings.INTERNAL_NOTIFY_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    client_host = request.client.host if request.client else ""
+    if client_host not in ("127.0.0.1", "::1", "localhost"):
+        raise HTTPException(status_code=403, detail="Loopback only")
+
+    body = await request.json()
+    from app.websocket.notification_manager import NotificationType, NotificationPriority
+    try:
+        ntype = NotificationType(body["type"])
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Unknown notification type: {body.get('type')}")
+    try:
+        priority = NotificationPriority(body.get("priority", "normal"))
+    except ValueError:
+        priority = NotificationPriority.NORMAL
+
+    await notification_manager.send_notification(
+        user_id=body["user_id"],
+        notification_type=ntype,
+        title=body.get("title", ""),
+        message=body.get("message", ""),
+        data=body.get("data"),
+        priority=priority,
+        store=body.get("store", True),
+    )
+    return {"ok": True}
+
 if __name__ == "__main__":
     import uvicorn
     # If run directly via python main.py
-    logger.info(f"Starting API Server on port {settings.API_PORT}...")
+    logger.info(f"Starting API Server on port {settings.API_PORT} (reload={settings.RELOAD})...")
+    # reload=True KILLS in-flight downloads/tasks on any file save and can leak the
+    # port; keep it off by default (RELOAD env var toggles it for development).
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=settings.API_PORT,
-        reload=True,
+        reload=settings.RELOAD,
         loop="uvloop",   # Faster event loop, reduces blocking
         workers=1        # Single worker to share model state
     )

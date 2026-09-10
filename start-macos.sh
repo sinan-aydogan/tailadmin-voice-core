@@ -164,21 +164,65 @@ fi
 echo ""
 echo "📋 Checking dependencies..."
 
-if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}Error: Python 3 is not installed${NC}"
-    echo "Install with: brew install python"
+# Find a Python interpreter >= 3.10 (spaCy/thinc no longer support 3.9).
+# Prefer Homebrew's versioned binaries: some PATH entries (e.g. uv's standalone
+# builds under ~/.local) report the right version yet cannot build a working venv
+# with pip. Importing ensurepip succeeds on those, so that check is not enough —
+# we actually create a throwaway venv and confirm its pip runs before accepting.
+_venv_works() {
+    local py="$1"
+    local probe
+    probe="$(mktemp -d)" || return 1
+    if "$py" -m venv "$probe/v" >/dev/null 2>&1 && "$probe/v/bin/python" -m pip --version >/dev/null 2>&1; then
+        rm -rf "$probe"
+        return 0
+    fi
+    rm -rf "$probe"
+    return 1
+}
+
+PYTHON_BIN=""
+for candidate in \
+    /opt/homebrew/bin/python3.11 /opt/homebrew/bin/python3.12 \
+    /opt/homebrew/bin/python3.13 /opt/homebrew/bin/python3.10 \
+    python3.11 python3.12 python3.13 python3.10 python3; do
+    command -v "$candidate" &> /dev/null || continue
+    ver=$("$candidate" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)
+    major=${ver%%.*}
+    minor=${ver##*.}
+    [ "$major" = "3" ] && [ "$minor" -ge 10 ] 2>/dev/null || continue
+    # Reject interpreters that can't actually build a working venv (e.g. uv builds).
+    _venv_works "$candidate" || continue
+    PYTHON_BIN="$candidate"
+    break
+done
+
+if [ -z "$PYTHON_BIN" ]; then
+    echo -e "${RED}Error: Python 3.10+ is required but not found${NC}"
+    echo "Install with: brew install python@3.11"
     exit 1
 fi
 
-PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-echo -e "${GREEN}✓ Python version: $PYTHON_VERSION${NC}"
+PYTHON_VERSION=$("$PYTHON_BIN" --version 2>&1 | awk '{print $2}')
+echo -e "${GREEN}✓ Python version: $PYTHON_VERSION ($PYTHON_BIN)${NC}"
 
 # Set up virtual environment in data/venvies/main
 VENV_DIR="data/venvies/main"
+
+# Recreate the venv if it was built with an incompatible (< 3.10) Python
+if [ -d "$VENV_DIR" ]; then
+    venv_ver=$("$VENV_DIR/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)
+    venv_minor=${venv_ver##*.}
+    if [ -z "$venv_ver" ] || [ "${venv_ver%%.*}" != "3" ] || [ "$venv_minor" -lt 10 ] 2>/dev/null; then
+        echo -e "${YELLOW}⚠ Existing venv uses Python ${venv_ver:-unknown} (< 3.10); recreating...${NC}"
+        rm -rf "$VENV_DIR"
+    fi
+fi
+
 if [ ! -d "$VENV_DIR" ]; then
     echo ""
     echo "📦 Creating virtual environment in $VENV_DIR..."
-    python3 -m venv "$VENV_DIR"
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
 
 # Activate virtual environment
@@ -254,54 +298,87 @@ echo "   USE_GPU: $USE_GPU"
 echo "   API_PORT: ${API_PORT:-5001}"
 echo "   UI_PORT: ${UI_PORT:-5002}"
 
-# Check if ports are already in use
-check_and_kill_port() {
-    local port=$1
-    local name=$2
-    
-    # Check if lsof is available
+# --- Port helpers ---
+port_in_use() {
+    lsof -Pi :"$1" -sTCP:LISTEN -t 2>/dev/null | grep -q .
+}
+
+kill_port() {
+    local pids
+    pids=$(lsof -Pi :"$1" -sTCP:LISTEN -t 2>/dev/null) || true
+    if [ -n "$pids" ]; then
+        echo "$pids" | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+# Resolve a usable port for a service. On conflict, offer to (k) kill the other
+# process, (d) use a different port, or (i) abort. Result -> global RESOLVED_PORT.
+# A different port propagates everywhere because API_PORT/UI_PORT are exported and
+# the frontend learns the API port dynamically via /config.js.
+resolve_port() {
+    local name=$1
+    RESOLVED_PORT=$2
+
     if ! command -v lsof &> /dev/null; then
-        echo -e "${YELLOW}⚠ lsof not found, skipping port check for $port${NC}"
+        echo -e "${YELLOW}⚠ lsof not found, skipping port check for $RESOLVED_PORT${NC}"
         return 0
     fi
-    
-    # Check port with error handling
-    local pids
-    pids=$(lsof -Pi :$port -sTCP:LISTEN -t 2>/dev/null) || true
-    
-    if [ -n "$pids" ]; then
-        echo -e "${YELLOW}⚠ Port $port is already in use by another process${NC}"
-        read -p "   Do you want to kill the process using port $port ($name)? [y/N]: " -n 1 -r
+
+    while port_in_use "$RESOLVED_PORT"; do
+        local holder
+        holder=$(lsof -Pi :"$RESOLVED_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)
+        echo -e "${YELLOW}⚠ Port $RESOLVED_PORT ($name) başka bir uygulama tarafından kullanılıyor (PID ${holder:-?})${NC}"
+        echo "   [k] Kullanan uygulamayı kapat   [d] Farklı port kullan   [i] İptal"
+        read -p "   Seçiminiz [k/d/i]: " -n 1 -r choice
         echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            local pid=$(echo "$pids" | head -1)
-            if [ -n "$pid" ]; then
-                echo "   Killing process $pid on port $port..."
-                kill -9 $pid 2>/dev/null || true
-                sleep 1
-                echo -e "${GREEN}   ✓ Port $port is now free${NC}"
-            fi
-        else
-            echo -e "${RED}   ✗ Cannot start $name - port $port is in use${NC}"
-            return 1
-        fi
-    fi
+        case "$choice" in
+            k|K)
+                echo "   Port $RESOLVED_PORT üzerindeki işlem kapatılıyor..."
+                kill_port "$RESOLVED_PORT"
+                if port_in_use "$RESOLVED_PORT"; then
+                    echo -e "${RED}   ✗ Port hâlâ meşgul${NC}"
+                else
+                    echo -e "${GREEN}   ✓ Port $RESOLVED_PORT artık boş${NC}"
+                fi
+                ;;
+            d|D)
+                read -p "   $name için yeni port girin (1024-65535): " new_port
+                if [[ "$new_port" =~ ^[0-9]+$ ]] && [ "$new_port" -ge 1024 ] && [ "$new_port" -le 65535 ]; then
+                    RESOLVED_PORT=$new_port
+                    echo -e "${GREEN}   → $name portu $RESOLVED_PORT olarak denenecek${NC}"
+                else
+                    echo -e "${RED}   Geçersiz port numarası (1024-65535 arası bir sayı girin)${NC}"
+                fi
+                ;;
+            *)
+                echo -e "${RED}   İptal edildi${NC}"
+                exit 1
+                ;;
+        esac
+    done
     return 0
 }
 
 echo ""
 echo "🔍 Checking ports..."
 
+# Ports can be pre-defined via env (e.g. API_PORT=5011 UI_PORT=5012 ./start-macos.sh)
 API_PORT=${API_PORT:-5001}
 UI_PORT=${UI_PORT:-5002}
 
-if ! check_and_kill_port $API_PORT "API Server"; then
+resolve_port "API Server" "$API_PORT"; API_PORT=$RESOLVED_PORT
+resolve_port "UI Server" "$UI_PORT"; UI_PORT=$RESOLVED_PORT
+
+if [ "$API_PORT" = "$UI_PORT" ]; then
+    echo -e "${RED}Error: API ve UI aynı portu ($API_PORT) kullanamaz. Farklı portlar seçin.${NC}"
     exit 1
 fi
 
-if ! check_and_kill_port $UI_PORT "UI Server"; then
-    exit 1
-fi
+# Export so main.py (settings.API_PORT), frontend_server.py (UI_PORT/API_PORT) and
+# the worker all use the resolved ports.
+export API_PORT UI_PORT
+echo -e "${GREEN}✓ Portlar ayarlandı → API: $API_PORT, UI: $UI_PORT${NC}"
 
 # Double-check ports are free before starting
 echo ""
@@ -319,6 +396,10 @@ for port in $API_PORT $UI_PORT; do
     fi
 done
 
+# Run the queue worker as its own OS process so heavy model inference (which holds
+# the Python GIL) never freezes the API event loop.
+export WORKER_MODE=separate
+
 # Start the UI server in background first (it starts faster)
 echo ""
 echo "🚀 Starting Voice Core UI Server..."
@@ -330,6 +411,19 @@ UI_PID=$!
 
 # Wait a moment for UI to start
 sleep 2
+
+# Start the queue worker in a supervisor loop (auto-restarts if it crashes, without
+# taking down the API). The API owns the DB schema + WS connections; the worker
+# forwards notifications to it over /internal/notify.
+echo "🚀 Starting Voice Core Worker (separate process)..."
+(
+    while true; do
+        python3 -m app.queue
+        echo -e "${YELLOW}⚠ Worker exited; restarting in 2s...${NC}"
+        sleep 2
+    done
+) &
+WORKER_SUPERVISOR_PID=$!
 
 # Start the API server
 echo "🚀 Starting Voice Core API..."
@@ -358,6 +452,12 @@ fi
 # Function to cleanup processes on exit
 cleanup() {
     echo -e "\n🛑 Shutting down..."
+    # Stop the worker supervisor first (so it won't relaunch), then the worker child.
+    if [ -n "$WORKER_SUPERVISOR_PID" ] && kill -0 $WORKER_SUPERVISOR_PID 2>/dev/null; then
+        echo "   Stopping worker..."
+        kill $WORKER_SUPERVISOR_PID 2>/dev/null
+    fi
+    pkill -f "app.queue" 2>/dev/null || true
     if kill -0 $UI_PID 2>/dev/null; then
         echo "   Stopping UI server..."
         kill $UI_PID 2>/dev/null

@@ -1,7 +1,10 @@
 /**
  * API Wrapper for Voice Core
  */
-const API_BASE = 'http://localhost:5001';
+// API base comes from the dynamic runtime config (config.js) so the port isn't
+// hardcoded; falls back to the current host on :5001 if config didn't load.
+const API_BASE = (window.VOICE_CORE_CONFIG && window.VOICE_CORE_CONFIG.apiBase)
+    || (location.protocol + '//' + location.hostname + ':5001');
 
 class ApiClient {
     constructor() {
@@ -106,6 +109,11 @@ class ApiClient {
         const formData = new FormData();
         formData.append('file', file);
         return this.request(`/profiles/${id}/audio`, 'POST', formData, true);
+    }
+
+    // System
+    async getSystemStats() {
+        return this.request('/system/stats');
     }
 
     // Models

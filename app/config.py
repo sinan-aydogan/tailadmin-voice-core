@@ -39,7 +39,27 @@ class Settings(BaseSettings):
     USE_GPU: str = "auto"
     MAX_CPU_THREADS: int = 4
     PYTORCH_ENABLE_MPS_FALLBACK: int = 1
-    
+
+    # Server runtime
+    # Auto-reload watches files and restarts on change. Convenient in dev, but it
+    # KILLS in-flight downloads/tasks and can leak the port. Keep off by default.
+    RELOAD: bool = False
+    # Queue worker placement:
+    #   "inline"   -> worker runs inside the API process (default; backward compatible)
+    #   "separate" -> worker runs as its own OS process (`python -m app.queue`), so
+    #                 model inference GIL never blocks the API event loop.
+    WORKER_MODE: str = "inline"
+    # Shared secret for the API's /internal/notify endpoint, used by a separate
+    # worker process to push WebSocket notifications through the API (which owns the
+    # WS connections). Change in production.
+    INTERNAL_NOTIFY_TOKEN: str = "change-me-internal"
+    # Comma-separated model ids to pre-load into RAM at startup ("" = none,
+    # "all" = every healthy model). Pre-loading everything wastes memory on Mac.
+    PRELOAD_MODELS: str = ""
+    # Push live system-resource stats (CPU/RAM/disk) to the UI footer over WS.
+    SYSTEM_STATS_ENABLED: bool = True
+    SYSTEM_STATS_INTERVAL_SEC: float = 3.0
+
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_RETENTION_DAYS: int = 30

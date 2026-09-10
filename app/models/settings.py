@@ -9,7 +9,9 @@ class AppSettings(Base):
     __tablename__ = "app_settings"
 
     id = Column(Integer, primary_key=True, index=True)
-    tab = Column(String, nullable=False) # tts, stt, hardware, storage, security, server, log
+    # NOT NULL, but the create-setting endpoint doesn't set it, so give it a default
+    # (otherwise the ORM inserts tab=NULL and violates the constraint).
+    tab = Column(String, nullable=False, default="general") # tts, stt, hardware, storage, security, server, log
     key = Column(String, unique=True, index=True, nullable=False) # e.g. use_gpu
     value = Column(String) # JSON string representation
     description = Column(String, nullable=True) # Added to match router schema

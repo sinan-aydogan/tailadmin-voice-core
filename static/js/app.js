@@ -26,12 +26,10 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
     });
 
-    // Sidebar Toggle (Mobile)
+    // Sidebar Toggle (Mobile) — position is handled by responsive classes on the
+    // <aside> (fixed on mobile, static on desktop); here we only slide it in/out.
     sidebarToggle.addEventListener('click', () => {
         sidebar.classList.toggle('-translate-x-full');
-        sidebar.classList.toggle('absolute');
-        sidebar.classList.toggle('z-40');
-        sidebar.classList.toggle('h-screen');
     });
 
     // Initialize
@@ -70,6 +68,67 @@ document.addEventListener('DOMContentLoaded', () => {
             el.textContent = currentUser?.username || 'Admin';
         });
         lucide.createIcons();
+        initSystemFooter();
+    }
+
+    // --- System resource footer (CPU / RAM / Disk / GPU) ---
+    function footerColor(pct) {
+        if (pct >= 92) return 'hsl(var(--destructive))';
+        if (pct >= 80) return 'hsl(var(--warning))';
+        return '';  // inherit default muted color
+    }
+
+    function updateSystemFooter(stats) {
+        if (!stats) return;
+        const cpu = document.getElementById('footerCpu');
+        const ram = document.getElementById('footerRam');
+        const disk = document.getElementById('footerDisk');
+        const gpu = document.getElementById('footerGpu');
+        const gpuWrap = document.getElementById('footerGpuWrap');
+        const gpuLabel = document.getElementById('footerGpuLabel');
+        const procRam = document.getElementById('footerProcRam');
+
+        if (cpu) { cpu.textContent = `${stats.cpu_pct}%`; cpu.style.color = footerColor(stats.cpu_pct); }
+        if (ram && stats.ram) {
+            ram.textContent = `${stats.ram.used_gb}/${stats.ram.total_gb} GB`;
+            ram.style.color = footerColor(stats.ram.pct);
+        }
+        if (disk && stats.disk) {
+            disk.textContent = `${stats.disk.pct}%`;
+            disk.style.color = footerColor(stats.disk.pct);
+        }
+        if (procRam) procRam.textContent = `${stats.process_ram_gb} GB`;
+        if (gpuWrap && gpu && stats.gpu) {
+            if (stats.gpu.backend && stats.gpu.backend !== 'cpu') {
+                gpuWrap.classList.remove('hidden');
+                if (gpuLabel) gpuLabel.textContent = stats.gpu.backend.toUpperCase();
+                gpu.textContent = `${stats.gpu.allocated_gb} GB`;
+            } else {
+                gpuWrap.classList.add('hidden');
+            }
+        }
+    }
+
+    function initSystemFooter() {
+        if (window.__footerInit) return;
+        window.__footerInit = true;
+
+        // Live push over WebSocket (primary source).
+        if (typeof wsClient !== 'undefined') {
+            wsClient.on('system_stats', updateSystemFooter);
+        }
+
+        // Fallback polling when the WebSocket isn't connected.
+        setInterval(async () => {
+            const wsUp = typeof wsClient !== 'undefined' && wsClient.isConnected;
+            if (wsUp) return;  // WS is feeding the footer; skip the poll
+            try {
+                updateSystemFooter(await api.getSystemStats());
+            } catch (e) { /* ignore transient errors */ }
+        }, 5000);
+
+        // Immediate first paint so the footer isn't blank until the first tick.
+        api.getSystemStats().then(updateSystemFooter).catch(() => {});
     }
 
     // Login Form
@@ -651,6 +710,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                             ${readyEngines.includes('xtts') ? '<option value="xtts">XTTS V2</option>' : ''}
                                             ${readyEngines.includes('bark') ? '<option value="bark">Bark</option>' : ''}
                                             ${readyEngines.includes('tortoise') ? '<option value="tortoise">Tortoise</option>' : ''}
+                                            ${readyEngines.includes('piper-tr') ? '<option value="piper-tr">Piper (Türkçe)</option>' : ''}
+                                            ${readyEngines.includes('piper-en') ? '<option value="piper-en">Piper (İngilizce)</option>' : ''}
+                                            ${readyEngines.includes('piper-de') ? '<option value="piper-de">Piper (Almanca)</option>' : ''}
+                                            ${readyEngines.includes('piper-fr') ? '<option value="piper-fr">Piper (Fransızca)</option>' : ''}
                                             ${readyEngines.includes('musicgen-small') ? '<option value="musicgen-small">MusicGen Small (Hızlı)</option>' : ''}
                                             ${readyEngines.includes('musicgen-medium') ? '<option value="musicgen-medium">MusicGen Medium (Dengeli)</option>' : ''}
                                             ${readyEngines.includes('musicgen-large') ? '<option value="musicgen-large">MusicGen Large (En İyi Kalite)</option>' : ''}
@@ -1217,11 +1280,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                             </td>
                                             <td>
                                                 ${t.status === 'pending' || t.status === 'running' || t.status === 'downloading' ? `
-                                                    <button onclick="event.stopPropagation(); cancelTask('${t.id}', ${t.itemType === 'download'})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
+                                                    <button onclick="event.stopPropagation(); cancelTask('${t.itemType === 'download' ? t.model_id : t.id}', ${t.itemType === 'download'})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
                                                         <i data-lucide="x" class="w-4 h-4"></i>
                                                     </button>
                                                 ` : `
-                                                    <button onclick="event.stopPropagation(); deleteTask('${t.id}', ${t.itemType === 'download'})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
+                                                    <button onclick="event.stopPropagation(); deleteTask('${t.itemType === 'download' ? t.model_id : t.id}', ${t.itemType === 'download'})" class="p-2 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
                                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                                                     </button>
                                                 `}
@@ -1496,7 +1559,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <span class="text-muted-foreground">${t('settings.theme')}</span>
                                         <p class="text-xs text-muted-foreground">${t('settings.theme.desc')}</p>
                                     </div>
-                                    <button id="themeToggle" class="btn btn-outline btn-icon" title="${document.documentElement.classList.contains('dark') ? t('settings.theme.light') : t('settings.theme.dark')}">
+                                    <button id="settingsThemeToggle" class="btn btn-outline btn-icon" title="${document.documentElement.classList.contains('dark') ? t('settings.theme.light') : t('settings.theme.dark')}">
                                         <i data-lucide="${document.documentElement.classList.contains('dark') ? 'sun' : 'moon'}" class="w-4 h-4"></i>
                                     </button>
                                 </div>
@@ -1574,7 +1637,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </p>
                                 </div>
                                 <div class="card-content">
-                                    <a href="http://localhost:5001/docs" target="_blank" class="btn btn-outline w-full">
+                                    <a href="${API_BASE}/docs" target="_blank" class="btn btn-outline w-full">
                                         <i data-lucide="external-link" class="w-4 h-4 mr-2"></i>
                                         Swagger UI'yi Aç
                                     </a>
@@ -1809,8 +1872,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupGeneralSettingsHandlers() {
-        // Theme toggle
-        const themeBtn = document.getElementById('themeToggle');
+        // Theme toggle (unique id so it doesn't collide with the header's #themeToggle,
+        // which would misbind this handler to the header button and double-toggle it).
+        const themeBtn = document.getElementById('settingsThemeToggle');
         if (themeBtn) {
             themeBtn.addEventListener('click', async () => {
                 document.documentElement.classList.toggle('dark');

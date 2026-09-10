@@ -30,6 +30,8 @@ data/outputs/
 data/profiles/
 data/uploads/
 data/*.db
+data/*.db-wal
+data/*.db-shm
 data/*.sqlite
 data/*.sqlite3
 
@@ -62,6 +64,7 @@ Desktop.ini
 # IDE
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 .cursor/

@@ -281,7 +281,7 @@ const i18n = {
     async init() {
         try {
             // Try to get user's preference from API
-            const response = await fetch('http://localhost:5001/auth/me/preferences', {
+            const response = await fetch(`${(window.VOICE_CORE_CONFIG && window.VOICE_CORE_CONFIG.apiBase) || (location.protocol + '//' + location.hostname + ':5001')}/auth/me/preferences`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('vc_token')}`
                 }
@@ -317,7 +317,7 @@ const i18n = {
      */
     async savePreferences(theme, language) {
         try {
-            const response = await fetch('http://localhost:5001/auth/me/preferences', {
+            const response = await fetch(`${(window.VOICE_CORE_CONFIG && window.VOICE_CORE_CONFIG.apiBase) || (location.protocol + '//' + location.hostname + ':5001')}/auth/me/preferences`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

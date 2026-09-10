@@ -23,10 +23,10 @@ class TTSRegistry:
         "musicgen-large": lambda: MusicGenEngine("large"),
         "musicgen-melody": lambda: MusicGenEngine("melody"),
         "tortoise": TortoiseEngine,
-        "piper-tr": lambda: PiperEngine("tr_TR-dfki-medium"),
-        "piper-en": lambda: PiperEngine("en_US-lessac-medium"),
-        "piper-de": lambda: PiperEngine("de_DE-thorsten-medium"),
-        "piper-fr": lambda: PiperEngine("fr_FR-siwis-medium"),
+        "piper-tr": lambda: PiperEngine("tr_TR-dfki-medium", model_id="piper-tr"),
+        "piper-en": lambda: PiperEngine("en_US-lessac-medium", model_id="piper-en"),
+        "piper-de": lambda: PiperEngine("de_DE-thorsten-medium", model_id="piper-de"),
+        "piper-fr": lambda: PiperEngine("fr_FR-siwis-medium", model_id="piper-fr"),
     }
     
     _instances: Dict[str, BaseTTS] = {}
@@ -48,6 +48,42 @@ class TTSRegistry:
             
         return cls._instances[engine_name]
 
+    @classmethod
+    def unload(cls, name: str) -> bool:
+        """Drop a loaded engine instance to free RAM/VRAM.
+
+        Clears the singleton and best-effort empties the MPS/CUDA cache. Returns
+        True if an instance was actually removed.
+        """
+        instance = cls._instances.pop(name, None)
+        if instance is None:
+            return False
+        # Let engines release big tensors if they expose a hook.
+        for attr in ("_model", "model"):
+            if hasattr(instance, attr):
+                try:
+                    setattr(instance, attr, None)
+                except Exception:
+                    pass
+        try:
+            import torch
+            if torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+            elif torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+        logger.info(f"Unloaded TTS engine: {name}")
+        return True
+
+    @classmethod
+    def loaded_engines(cls) -> list:
+        """Names of currently instantiated engines."""
+        return list(cls._instances.keys())
+
 # Global registry instance/helper
 def get_tts_engine(name: str = None) -> BaseTTS:
     return TTSRegistry.get_engine(name)
+
+def unload_tts_engine(name: str) -> bool:
+    return TTSRegistry.unload(name)

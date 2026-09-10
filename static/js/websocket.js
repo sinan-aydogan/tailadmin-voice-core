@@ -31,7 +31,11 @@ class WebSocketClient {
 
         this.currentToken = token;
         this.isConnecting = true;
-        const wsUrl = `ws://localhost:5001/ws/notifications?token=${token}`;
+        // WS base comes from the dynamic runtime config (config.js); falls back to
+        // the current host on :5001 if config didn't load.
+        const wsBase = (window.VOICE_CORE_CONFIG && window.VOICE_CORE_CONFIG.wsBase)
+            || ((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.hostname + ':5001');
+        const wsUrl = `${wsBase}/ws/notifications?token=${token}`;
 
         try {
             this.ws = new WebSocket(wsUrl);

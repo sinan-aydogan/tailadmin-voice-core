@@ -27,6 +27,11 @@ piper-tts  # Lightweight TTS for fast inference
 bangla<0.0.5  # Fixed Python 3.10 syntax error on Python 3.9
 transformers>=4.33.0,<4.40.0  # Compatible with TTS>=0.22.0
 bcrypt>=3.2.0,<4.0.0  # Resolves passlib ValueError on password length detection and bcrypt 4.x compatibility issues
+# spaCy 3.9+ / thinc 8.4+ drop Python <3.10 support; newer thinc (8.3.12+) also
+# requires Python >=3.10. Pin to the 3.8/8.3 line so a transitive resolve can't
+# silently pull an incompatible build. Requires Python >= 3.10 (see start-macos.sh).
+spacy>=3.7.0,<3.9.0
+thinc>=8.2.0,<8.4.0
 
 
 # STT Engines

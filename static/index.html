@@ -125,7 +125,10 @@
     <div id="appView" class="hidden min-h-screen flex">
         
         <!-- Sidebar -->
-        <aside id="sidebar" class="sidebar w-64 flex-shrink-0 flex flex-col border-r transition-all duration-300">
+        <!-- Mobile (<lg): fixed off-canvas, out of flow, hidden by default (slide in via hamburger).
+             Desktop (lg+): static, in-flow, always visible. Keeping it out of flow on mobile is
+             what prevents the 256px empty gap / content shift when it's translated off-screen. -->
+        <aside id="sidebar" class="sidebar w-64 flex-shrink-0 flex flex-col border-r transition-transform duration-300 fixed lg:static inset-y-0 left-0 z-40 lg:z-auto -translate-x-full lg:translate-x-0">
             <!-- Logo -->
             <div class="h-16 flex items-center px-6 border-b border-border">
                 <div class="flex items-center gap-3">
@@ -237,6 +240,40 @@
                     <!-- Content will be rendered here -->
                 </div>
             </main>
+
+            <!-- System Resource Footer -->
+            <footer id="systemFooter" class="h-9 border-t border-border bg-card flex items-center justify-between px-4 text-xs text-muted-foreground select-none">
+                <div class="flex items-center gap-4">
+                    <!-- CPU -->
+                    <div class="flex items-center gap-1.5" title="İşlemci Kullanımı">
+                        <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+                        <span>CPU</span>
+                        <span id="footerCpu" class="font-medium tabular-nums">–</span>
+                    </div>
+                    <!-- RAM -->
+                    <div class="flex items-center gap-1.5" title="Bellek Kullanımı">
+                        <i data-lucide="memory-stick" class="w-3.5 h-3.5"></i>
+                        <span>RAM</span>
+                        <span id="footerRam" class="font-medium tabular-nums">–</span>
+                    </div>
+                    <!-- Disk -->
+                    <div class="flex items-center gap-1.5" title="Disk Kullanımı (model dizini)">
+                        <i data-lucide="hard-drive" class="w-3.5 h-3.5"></i>
+                        <span>Disk</span>
+                        <span id="footerDisk" class="font-medium tabular-nums">–</span>
+                    </div>
+                    <!-- GPU -->
+                    <div id="footerGpuWrap" class="hidden sm:flex items-center gap-1.5" title="GPU Bellek Kullanımı">
+                        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                        <span id="footerGpuLabel">GPU</span>
+                        <span id="footerGpu" class="font-medium tabular-nums">–</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5" title="Proje Belleği">
+                    <span class="hidden sm:inline">Uygulama</span>
+                    <span id="footerProcRam" class="font-medium tabular-nums">–</span>
+                </div>
+            </footer>
         </div>
     </div>
 
@@ -307,11 +344,13 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/i18n.js"></script>
-    <script src="js/api.js?v=2"></script>
-    <script src="js/websocket.js"></script>
+    <!-- Runtime config (dynamic API/UI ports) — must load before any script that calls the API -->
+    <script src="config.js"></script>
+    <script src="js/i18n.js?v=3"></script>
+    <script src="js/api.js?v=3"></script>
+    <script src="js/websocket.js?v=2"></script>
     <script src="js/notifications.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/app.js?v=6"></script>
     
     <script>
         // Initialize Lucide icons
