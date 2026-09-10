@@ -15,6 +15,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
     {
         Window::open()
             ->title('Voice Core - AI Ses Yönetim Sistemi')
+            ->route('dashboard')
             ->width(1280)
             ->height(850)
             ->minWidth(1024)
@@ -28,6 +29,8 @@ class NativeAppServiceProvider implements ProvidesPhpIni
     public function phpIni(): array
     {
         return [
+            'opcache.enable' => '0',
+            'opcache.enable_cli' => '0',
         ];
     }
 }

@@ -88,6 +88,10 @@ return [
         'content',
         'node_modules',
         '*/tests',
+        'data/venvies/*',
+        'data/models/*',
+        'data/outputs/*',
+        'engine/.venv/*',
     ],
 
     /**
@@ -99,7 +103,8 @@ return [
          * updater will only work when your application is bundled
          * for production.
          */
-        'enabled' => env('NATIVEPHP_UPDATER_ENABLED', true),
+        'enabled' => env('NATIVEPHP_UPDATER_ENABLED', false),
+
 
         /**
          * The updater provider to use.
@@ -165,7 +170,7 @@ return [
      * Define your own scripts to run before and after the build process.
      */
     'prebuild' => [
-        // 'npm run build',
+        'npm run build',
     ],
 
     'postbuild' => [
@@ -179,14 +184,6 @@ return [
      */
     'nsis' => [
         'delete_app_data_on_uninstall' => env('NATIVEPHP_NSIS_DELETE_APP_DATA', false),
-    ],
-
-    'cleanup_exclude_files' => [
-        'data/venvies/*',
-        'data/models/*',
-        'data/outputs/*',
-        'engine/.venv/*',
-        'node_modules/*',
     ],
 
     /**
