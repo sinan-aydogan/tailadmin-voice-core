@@ -181,8 +181,17 @@ return [
         'delete_app_data_on_uninstall' => env('NATIVEPHP_NSIS_DELETE_APP_DATA', false),
     ],
 
+    'cleanup_exclude_files' => [
+        'data/venvies/*',
+        'data/models/*',
+        'data/outputs/*',
+        'engine/.venv/*',
+        'node_modules/*',
+    ],
+
     /**
      * Custom PHP binary path.
      */
     'binary_path' => env('NATIVEPHP_PHP_BINARY_PATH', null),
 ];
+

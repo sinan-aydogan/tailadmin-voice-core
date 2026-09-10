@@ -6,7 +6,9 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/nativephp/
 .env
+
 .env.backup
 .env.production
 .phpactor.json
