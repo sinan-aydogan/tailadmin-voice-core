@@ -1,0 +1,145 @@
+"""
+CLI interface for Python Voice Core engine.
+Supports execution via Laravel Process facade or standalone CLI.
+"""
+import sys
+import os
+import json
+import argparse
+from pathlib import Path
+
+ENGINE_DIR = Path(__file__).resolve().parent.parent
+if str(ENGINE_DIR) not in sys.path:
+    sys.path.insert(0, str(ENGINE_DIR))
+
+from app.config import settings
+
+def tts_command(args):
+    from app.tts.registry import get_tts_engine
+    try:
+        engine = get_tts_engine(args.engine)
+        output_path = args.output
+        if not output_path:
+            import uuid
+            os.makedirs(settings.OUTPUTS_DIR, exist_ok=True)
+            output_path = str(settings.OUTPUTS_DIR / f"tts_{uuid.uuid4().hex[:8]}.wav")
+        else:
+            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+        import asyncio
+        kwargs = {}
+        if args.profile:
+            kwargs["profile_path"] = args.profile
+
+        ok = asyncio.run(engine.generate_audio(
+            text=args.text,
+            output_path=output_path,
+            language=args.language,
+            **kwargs
+        ))
+
+        if ok and os.path.exists(output_path):
+            result = {
+                "success": True,
+                "output_path": output_path,
+                "size_bytes": os.path.getsize(output_path),
+            }
+            print(json.dumps(result))
+            return 0
+        else:
+            result = {"success": False, "error": "Generation failed or output file not created"}
+            print(json.dumps(result), file=sys.stderr)
+            return 1
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}), file=sys.stderr)
+        return 1
+
+def stt_command(args):
+    from app.stt.registry import get_stt_engine
+    try:
+        engine = get_stt_engine("whisper")
+        transcription = engine.transcribe(
+            audio_path=args.audio,
+            language=args.language if args.language != "auto" else None,
+        )
+        result = {
+            "success": True,
+            "text": transcription.get("text", ""),
+            "language": transcription.get("language", ""),
+            "segments": transcription.get("segments", []),
+        }
+        print(json.dumps(result))
+        return 0
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}), file=sys.stderr)
+        return 1
+
+def download_command(args):
+    from app.downloader.download_utils import download_model
+    try:
+        ok = download_model(args.model)
+        result = {"success": ok, "model_id": args.model}
+        print(json.dumps(result))
+        return 0 if ok else 1
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}), file=sys.stderr)
+        return 1
+
+def models_command(args):
+    from app.downloader.model_registry import AVAILABLE_MODELS
+    from app.downloader.integrity_checker import is_model_healthy
+    models = []
+    for m in AVAILABLE_MODELS:
+        m_copy = dict(m)
+        m_copy["is_downloaded"] = is_model_healthy(m["id"])
+        models.append(m_copy)
+    print(json.dumps(models))
+    return 0
+
+def system_command(args):
+    from app.routers.system_router import collect_system_stats
+    stats = collect_system_stats()
+    print(json.dumps(stats))
+    return 0
+
+def main():
+    parser = argparse.ArgumentParser(description="TailAdmin Voice Core CLI")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # TTS
+    tts_parser = subparsers.add_parser("tts")
+    tts_parser.add_argument("--text", required=True)
+    tts_parser.add_argument("--engine", default="piper-tr")
+    tts_parser.add_argument("--language", default="tr")
+    tts_parser.add_argument("--output", default=None)
+    tts_parser.add_argument("--profile", default=None)
+
+    # STT
+    stt_parser = subparsers.add_parser("stt")
+    stt_parser.add_argument("--audio", required=True)
+    stt_parser.add_argument("--language", default="tr")
+
+    # Download
+    dl_parser = subparsers.add_parser("download")
+    dl_parser.add_argument("--model", required=True)
+
+    # Models list
+    subparsers.add_parser("models")
+
+    # System stats
+    subparsers.add_parser("system")
+
+    args = parser.parse_args()
+    if args.command == "tts":
+        sys.exit(tts_command(args))
+    elif args.command == "stt":
+        sys.exit(stt_command(args))
+    elif args.command == "download":
+        sys.exit(download_command(args))
+    elif args.command == "models":
+        sys.exit(models_command(args))
+    elif args.command == "system":
+        sys.exit(system_command(args))
+
+if __name__ == "__main__":
+    main()

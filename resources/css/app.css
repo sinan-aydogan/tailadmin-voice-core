@@ -1,0 +1,14 @@
+@import '@tailadmin/ui/styles/tokens.css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.vue';
+
+@layer base {
+    body {
+        background-color: var(--color-bg, #161826);
+        color: var(--color-text, #e9e9ed);
+    }
+}

@@ -1,30 +1,43 @@
-# Environment
+# Laravel
+/vendor
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
 .env
-*.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.fleet
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+Homestead.json
+Homestead.yaml
 
-# Python
+# Python / PyTorch
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-build/
-.eggs/
-*.egg
-.venv/
-.venv-*/
-venv/
-env/
-.python-version
-
-# Pip cache and temp
+*$py.class
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+.pytest_cache/
+.coverage
+htmlcov/
 .pip-cache/
 .tmp/
+.venv/
+engine/.venv/
 
-# Data (indirilen modeller, üretilen sesler, kullanıcı yüklemeleri)
-# Keep venvies directory but ignore its contents
+# Voice Core Data
 data/models/
 data/outputs/
 data/profiles/
@@ -34,51 +47,28 @@ data/*.db-wal
 data/*.db-shm
 data/*.sqlite
 data/*.sqlite3
-
-# Virtual environments in data/venvies
 data/venvies/*/
-!.gitkeep
+!data/venvies/.gitkeep
 
 # Logs
 logs/
 *.log
 
-# SQLite veritabanı
-*.db
-*.sqlite
-*.sqlite3
+# IDE
+.idea/
+.vscode/
+.claude/
+.cursor/
+*.swp
+*.swo
 
-# macOS
+# OS
 .DS_Store
 .AppleDouble
 .LSOverride
 .Spotlight-V100
 .Trashes
 ._*
-
-# Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-
-# IDE
-.idea/
-.vscode/
-.claude/
-*.swp
-*.swo
-.cursor/
-
-# PyTorch / Model cache
-*.pt
-*.pth
-*.ckpt
-*.safetensors
-
-# Test cache
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Node (frontend bağımlılıkları varsa)
-node_modules/
