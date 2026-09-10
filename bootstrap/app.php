@@ -17,4 +17,21 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
+    })
+    ->booting(function (): void {
+        if ($apiUrl = getenv('NATIVEPHP_API_URL')) {
+            config(['nativephp-internal.api_url' => $apiUrl]);
+        }
+        if ($secret = getenv('NATIVEPHP_SECRET')) {
+            config(['nativephp-internal.secret' => $secret]);
+        }
+        if ($storagePath = getenv('NATIVEPHP_STORAGE_PATH')) {
+            config(['nativephp-internal.storage_path' => $storagePath]);
+        }
+        if ($databasePath = getenv('NATIVEPHP_DATABASE_PATH')) {
+            config(['nativephp-internal.database_path' => $databasePath]);
+        }
+        if (getenv('NATIVEPHP_RUNNING')) {
+            config(['nativephp-internal.running' => true]);
+        }
     })->create();
