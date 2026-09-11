@@ -55,18 +55,35 @@ def tts_command(args):
         return 1
 
 def stt_command(args):
+    import asyncio
     from app.stt.registry import get_stt_engine
     try:
         engine = get_stt_engine("whisper")
-        transcription = engine.transcribe(
+        lang = args.language if args.language != "auto" else None
+        model_size = getattr(args, "model_size", None)
+        transcription = asyncio.run(engine.transcribe(
             audio_path=args.audio,
-            language=args.language if args.language != "auto" else None,
-        )
+            language=lang,
+            model_size=model_size,
+        ))
+
+        if isinstance(transcription, str) and transcription.startswith("Error:"):
+            raise RuntimeError(transcription)
+
+        if isinstance(transcription, dict):
+            text = transcription.get("text", "")
+            detected_lang = transcription.get("language", args.language)
+            segments = transcription.get("segments", [])
+        else:
+            text = str(transcription)
+            detected_lang = args.language
+            segments = []
+
         result = {
             "success": True,
-            "text": transcription.get("text", ""),
-            "language": transcription.get("language", ""),
-            "segments": transcription.get("segments", []),
+            "text": text,
+            "language": detected_lang,
+            "segments": segments,
         }
         print(json.dumps(result))
         return 0
@@ -75,6 +92,12 @@ def stt_command(args):
         return 1
 
 def download_command(args):
+    from app.config import settings, reload_custom_settings
+    reload_custom_settings()
+    if getattr(args, "token", None):
+        settings.HF_TOKEN = args.token
+        os.environ["HF_TOKEN"] = args.token
+        os.environ["HUGGING_FACE_HUB_TOKEN"] = args.token
     from app.downloader.download_utils import download_model
     try:
         ok = download_model(args.model)
@@ -118,10 +141,12 @@ def main():
     stt_parser = subparsers.add_parser("stt")
     stt_parser.add_argument("--audio", required=True)
     stt_parser.add_argument("--language", default="tr")
+    stt_parser.add_argument("--model-size", dest="model_size", default=None)
 
     # Download
     dl_parser = subparsers.add_parser("download")
     dl_parser.add_argument("--model", required=True)
+    dl_parser.add_argument("--token", default=None)
 
     # Models list
     subparsers.add_parser("models")

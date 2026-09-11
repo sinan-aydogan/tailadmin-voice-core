@@ -21,6 +21,8 @@ class NativeAppServiceProvider implements ProvidesPhpIni
             ->minWidth(1024)
             ->minHeight(700)
             ->rememberState();
+
+        \App\Services\QueueWorkerService::ensureRunning();
     }
 
     /**

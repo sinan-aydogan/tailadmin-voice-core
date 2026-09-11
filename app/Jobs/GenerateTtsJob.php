@@ -49,6 +49,11 @@ class GenerateTtsJob implements ShouldQueue
                 'completed_at' => now(),
             ]);
 
+            if (!empty($payload['playlist_id'])) {
+                $playlist = \App\Models\VoicePlaylist::find($payload['playlist_id']);
+                $playlist?->syncItemStatuses();
+            }
+
             Log::info("GenerateTtsJob #{$task->id} completed successfully.");
         } catch (\Throwable $e) {
             Log::error("GenerateTtsJob #{$task->id} failed: " . $e->getMessage());
@@ -58,6 +63,11 @@ class GenerateTtsJob implements ShouldQueue
                 'error_message' => $e->getMessage(),
                 'completed_at' => now(),
             ]);
+
+            if (!empty($task->payload['playlist_id'])) {
+                $playlist = \App\Models\VoicePlaylist::find($task->payload['playlist_id']);
+                $playlist?->syncItemStatuses();
+            }
 
             throw $e;
         }

@@ -51,6 +51,7 @@ data/*.sqlite
 data/*.sqlite3
 data/venvies/*/
 !data/venvies/.gitkeep
+data/settings.json
 
 # Logs
 logs/

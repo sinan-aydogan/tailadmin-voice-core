@@ -48,7 +48,8 @@ class SttController extends Controller
             ],
         ]);
 
-        TranscribeSttJob::dispatch($task->id);
+        TranscribeSttJob::dispatch($task->id)->onQueue('default');
+        \App\Services\QueueWorkerService::ensureRunning();
 
         return redirect()->back()->with('success', 'Deşifre işlemi kuyruğa eklendi.');
     }

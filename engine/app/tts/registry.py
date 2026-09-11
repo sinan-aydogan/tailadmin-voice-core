@@ -12,6 +12,7 @@ class TTSRegistry:
 
     _engines: Dict[str, Callable[[], BaseTTS]] = {
         "xtts": lambda: __import__("app.tts.xtts", fromlist=["XTTSEngine"]).XTTSEngine(),
+        "xtts-v2": lambda: __import__("app.tts.xtts", fromlist=["XTTSEngine"]).XTTSEngine(),
         "bark": lambda: __import__("app.tts.bark", fromlist=["BarkEngine"]).BarkEngine(),
         "musicgen-small": lambda: __import__("app.tts.musicgen", fromlist=["MusicGenEngine"]).MusicGenEngine("small"),
         "musicgen-medium": lambda: __import__("app.tts.musicgen", fromlist=["MusicGenEngine"]).MusicGenEngine("medium"),

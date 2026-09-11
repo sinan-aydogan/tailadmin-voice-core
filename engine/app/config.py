@@ -74,8 +74,36 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
+import json
+import os
+
 # Instantiate global settings
 settings = Settings()
+
+def reload_custom_settings():
+    """Reload dynamic settings from data/settings.json into global settings and env vars."""
+    _settings_file = settings.DATA_DIR / "settings.json"
+    if _settings_file.exists():
+        try:
+            with open(_settings_file, "r", encoding="utf-8") as _f:
+                _custom = json.load(_f)
+                if "models_dir" in _custom and _custom["models_dir"]:
+                    _custom_path = Path(_custom["models_dir"])
+                    settings.MODELS_DIR = _custom_path
+                if "hf_token" in _custom:
+                    val = str(_custom["hf_token"]).strip() if _custom["hf_token"] else None
+                    settings.HF_TOKEN = val
+                    if val:
+                        os.environ["HF_TOKEN"] = val
+                        os.environ["HUGGING_FACE_HUB_TOKEN"] = val
+                    else:
+                        os.environ.pop("HF_TOKEN", None)
+                        os.environ.pop("HUGGING_FACE_HUB_TOKEN", None)
+        except Exception:
+            pass
+
+# Initial load from data/settings.json
+reload_custom_settings()
 
 # Ensure directories exist
 for path in [settings.MODELS_DIR, settings.OUTPUTS_DIR, settings.PROFILES_DIR, settings.UPLOADS_DIR]:

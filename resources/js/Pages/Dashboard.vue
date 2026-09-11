@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <AppLayout title="Dashboard">
     <div class="space-y-6">
       <!-- Welcome Card -->
@@ -80,24 +80,48 @@
                     }">
                 {{ task.status }}
               </span>
-              <audio v-if="task.status === 'completed' && task.payload?.filename"
-                     controls
-                     class="h-8 w-44"
-                     :src="'/api/audio/' + task.payload.filename"></audio>
+              <!-- Play Button (Opens Modal) -->
+              <button
+                v-if="task.status === 'completed' && (task.payload?.filename || task.result?.filename || task.output_path)"
+                @click="openPlayerModal(task)"
+                class="p-2 rounded-xl bg-neutral-800 hover:bg-accent/20 hover:text-accent text-neutral-300 transition-colors flex items-center justify-center group"
+                title="Sesi Dinle"
+              >
+                <svg class="w-4 h-4 fill-current text-accent" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Custom Audio Player Modal -->
+    <AudioPlayerModal
+      :show="showPlayerModal"
+      :task="selectedTask"
+      @close="showPlayerModal = false"
+    />
   </AppLayout>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import AppLayout from '../Layouts/AppLayout.vue'
+import AudioPlayerModal from '../Components/AudioPlayerModal.vue'
 
 defineProps({
   metrics: Object,
   recentTasks: Array,
 })
+
+const showPlayerModal = ref(false)
+const selectedTask = ref(null)
+
+const openPlayerModal = (task) => {
+  selectedTask.value = task
+  showPlayerModal.value = true
+}
 </script>

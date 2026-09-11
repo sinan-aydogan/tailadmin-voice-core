@@ -24,7 +24,7 @@ class ProfileController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:100',
             'description' => 'nullable|string|max:500',
-            'sample' => 'nullable|file|mimes:wav,mp3,ogg,m4a|max:20480',
+            'sample' => 'nullable|file|mimes:wav,mp3,ogg,m4a,webm|max:20480',
         ]);
 
         $samplePath = null;
@@ -34,16 +34,25 @@ class ProfileController extends Controller
             if (!is_dir($dir)) {
                 mkdir($dir, 0755, true);
             }
-            $filename = 'profile_' . Str::random(12) . '.' . $file->getClientOriginalExtension();
+            $ext = $file->getClientOriginalExtension() ?: 'wav';
+            $filename = 'profile_' . Str::random(12) . '.' . $ext;
             $file->move($dir, $filename);
             $samplePath = $dir . DIRECTORY_SEPARATOR . $filename;
         }
 
-        VoiceProfile::create([
+        $profile = VoiceProfile::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'sample_path' => $samplePath,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'profile' => $profile,
+                'message' => 'Ses profili başarıyla oluşturuldu.',
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Ses profili başarıyla oluşturuldu.');
     }

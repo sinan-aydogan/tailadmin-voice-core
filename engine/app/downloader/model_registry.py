@@ -41,7 +41,7 @@ AVAILABLE_MODELS = [
         "repo_id": "coqui/XTTS-v2",
         "description": "High quality multi-lingual text-to-speech with voice cloning.",
         "size_estimate_mb": 2500,
-        "languages": ["en", "tr", "es", "fr", "de", "it", "pt", "pl", "ar", "ru", "zh", "ja", "ko", "hu", "cs"]
+        "languages": ["tr", "en", "fr", "bg", "de", "it", "ru", "zh", "ko", "hi", "es", "pt", "pl", "ar", "ja", "hu", "cs"]
     },
     {
         "id": "bark",
@@ -60,7 +60,7 @@ AVAILABLE_MODELS = [
         "type": "tts",
         "repo_id": "Manmay/tortoise-tts",
         "description": "Strong multi-voice text-to-speech system. Best for English.",
-        "size_estimate_mb": 3000,
+        "size_estimate_mb": 4200,
         "languages": ["en"]
     },
     {

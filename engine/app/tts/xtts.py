@@ -43,6 +43,22 @@ class XTTSEngine(BaseTTS):
         
         logger.info(f"Starting XTTS model load from {self.model_path}...")
             
+        # Ensure torchaudio uses soundfile for loading audio
+        try:
+            import torchaudio
+            import soundfile as sf
+            def _sf_load(filepath, *args, **kwargs):
+                data, sr = sf.read(filepath)
+                t = torch.from_numpy(data).float()
+                if t.ndim == 1:
+                    t = t.unsqueeze(0)
+                else:
+                    t = t.t()
+                return t, sr
+            torchaudio.load = _sf_load
+        except Exception as e:
+            logger.warning(f"Could not patch torchaudio.load: {e}")
+
         # Fix for PyTorch 2.6+ safe loading (weights_only=True)
         # We need to allowlist XttsConfig and related classes because the TTS library uses torch.load internally
         try:
@@ -103,7 +119,16 @@ class XTTSEngine(BaseTTS):
 
     def _generate_sync(self, text: str, output_path: str, language: str, profile_path: Optional[str], **kwargs):
         """Synchronous generation logic to be run in a separate thread."""
-        logger.info(f"[XTTS] Starting _generate_sync - text length: {len(text)}, language: {language}")
+        # Normalize and map language code for XTTS
+        lang_map = {
+            "zh": "zh-cn",
+            "zh_cn": "zh-cn",
+            "bg": "ru",  # Use Cyrillic phonemizer for Bulgarian text on XTTS
+        }
+        original_lang = (language or "tr").lower()
+        language = lang_map.get(original_lang, original_lang)
+
+        logger.info(f"[XTTS] Starting _generate_sync - text length: {len(text)}, language: {language} (requested: {original_lang})")
 
         # Load the model (runs in the worker process; GIL isolation is handled at the
         # process level now, so the previous time.sleep(0.01) "yield" hack is gone).
@@ -111,33 +136,50 @@ class XTTSEngine(BaseTTS):
         logger.info("[XTTS] Model loaded, preparing speaker reference...")
         
         # Determine speaker reference
-        speaker_wav = profile_path or os.path.join(self.model_path, "samples", "default.wav")
-        if not os.path.exists(speaker_wav):
-            logger.warning(f"Speaker profile not found at {speaker_wav}, falling back to built-in generation if possible")
+        speaker_wav = profile_path
+        if not speaker_wav or not os.path.exists(speaker_wav):
+            samples_dir = os.path.join(self.model_path, "samples")
+            candidates = [
+                os.path.join(samples_dir, f"{language}_sample.wav"),
+                os.path.join(samples_dir, f"{language}-sample.wav"),
+                os.path.join(samples_dir, "default.wav"),
+                os.path.join(samples_dir, "tr_sample.wav"),
+                os.path.join(samples_dir, "en_sample.wav"),
+            ]
             speaker_wav = None
-        else:
-            logger.info(f"[XTTS] Using speaker reference: {speaker_wav}")
+            for candidate in candidates:
+                if os.path.exists(candidate):
+                    speaker_wav = candidate
+                    break
+
+            if not speaker_wav and os.path.isdir(samples_dir):
+                for f in os.listdir(samples_dir):
+                    if f.endswith(".wav"):
+                        speaker_wav = os.path.join(samples_dir, f)
+                        break
+
+        if not speaker_wav or not os.path.exists(speaker_wav):
+            logger.error(f"[XTTS] No valid reference speaker audio could be found in {self.model_path}/samples or profile.")
+            return False
+
+        logger.info(f"[XTTS] Using speaker reference: {speaker_wav}")
             
         logger.info(f"[XTTS] Generating audio for text: '{text[:30]}...' in {language}")
         
         try:
             # Low-level inference approach to avoid 'gpt_inference' attribute error in higher level synthesize()
             # 1. Get speaker latents (cached per reference audio + mtime)
-            if speaker_wav:
-                try:
-                    cache_key = (speaker_wav, os.path.getmtime(speaker_wav))
-                except OSError:
-                    cache_key = (speaker_wav, None)
-                cached = self._latent_cache.get(cache_key)
-                if cached is not None:
-                    logger.info("[XTTS] Using cached speaker conditioning latents")
-                    gpt_cond_latent, speaker_embedding = cached
-                else:
-                    gpt_cond_latent, speaker_embedding = self._model.get_conditioning_latents(audio_path=[speaker_wav])
-                    self._latent_cache[cache_key] = (gpt_cond_latent, speaker_embedding)
+            try:
+                cache_key = (speaker_wav, os.path.getmtime(speaker_wav))
+            except OSError:
+                cache_key = (speaker_wav, None)
+            cached = self._latent_cache.get(cache_key)
+            if cached is not None:
+                logger.info("[XTTS] Using cached speaker conditioning latents")
+                gpt_cond_latent, speaker_embedding = cached
             else:
-                # Fallback to no latents if no speaker_wav, though XTTS usually needs it
-                gpt_cond_latent, speaker_embedding = None, None
+                gpt_cond_latent, speaker_embedding = self._model.get_conditioning_latents(audio_path=[speaker_wav])
+                self._latent_cache[cache_key] = (gpt_cond_latent, speaker_embedding)
 
             # 2. Run inference
             logger.info("[XTTS] Getting conditioning latents...")
@@ -160,14 +202,12 @@ class XTTSEngine(BaseTTS):
                 speaker_embedding,
                 **inference_kwargs
             )
-            logger.info("[XTTS] Inference completed, saving audio...")
+            # Save the file directly with soundfile
+            import soundfile as sf
+            import numpy as np
             
-            # Save the file
-            import torchaudio
-            import torch
-            
-            tensor_out = torch.tensor(out["wav"]).unsqueeze(0)
-            torchaudio.save(output_path, tensor_out, self._model.config.audio.sample_rate)
+            wav_data = np.array(out["wav"])
+            sf.write(output_path, wav_data, self._model.config.audio.sample_rate)
             
             logger.success(f"Successfully generated XTTS audio: {output_path}")
             return True

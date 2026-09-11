@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class PythonVoiceService
 {
@@ -25,12 +26,34 @@ class PythonVoiceService
      */
     public function isServiceOnline(): bool
     {
-        try {
-            $response = Http::timeout(2)->get("{$this->baseUrl}/health");
-            return $response->successful();
-        } catch (\Throwable $e) {
+        static $localCache = null;
+        static $localCacheTime = 0;
+
+        if ($localCache !== null && (microtime(true) - $localCacheTime) < 3.0) {
+            return $localCache;
+        }
+
+        $host = parse_url($this->baseUrl, PHP_URL_HOST) ?? '127.0.0.1';
+        $port = parse_url($this->baseUrl, PHP_URL_PORT) ?? 5001;
+
+        // Fast non-blocking socket probe (50ms timeout)
+        $fp = @fsockopen($host, (int) $port, $errno, $errstr, 0.05);
+        if (!$fp) {
+            $localCache = false;
+            $localCacheTime = microtime(true);
             return false;
         }
+        fclose($fp);
+
+        try {
+            $response = Http::timeout(1)->get("{$this->baseUrl}/health");
+            $localCache = $response->successful();
+        } catch (\Throwable $e) {
+            $localCache = false;
+        }
+
+        $localCacheTime = microtime(true);
+        return $localCache;
     }
 
     /**
@@ -107,12 +130,13 @@ class PythonVoiceService
             ->run($cmd);
 
         if (!$result->successful()) {
-            throw new \RuntimeException("TTS generation CLI failed: " . $result->errorOutput());
+            throw new \RuntimeException("TTS generation CLI failed: " . self::cleanUtf8($result->errorOutput()));
         }
 
-        $data = json_decode($result->output(), true);
+        $output = self::cleanUtf8($result->output());
+        $data = json_decode($output, true);
         if (!$data || empty($data['success'])) {
-            throw new \RuntimeException("TTS generation CLI error: " . ($data['error'] ?? $result->output()));
+            throw new \RuntimeException("TTS generation CLI error: " . ($data['error'] ?? $output));
         }
 
         return $data;
@@ -121,14 +145,17 @@ class PythonVoiceService
     /**
      * Transcribe speech to text (STT).
      */
-    public function transcribeStt(string $audioFilePath, string $language = 'tr'): array
+    public function transcribeStt(string $audioFilePath, string $language = 'tr', ?string $modelSize = null): array
     {
         if ($this->isServiceOnline()) {
+            $postData = ['language' => $language];
+            if (!empty($modelSize)) {
+                $postData['model_size'] = $modelSize;
+            }
+
             $response = Http::timeout(600)
                 ->attach('file', file_get_contents($audioFilePath), basename($audioFilePath))
-                ->post("{$this->baseUrl}/stt/transcribe", [
-                    'language' => $language,
-                ]);
+                ->post("{$this->baseUrl}/stt/transcribe", $postData);
 
             if ($response->successful()) {
                 return $response->json();
@@ -145,43 +172,117 @@ class PythonVoiceService
             '--language', $language,
         ];
 
+        if (!empty($modelSize)) {
+            $cmd[] = '--model-size';
+            $cmd[] = $modelSize;
+        }
+
         $result = Process::path($this->enginePath)
             ->timeout(600)
             ->run($cmd);
 
         if (!$result->successful()) {
-            throw new \RuntimeException("STT transcription CLI failed: " . $result->errorOutput());
+            throw new \RuntimeException("STT transcription CLI failed: " . self::cleanUtf8($result->errorOutput()));
         }
 
-        return json_decode($result->output(), true) ?? ['text' => $result->output()];
+        $output = self::cleanUtf8($result->output());
+        return json_decode($output, true) ?? ['text' => $output];
     }
 
     /**
-     * Download a model from HuggingFace / Piper.
+     * Total size in bytes of all files inside a directory.
      */
-    public function downloadModel(string $modelId): array
+    public static function getDirectorySize(string $path): int
     {
-        if ($this->isServiceOnline()) {
-            $response = Http::timeout(30)->post("{$this->baseUrl}/models/download/{$modelId}");
-            if ($response->successful()) {
-                return $response->json();
-            }
+        if (!is_dir($path)) {
+            return 0;
         }
 
-        $result = Process::path($this->enginePath)
-            ->timeout(1800)
-            ->run([
-                $this->pythonBin,
-                '-m', 'app.cli',
-                'download',
-                '--model', $modelId,
-            ]);
+        $size = 0;
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($iterator as $file) {
+                if ($file->isFile()) {
+                    $size += $file->getSize();
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore concurrent write access errors
+        }
+
+        return $size;
+    }
+
+    /**
+     * Download a model from HuggingFace / Piper with live progress monitoring.
+     */
+    public function downloadModel(string $modelId, ?callable $onProgress = null): array
+    {
+        Cache::forget('voice_available_models');
+
+        $models = $this->getAvailableModels();
+        $targetModel = collect($models)->firstWhere('id', $modelId);
+        $estimateMb = $targetModel['size_estimate_mb'] ?? 1000;
+        $totalBytes = $estimateMb * 1024 * 1024;
+        $targetDir = base_path('data/models/' . $modelId);
+
+        // Load custom models dir and HF token from data/settings.json if present
+        $settingsFile = base_path('data' . DIRECTORY_SEPARATOR . 'settings.json');
+        $hfToken = env('HF_TOKEN');
+        if (file_exists($settingsFile)) {
+            try {
+                $st = json_decode(file_get_contents($settingsFile), true);
+                if (!empty($st['hf_token'])) {
+                    $hfToken = trim($st['hf_token']);
+                }
+                if (!empty($st['models_dir'])) {
+                    $targetDir = rtrim($st['models_dir'], '/\\') . DIRECTORY_SEPARATOR . $modelId;
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        $cmd = [
+            $this->pythonBin,
+            '-m', 'app.cli',
+            'download',
+            '--model', $modelId,
+        ];
+        if ($hfToken) {
+            $cmd[] = '--token';
+            $cmd[] = $hfToken;
+        }
+
+        $env = [];
+        if ($hfToken) {
+            $env['HF_TOKEN'] = $hfToken;
+            $env['HUGGING_FACE_HUB_TOKEN'] = $hfToken;
+        }
+
+        $process = Process::path($this->enginePath)
+            ->timeout(3600)
+            ->env($env)
+            ->start($cmd);
+
+        while ($process->running()) {
+            if ($onProgress) {
+                $currentBytes = self::getDirectorySize($targetDir);
+                $pct = min(99.0, max(5.0, round(($currentBytes / $totalBytes) * 100, 1)));
+                $onProgress($pct, $currentBytes, $totalBytes);
+            }
+            sleep(1);
+        }
+
+        $result = $process->wait();
+        Cache::forget('voice_available_models');
 
         if (!$result->successful()) {
-            throw new \RuntimeException("Model download failed: " . $result->errorOutput());
+            throw new \RuntimeException("Model download failed: " . self::cleanUtf8($result->errorOutput()));
         }
 
-        return json_decode($result->output(), true) ?? ['success' => true];
+        $output = self::cleanUtf8($result->output());
+        return json_decode($output, true) ?? ['success' => true];
     }
 
     /**
@@ -189,22 +290,25 @@ class PythonVoiceService
      */
     public function getAvailableModels(): array
     {
-        if ($this->isServiceOnline()) {
-            try {
-                $response = Http::timeout(5)->get("{$this->baseUrl}/models/available");
-                if ($response->successful()) {
-                    return $response->json();
+        return Cache::remember('voice_available_models', 180, function () {
+            if ($this->isServiceOnline()) {
+                try {
+                    $response = Http::timeout(2)->get("{$this->baseUrl}/models/available");
+                    if ($response->successful()) {
+                        return $response->json();
+                    }
+                } catch (\Throwable $e) {
+                    // fall through
                 }
-            } catch (\Throwable $e) {
-                // fall through
             }
-        }
 
-        $result = Process::path($this->enginePath)
-            ->timeout(10)
-            ->run([$this->pythonBin, '-m', 'app.cli', 'models']);
+            $result = Process::path($this->enginePath)
+                ->timeout(10)
+                ->run([$this->pythonBin, '-m', 'app.cli', 'models']);
 
-        return json_decode($result->output(), true) ?? [];
+            $output = self::cleanUtf8($result->output());
+            return json_decode($output, true) ?? [];
+        });
     }
 
     /**
@@ -212,26 +316,59 @@ class PythonVoiceService
      */
     public function getSystemStats(): array
     {
-        if ($this->isServiceOnline()) {
-            try {
-                $response = Http::timeout(3)->get("{$this->baseUrl}/system/stats");
-                if ($response->successful()) {
-                    return $response->json();
+        return Cache::remember('system_stats_metric', 5, function () {
+            if ($this->isServiceOnline()) {
+                try {
+                    $response = Http::timeout(1)->get("{$this->baseUrl}/system/stats");
+                    if ($response->successful()) {
+                        return $response->json();
+                    }
+                } catch (\Throwable $e) {
+                    // fall through to non-blocking native fallback
                 }
-            } catch (\Throwable $e) {
-                // fall through
             }
+
+            // High-speed native PHP metrics (< 0.1ms, non-blocking)
+            $diskTotal = @disk_total_space(base_path()) ?: 1;
+            $diskFree = @disk_free_space(base_path()) ?: 0;
+            $diskUsed = max(0, $diskTotal - $diskFree);
+            $diskPct = round(($diskUsed / $diskTotal) * 100, 1);
+
+            return [
+                'cpu_pct' => 0.0,
+                'ram' => [
+                    'used_gb' => 0.0,
+                    'total_gb' => 0.0,
+                    'pct' => 0.0,
+                ],
+                'disk' => [
+                    'used_gb' => round($diskUsed / (1024 ** 3), 1),
+                    'total_gb' => round($diskTotal / (1024 ** 3), 1),
+                    'pct' => $diskPct,
+                ],
+                'gpu' => [
+                    'backend' => 'cpu',
+                    'allocated_gb' => 0.0,
+                ],
+            ];
+        });
+    }
+
+    /**
+     * Ensure string is safe, valid UTF-8, converting Windows-1254/CP857 if necessary.
+     */
+    public static function cleanUtf8(?string $string): string
+    {
+        if ($string === null || $string === '') {
+            return '';
         }
-
-        $result = Process::path($this->enginePath)
-            ->timeout(5)
-            ->run([$this->pythonBin, '-m', 'app.cli', 'system']);
-
-        return json_decode($result->output(), true) ?? [
-            'cpu_pct' => 0,
-            'ram' => ['used_gb' => 0, 'total_gb' => 0, 'pct' => 0],
-            'disk' => ['used_gb' => 0, 'total_gb' => 0, 'pct' => 0],
-            'gpu' => ['backend' => 'cpu', 'allocated_gb' => 0],
-        ];
+        if (mb_check_encoding($string, 'UTF-8')) {
+            return $string;
+        }
+        $converted = @iconv('WINDOWS-1254', 'UTF-8//IGNORE', $string);
+        if ($converted !== false && mb_check_encoding($converted, 'UTF-8')) {
+            return $converted;
+        }
+        return mb_convert_encoding($string, 'UTF-8', 'UTF-8');
     }
 }

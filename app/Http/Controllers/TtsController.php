@@ -63,7 +63,8 @@ class TtsController extends Controller
             'output_path' => $outputPath,
         ]);
 
-        GenerateTtsJob::dispatch($task->id);
+        GenerateTtsJob::dispatch($task->id)->onQueue('default');
+        \App\Services\QueueWorkerService::ensureRunning();
 
         return redirect()->back()->with('success', 'Ses üretimi kuyruğa eklendi.');
     }

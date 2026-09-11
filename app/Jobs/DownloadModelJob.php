@@ -7,6 +7,7 @@ use App\Services\PythonVoiceService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class DownloadModelJob implements ShouldQueue
 {
@@ -32,13 +33,22 @@ class DownloadModelJob implements ShouldQueue
 
         try {
             Log::info("Starting DownloadModelJob for {$download->model_id}...");
-            $result = $service->downloadModel($download->model_id);
+            $result = $service->downloadModel($download->model_id, function ($pct, $downloadedBytes, $totalBytes) use ($download) {
+                $download->update([
+                    'status' => 'downloading',
+                    'progress' => $pct,
+                    'downloaded_bytes' => $downloadedBytes,
+                    'total_bytes' => $totalBytes,
+                ]);
+            });
 
             $download->update([
                 'status' => 'completed',
                 'progress' => 100.0,
                 'error_message' => null,
             ]);
+
+            Cache::forget('voice_available_models');
 
             Log::info("DownloadModelJob for {$download->model_id} completed successfully.");
         } catch (\Throwable $e) {

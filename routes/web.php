@@ -10,12 +10,14 @@ use App\Http\Controllers\QueueController;
 use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SystemApiController;
+use App\Http\Controllers\SupportController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/support', [SupportController::class, 'index'])->name('support.index');
 
 // TTS
 Route::get('/tts', [TtsController::class, 'index'])->name('tts.index');
@@ -33,20 +35,38 @@ Route::delete('/profiles/{id}', [ProfileController::class, 'destroy'])->name('pr
 // Models
 Route::get('/models', [ModelManagerController::class, 'index'])->name('models.index');
 Route::post('/models/download/{modelId}', [ModelManagerController::class, 'download'])->name('models.download');
+Route::get('/api/models/downloads', [ModelManagerController::class, 'downloadsApi'])->name('api.models.downloads');
 
 // Queue
 Route::get('/queue', [QueueController::class, 'index'])->name('queue.index');
+Route::post('/queue/repair', [QueueController::class, 'repair'])->name('queue.repair');
+Route::post('/queue/{id}/retry', [QueueController::class, 'retry'])->name('queue.retry');
 Route::delete('/queue/{id}', [QueueController::class, 'destroy'])->name('queue.destroy');
+Route::get('/api/queue/tasks', [QueueController::class, 'tasksApi'])->name('api.queue.tasks');
 
 // Playlists
 Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
 Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');
+Route::delete('/playlists/{id}', [PlaylistController::class, 'destroy'])->name('playlists.destroy');
+Route::post('/playlists/{id}/items', [PlaylistController::class, 'addItem'])->name('playlists.items.add');
+Route::delete('/playlists/{id}/items/{itemId}', [PlaylistController::class, 'removeItem'])->name('playlists.items.remove');
+Route::post('/playlists/{id}/config', [PlaylistController::class, 'updateConfig'])->name('playlists.config.update');
+Route::post('/playlists/{id}/process', [PlaylistController::class, 'process'])->name('playlists.process');
+Route::post('/playlists/{id}/items/{itemId}/process', [PlaylistController::class, 'processItem'])->name('playlists.items.process');
+Route::get('/playlists/{id}/download-zip', [PlaylistController::class, 'downloadZip'])->name('playlists.download_zip');
+Route::get('/api/playlists/{id}', [PlaylistController::class, 'apiPlaylist'])->name('api.playlists.show');
 
 // Settings
 Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
 Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
+Route::post('/settings/browse-folder', [SettingsController::class, 'browseFolder'])->name('settings.browse_folder');
 
 // System API
 Route::get('/api/system/stats', [SystemApiController::class, 'stats'])->name('api.system.stats');
+Route::get('/api/system/operations', [SystemApiController::class, 'operations'])->name('api.system.operations');
+Route::delete('/api/system/operations/{type}/{id}', [SystemApiController::class, 'cancelOperation'])->name('api.system.operations.cancel');
 Route::get('/api/audio/{filename}', [SystemApiController::class, 'audio'])->name('api.audio');
+Route::get('/api/tasks/{type}', [SystemApiController::class, 'tasks'])->name('api.tasks');
+Route::delete('/api/tasks/{id}', [SystemApiController::class, 'deleteTask'])->name('api.tasks.delete');
+Route::post('/api/system/open-url', [SystemApiController::class, 'openUrl'])->name('api.system.open_url');
 

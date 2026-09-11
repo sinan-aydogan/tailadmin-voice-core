@@ -251,7 +251,11 @@ def download_hf_model(db_factory, model_id: str, repo_id: str, local_dir: str,
     # for flaky connections.
     os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
     os.environ["HF_HUB_HTTP_TIMEOUT"] = "60"
-    token = settings.HF_TOKEN or None
+    
+    from app.config import reload_custom_settings
+    reload_custom_settings()
+
+    token = settings.HF_TOKEN or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN") or None
     if token:
         logger.info(f"Using HF_TOKEN for authenticated downloads (starts with: {token[:10]}...)")
     else:
