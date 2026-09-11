@@ -60,14 +60,20 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Prepare Environment File
+      - name: Copy .env
         shell: bash
         run: |
-          cp .env.example .env || cp .env .env.bak 2>/dev/null || touch .env
-          php artisan key:generate --force
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            touch .env
+          fi
 
       - name: Install Composer Dependencies
         run: composer install --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Generate Application Key
+        run: php artisan key:generate --force
 
       - name: Install NPM Dependencies
         run: npm ci
