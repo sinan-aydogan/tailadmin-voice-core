@@ -1,100 +1,226 @@
-# TailAdmin Voice Core (Native Desktop Edition)
+<div align="center">
 
-Masaüstü yapay zeka ses yönetim istasyonu: **NativePHP Electron + Laravel 13 + Inertia (Vue 3) + @tailadmin/ui + İzole Python Motoru**.
+# 🎙️ TailAdmin Voice Core
+### Masaüstü Yapay Zeka Ses Yönetim İstasyonu (TTS / STT / Ses Klonlama)
 
----
+[![GitHub Release](https://img.shields.io/github/v/release/sinan-aydogan/tailadmin-voice-core?color=3b82f6&logo=github)](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE.md)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet)](https://github.com/sinan-aydogan/tailadmin-voice-core/releases)
+[![Laravel](https://img.shields.io/badge/Laravel-13.x-f43f5e?logo=laravel)](https://laravel.com)
+[![NativePHP](https://img.shields.io/badge/NativePHP-2.3.0-6366f1)](https://nativephp.com)
+[![Vue 3](https://img.shields.io/badge/Vue-3.x-42b883?logo=vue.js)](https://vuejs.org)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?logo=python)](https://python.org)
 
-## 🚀 Mimari ve Donma Çözümü
+**NativePHP Electron + Laravel 13 + Inertia (Vue 3) + @tailadmin/ui + İzole Python Yapay Zeka Çekirdeği**
 
-Önceki mimaride PyTorch inference ve dosya indirme işlemleri arayüzü ve API event loop'unu Python GIL (Global Interpreter Lock) nedeniyle kilitliyordu.
+[İndir (v1.0.0)](#-hızlı-indirme-v100) • [Özellikler](#-özellikler) • [Mimari](#-mimari-ve-süreç-izolasyonu) • [Kurulum](#-kurulum-ve-geliştirme) • [Destek Ol](#-destek-ve-bağış)
 
-Yeni mimaride **tam süreç izolasyonu (Process Isolation)** uygulanmıştır:
-1. **Masaüstü Arayüzü:** NativePHP (Electron) + Inertia.js (Vue 3) ve `@tailadmin/ui` bileşenleri ile 60 FPS akıcı ve responsive arayüz.
-2. **Kuyruk Katmanı (Queue):** Laravel Database Queue Worker (`GenerateTtsJob`, `TranscribeSttJob`, `DownloadModelJob`).
-3. **İzole Python AI Çekirdeği (`engine/`):** Python FastAPI mikroservisi veya izole CLI (`python -m app.cli`) olarak ayrı işletim sistemi sürecinde çalışır. PyTorch model yükleme ve çıkarımları UI thread'ine asla temas etmez.
-4. **Gerçek Zamanlı Durum:** Inertia polling ve canlı sistem kaynakları altbilgi çubuğu (CPU, RAM, Disk, GPU/MPS/CUDA).
-
-```
-┌────────────────────────────────────────────────────────┐
-│              NativePHP Electron Shell                  │
-├────────────────────────────────────────────────────────┤
-│           Inertia.js + Vue 3 (@tailadmin/ui)           │
-│                 (60 FPS Akıcı UI)                      │
-└───────────────────────────┬────────────────────────────┘
-                            │ HTTP / Inertia
-┌───────────────────────────▼────────────────────────────┐
-│                  Laravel 13 Backend                    │
-│   • Controllers & Routes                               │
-│   • SQLite Database (WAL Mode)                         │
-│   • Laravel Queue (GenerateTtsJob, TranscribeSttJob)   │
-└───────────────────────────┬────────────────────────────┘
-                            │ Process::run() / HTTP
-┌───────────────────────────▼────────────────────────────┐
-│          İzole Python AI Çekirdeği (engine/)            │
-│   • Piper TTS (TR / EN / DE / FR - ONNX Çok Hızlı)     │
-│   • XTTS v2 (Ses Klonlama)                             │
-│   • Bark (Doğal / İfadeli Ses)                         │
-│   • Faster-Whisper (STT - Sesten Metne)                │
-│   • HuggingFace & Piper Model Yöneticisi               │
-└────────────────────────────────────────────────────────┘
-```
+</div>
 
 ---
 
-## 📦 Proje Yapısı
+## 📥 Hızlı İndirme (v1.0.0)
 
-- `app/`: Laravel 13 PHP backend (Controllers, Jobs, Models, Providers, Services)
-- `engine/`: İzole Python ses motoru (FastAPI, CLI, Piper, XTTS, Bark, Whisper)
-- `resources/js/`: Inertia Vue 3 sayfaları (`Dashboard`, `Tts`, `Stt`, `Profiles`, `Models`, `Queue`, `Playlists`, `Settings`)
-- `resources/js/Components/`: Canlı CPU/RAM/Disk/GPU footer göstergesi ve UI bileşenleri
-- `data/`: Modeller, ses profilleri, çıktı sesleri ve veritabanı
+Doğrudan masaüstünüzde çalıştırmak için platformunuza uygun sürümü indirin:
+
+| Platform | Mimari | İndirme Bağlantısı | Tür |
+|---|---|---|---|
+| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/electron.exe) | Windows Kurulum / Çalıştırılabilir Dosya |
+| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.0.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/Voice.Core-v1.0.0.AppImage) | Taşınabilir Universal Linux AppImage |
+| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.0.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/voice-core_v1.0.0_amd64.deb) | Debian / Ubuntu Kurulum Paketi |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.0.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/Voice.Core-v1.0.0-arm64.dmg) | macOS Disk İmajı (M1 / M2 / M3 / M4) |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.0.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/Voice.Core-v1.0.0-arm64.zip) | macOS Taşınabilir Uygulama Arşivi |
+
+> Tüm sürümleri ve değişiklik geçmişini [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) sayfasında bulabilirsiniz.
+
+---
+
+## ✨ Özellikler
+
+- 🔊 **Gelişmiş Metinden Sese (TTS) Motorları:**
+  - **Piper TTS:** ONNX tabanlı, gerçek zamanlıdan 5-10 kat daha hızlı, ultra hafif metinden sese dönüştürme (Türkçe, İngilizce, Almanca, Fransızca).
+  - **XTTS v2:** 3-6 saniyelik referans ses kaydı ile sıfır veri kaybıyla yüksek kaliteli ses klonlama (Voice Cloning).
+  - **Bark:** Duygulu, nefes ve tonlama vurgularına sahip doğal insan konuşması üretimi.
+  - **Tortoise TTS:** Derinlikli, yüksek doğruluklu metin seslendirme.
+  - **MusicGen:** Metin tanımlarından müzik ve atmosferik ses üretimi.
+- 🎙️ **Sesten Metne (STT - Speech to Text):**
+  - **Faster-Whisper:** Türkçe dahil 90+ dilde düşük kaynak tüketimi ve yüksek doğruluk oranı ile ses kaydından metin çıkarma ve transkripsiyon.
+- 👤 **Ses Profili ve Örnek Yönetimi:**
+  - Kendi sesinizi veya özel konuşmacı seslerini yükleyip referans ses profilleri oluşturma.
+- 📋 **Çalma Listeleri & Toplu Üretim (Playlists):**
+  - Uzun metinleri parçalara bölerek tek veya karma motorlarla sıralı/toplu seslendirme kuyruğu oluşturma.
+- 🧩 **Entegre Model Yöneticisi:**
+  - Hugging Face ve Piper açık kaynak modellerini tek tıkla otomatik indirme, doğrulama (integrity check) ve disk kullanım yönetimi.
+- 🖥️ **60 FPS Modern Masaüstü Deneyimi:**
+  - `@tailadmin/ui` tasarım sistemi ve Tailwind CSS ile tamamen koyu mod uyumlu, responsive ve modern arayüz.
+  - Dahili **Gelişmiş Ses Oynatıcı:** Canlı waveform görselleştirici, önceki/sonraki parça geçişi, hız ayarı ve tek tıkla WAV/MP3 indirme.
+  - **Yeniden Dene (Retry Modal):** Hata alan görevleri farklı motor veya model seçerek anında yeniden kuyruğa alma.
+- 📊 **Canlı Sistem Monitörü (Footer):**
+  - CPU, RAM, Disk ve GPU/MPS/CUDA donanım kullanımını altbilgi çubuğunda canlı izleme.
+- 🌐 **Çok Dilli Arayüz (i18n):**
+  - Türkçe ve İngilizce tam arayüz yerelleştirmesi.
+
+---
+
+## 🚀 Mimari ve Süreç İzolasyonu
+
+Yapay zeka çıkarım (inference) ve model indirme işlemleri geleneksel monolitik masaüstü uygulamalarında kullanıcı arayüzünü (UI) Python GIL (Global Interpreter Lock) nedeniyle kilitler. 
+
+TailAdmin Voice Core, **Tam Süreç İzolasyonu (Process Isolation)** mimarisiyle tasarlanmıştır:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                   NativePHP Electron Shell (Masaüstü)                  │
+├────────────────────────────────────────────────────────────────────────┤
+│                 Inertia.js + Vue 3 (@tailadmin/ui)                     │
+│                (60 FPS Akıcı UI - Asla Donmaz / Kilitlenmez)           │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ HTTP / Inertia IPC
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                          Laravel 13 Backend                            │
+│   • Controllers & Routes (Masaüstü API / Sayfalar)                     │
+│   • SQLite Database (WAL Mode - Eşzamanlı Okuma/Yazma)                 │
+│   • Laravel Queue (GenerateTtsJob, TranscribeSttJob, DownloadModelJob) │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Process::run() / CLI / HTTP
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                 İzole Python AI Çekirdeği (engine/)                    │
+│   • Piper TTS (ONNX Ultra Fast)                                        │
+│   • XTTS v2 (Zero-shot Voice Cloning)                                  │
+│   • Bark & Tortoise TTS (Doğal Konuşma)                                │
+│   • Faster-Whisper (STT - Transkripsiyon)                              │
+│   • HuggingFace & Piper Model Yöneticisi                               │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Arayüz Katmanı:** Electron üzerinde koşan Vue 3 arayüzü yalnızca Laravel backend ile konuşur; yapay zeka çıkarımlarından tamamen yalıtılmıştır.
+2. **Kuyruk Katmanı:** Ses üretimi ve model indirme görevleri Laravel veritabanı kuyruğuna alınır (`jobs`).
+3. **AI Motoru:** Arka planda bağımsız işletim sistemi süreçleri (`python -m app.cli` / FastAPI) olarak çalışır; ağır PyTorch hesaplamaları UI thread'ine asla temas etmez.
 
 ---
 
 ## 🛠️ Kurulum ve Geliştirme
 
 ### Gereksinimler
-- PHP >= 8.3 (SQLite, PDO, cURL eklentileri ile)
-- Composer >= 2.0
-- Node.js >= 20 & npm
-- Python >= 3.10 (PyTorch, Piper, Whisper bağımlılıkları ile)
+- **PHP** >= 8.3 veya 8.4 (`mbstring`, `xml`, `intl`, `pdo_sqlite`, `sqlite3`, `curl`, `zip`, `fileinfo` eklentileri ile)
+- **Composer** >= 2.0
+- **Node.js** >= 20 veya 22 & **npm**
+- **Python** >= 3.10 (PyTorch, Piper, Whisper bağımlılıkları ile)
 
-### 1. Bağımlılıkları Kurun
+### 1. Depoyu Klonlayın
+```bash
+git clone https://github.com/sinan-aydogan/tailadmin-voice-core.git
+cd tailadmin-voice-core
+```
+
+### 2. PHP ve Node Bağımlılıklarını Kurun
 ```bash
 composer install
 npm install
 ```
 
-### 2. Veritabanı ve Anahtar
+### 3. Ortam Değişkenlerini ve Veritabanını Hazırlayın
 ```bash
+cp .env.example .env
 php artisan key:generate
 php artisan migrate
 ```
 
-### 3. Varlık Derlemesi (Vite)
+### 4. Varlıkları Derleyin
 ```bash
 npm run build
 ```
 
-### 4. Masaüstü Uygulamasını Başlatın
+### 5. Masaüstü Uygulamasını Geliştirme Modunda Başlatın
 ```bash
 php artisan native:run
 ```
 
-### 5. Masaüstü Uygulamasını Paketleyin (Windows / macOS / Linux)
+### 6. Masaüstü Yükleyicilerini Paketleyin (Build)
 ```bash
-php artisan native:build
+# Windows x64 için:
+php artisan native:build win x64
+
+# Linux x64 için:
+php artisan native:build linux x64
+
+# macOS Apple Silicon için:
+php artisan native:build mac arm64
 ```
 
 ---
 
-## 🧪 Testler
-```bash
-php artisan test
+## 📂 Dizin Yapısı
+
+```text
+tailadmin-voice-core/
+├── app/
+│   ├── Http/Controllers/     # Laravel Inertia Controller katmanı
+│   ├── Jobs/                 # Arka plan kuyruk işleri (TTS, STT, Model İndirme)
+│   ├── Models/               # Eloquent ORM modelleri (Playlist, Profile, Task vb.)
+│   ├── Providers/            # NativeAppServiceProvider ve uygulama servisleri
+│   └── Services/             # Python CLI köprüsü ve kuyruk izleme servisleri
+├── config/
+│   └── nativephp.php         # NativePHP masaüstü ve updater konfigürasyonu
+├── engine/                   # İzole Python Yapay Zeka Çekirdeği
+│   ├── app/
+│   │   ├── cli.py            # Bağımsız CLI giriş noktası (donmasız çalıştırma)
+│   │   ├── tts/              # TTS motorları (piper, xtts, bark, tortoise, musicgen)
+│   │   ├── stt/              # Whisper STT motoru
+│   │   └── downloader/       # Model indirme ve bütünlük kontrolü
+│   └── requirements.txt      # Python kütüphane gereksinimleri
+├── resources/
+│   ├── js/
+│   │   ├── Components/       # AudioPlayerModal, RetryTaskModal, SystemFooter vb.
+│   │   ├── Layouts/          # AppLayout navigasyon ve düzen bileşenleri
+│   │   └── Pages/            # Inertia sayfaları (Dashboard, Tts, Stt, Models, Playlists vb.)
+│   └── css/                  # @tailadmin/ui ve Tailwind CSS stilleri
+├── patches/                  # Upstream kütüphane yamaları
+└── .github/workflows/        # Çoklu platform GitHub Actions Release iş akışı
 ```
+
+---
+
+## 💖 Destek ve Bağış
+
+Voice Core tamamen açık kaynaklı ve ücretsiz bir projedir. Projenin gelişimine katkıda bulunmak veya bir kahve ısmarlamak isterseniz:
+
+<p align="left">
+  <a href="https://ko-fi.com/sinanaydogan" target="_blank">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Ko-fi ile Destek Ol">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://www.buymeacoffee.com/sinanaydogan" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 36px !important;">
+  </a>
+</p>
+
+### 🌟 Destekçilerimiz & Sponsorlar
+
+<table border="0">
+  <tr>
+    <td align="center" width="160">
+      <a href="https://panelica.com" target="_blank" rel="noopener noreferrer">
+        <img src="https://panelica.com/assets/images/logo-light.png" alt="Panelica" width="140">
+      </a>
+    </td>
+    <td>
+      <strong><a href="https://panelica.com" target="_blank" rel="noopener noreferrer">Panelica</a></strong> — Modern sunucu ve altyapı yönetim paneli. Voice Core projesinin açık kaynak geliştirme süreçlerine verdikleri destek için teşekkür ederiz.
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🔗 Bağlantılar & Ekosistem
+
+- **Yapımcı:** [TailAdmin](https://tailadmin.dev)
+- **UI Kit:** [@tailadmin/ui (npm)](https://www.npmjs.com/package/@tailadmin/ui)
+- **Kaynak Kod:** [sinan-aydogan/tailadmin-voice-core](https://github.com/sinan-aydogan/tailadmin-voice-core)
+- **Sürüm Paketleri:** [GitHub Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases)
 
 ---
 
 ## 📄 Lisans
-Bu proje MIT lisansı ile lisanslanmıştır.
 
+Bu proje [MIT Lisansı](LICENSE.md) kapsamında lisanslanmıştır. Dilediğiniz gibi kullanabilir, katkıda bulunabilir ve genişletebilirsiniz.
