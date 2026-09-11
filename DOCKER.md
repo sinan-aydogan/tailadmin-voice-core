@@ -1,241 +1,184 @@
-# Docker ile Voice Core Kullanımı
+# 🐳 Docker ile TailAdmin Voice Core Sunucu Dağıtımı
 
-Bu doküman, Voice Core projesini Docker ile GPU desteğiyle çalıştırma talimatlarını içerir.
+Bu kılavuz, **TailAdmin Voice Core** projesini bir sunucuya (VPS, bulut sanal makinesi veya yerel sunucu) tek bir komutla %100 Dockerize edilmiş olarak kurma ve çalıştırma talimatlarını içerir.
 
-> **macOS Kullanıcıları İçin Önemli Not:** Docker Desktop macOS'te GPU passthrough desteklemez. Apple Silicon (M1/M2/M3) GPU kullanmak için [macOS Native Çalıştırma](#macos-native-çalıştırma-apple-silicon-gpu) bölümüne bakın.
+Sistem, **harici hiçbir bağımlılığa (PHP, Composer, Node.js vb.) gerek duymadan**, Web arayüzü, Laravel kuyruk işleyicisi ve PyTorch/CUDA destekli Python AI motorunu birlikte ayağa kaldırır.
 
-## Ön Koşullar
+---
 
-### 1. NVIDIA Docker Runtime (GPU Desteği İçin Zorunlu)
+## 🏗️ Mimari ve Servisler
 
-Docker container içinde GPU kullanabilmek için NVIDIA Container Toolkit kurulu olmalıdır:
+Docker Compose iki izole ve optimize servis çalıştırır:
+
+1. **`voice-core-app` (Port 8000):**
+   * Web Yönetim Arayüzü (Inertia Vue 3 + Tailwind CSS).
+   * RESTful API v1 (`/api/v1/...`).
+   * Dahili Laravel Queue Worker (görev işleyici).
+   * SQLite veritabanı (WAL modu).
+2. **`voice-core-engine` (Port 5001):**
+   * PyTorch 2.1.0 + CUDA 12.1 runtime.
+   * Piper TTS, XTTS v2, Bark, Tortoise TTS, Faster-Whisper.
+   * Model indirme ve bellek yöneticisi.
+
+---
+
+## ⚡ Hızlı Başlangıç
+
+### 1. Depoyu İndirin ve `.env` Dosyasını Hazırlayın
 
 ```bash
-# Ubuntu/Debian
+git clone https://github.com/sinan-aydogan/tailadmin-voice-core.git
+cd tailadmin-voice-core
+
+# Örnek konfigürasyon dosyasını kopyalayın
+cp .env.example .env
+```
+
+`.env` dosyasındaki önemli ayarlar:
+```env
+# Dışarıya açılacak Web & API portu (Varsayılan: 8000)
+PORT=8000
+
+# REST API güvenliği için gizli anahtar (Boş bırakılırsa yerel/açık modda çalışır)
+VOICE_CORE_API_KEY=super-secret-token-12345
+
+# GPU modu: auto, cuda, cpu
+USE_GPU=auto
+CUDA_VISIBLE_DEVICES=0
+```
+
+---
+
+### 2. Başlatma Senaryoları
+
+#### Senaryo A: NVIDIA GPU / CUDA Destekli Sunucularda Başlatma (Önerilen)
+
+Sunucunuzda [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) kurulu olmalıdır:
+
+```bash
+# Ubuntu / Debian için NVIDIA Toolkit kurulumu:
 sudo apt-get update
 sudo apt-get install -y nvidia-container-toolkit
 sudo systemctl restart docker
 
-# Diğer sistemler için:
-# https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+# Tüm sistemi GPU hızlandırmasıyla başlatın:
+docker compose up -d --build
 ```
 
-Kurulumu test etmek için:
-```bash
-docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
-```
+#### Senaryo B: CPU-Only Sunucularda veya macOS Docker Desktop Üzerinde Başlatma
 
-### 2. Docker Compose v2+
-
-GPU desteği için Docker Compose 2.0+ gereklidir:
-```bash
-docker compose version  # v2.x.x olmalı
-```
-
-## Hızlı Başlangıç
-
-### 1. Ortam Değişkenlerini Ayarla
-
-`.env` dosyasını kopyala ve düzenle:
-```bash
-cp .env.example .env
-```
-
-GPU kullanımı için önemli ayarlar:
-```env
-# GPU Yapılandırması
-USE_GPU=auto          # auto, cuda, cuda:0, cuda:1, cpu
-CUDA_VISIBLE_DEVICES=0  # Hangi GPU'yu kullanacağı (0, 1, 0,1, all)
-
-# Bellek Optimizasyonu
-PYTORCH_ENABLE_MPS_FALLBACK=1
-```
-
-### 2. Container'ı Başlat
+Eğer sunucunuzda GPU yoksa veya macOS Docker Desktop kullanıyorsanız GPU rezervasyonunu kaldıran override dosyasını kullanın:
 
 ```bash
-# Tüm servisleri başlat (API + UI)
-docker compose up -d
-
-# Sadece API'yi başlat
-docker compose up -d voice-core-api
-
-# Logları izle
-docker compose logs -f voice-core-api
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
 ```
 
-### 3. Erişim
+*(İpucu: Her seferinde `-f` yazmamak için terminalde `export COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml` tanımlayabilirsiniz.)*
 
-- API: http://localhost:5001
-- Frontend: http://localhost:5002
-- Health Check: http://localhost:5001/health
+---
 
-## GPU Doğrulama
+### 3. Sisteme Erişim ve Doğrulama
 
-Container içinde GPU'nun göründüğünü doğrula:
+Container'lar ayağa kalktıktan sonra:
 
+* 🌐 **Web Yönetim Arayüzü:** `http://<sunucu-ip>:8000`
+* 🩺 **Sağlık Kontrolü:** `http://<sunucu-ip>:8000/api/v1/health`
+* 📖 **REST API Referansı:** [API.md](file:///c:/Users/sinan/Projeler/tailadmin-voice-core/API.md)
+
+Sağlık kontrolünü test edin:
 ```bash
-# Container içine gir
-docker exec -it voice-core-api bash
-
-# PyTorch ile GPU kontrolü
-python -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()}'); print(f'CUDA Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
-
-# nvidia-smi ile GPU durumu
-nvidia-smi
+curl http://localhost:8000/api/v1/health
 ```
 
-## Yönetim Komutları
+**Beklenen Çıktı:**
+```json
+{
+  "status": "ok",
+  "app": "TailAdmin Voice Core",
+  "version": "1.0.0",
+  "services": {
+    "api": "healthy",
+    "python_engine": "online",
+    "queue_worker": "running"
+  }
+}
+```
+
+---
+
+## 💾 Kalıcı Veri (Volumes)
+
+Container'lar silinse veya güncellense dahi verileriniz asla kaybolmaz. Aşağıdaki dizinler host makineye bağlıdır:
+
+* `./data/models`: İndirilen yapay zeka modelleri (Hugging Face / Piper).
+* `./data/outputs`: Üretilen ses kayıtları (WAV/MP3).
+* `./data/profiles`: Ses klonlama referans ses dosyaları.
+* `./database`: SQLite veritabanı dosyası (`database.sqlite`).
+* `./storage`: Laravel uygulama logları ve oturum verileri.
+
+---
+
+## 🛠️ Yönetim ve Bakım Komutları
 
 ```bash
-# Container'ları durdur
+# Canlı logları izleme (Web + API)
+docker compose logs -f voice-core-app
+
+# Canlı logları izleme (Python AI Engine)
+docker compose logs -f voice-core-engine
+
+# Container'ları durdurma
 docker compose down
 
-# Container'ları ve volumeleri sil (veriler silinmez - ./data mount edildi)
-docker compose down -v
+# Kod değişikliklerinden sonra yeniden derleme ve başlatma
+docker compose up -d --build
 
-# Image'ı yeniden build et
-docker compose build --no-cache
-
-# Container'ı yeniden başlat
-docker compose restart
-
-# Container içinde shell aç
-docker exec -it voice-core-api bash
+# Python container içinde GPU durumunu kontrol etme
+docker exec -it voice-core-engine nvidia-smi
 ```
 
-## Sorun Giderme
+---
 
-### GPU Görünmüyor
+## 🔒 Üretim Ortamı (Nginx Reverse Proxy & SSL)
 
-1. NVIDIA Container Toolkit kurulu mu kontrol et:
-   ```bash
-   docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-smi
-   ```
+Sunucunuzda `domain.com` üzerinden güvenli erişim (HTTPS) sağlamak için örnek Nginx yapılandırması:
 
-2. Docker daemon'ı yeniden başlat:
-   ```bash
-   sudo systemctl restart docker
-   ```
+```nginx
+server {
+    listen 80;
+    server_name ses.sirketiniz.com;
+    return 301 https://$host$request_uri;
+}
 
-3. docker-compose.yml içinde GPU bölümü aktif mi kontrol et:
-   ```yaml
-   deploy:
-     resources:
-       reservations:
-         devices:
-           - driver: nvidia
-             count: all
-             capabilities: [gpu]
-   ```
+server {
+    listen 443 ssl http2;
+    server_name ses.sirketiniz.com;
 
-### CUDA Out of Memory
+    ssl_certificate /etc/letsencrypt/live/ses.sirketiniz.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ses.sirketiniz.com/privkey.pem;
 
-`.env` dosyasına ekle:
-```env
-PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket ve Uzun TTS İstekleri için Zaman Aşımı
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+}
 ```
 
-Veya docker-compose.yml içinde environment bölümüne ekle.
+---
 
-### Model İndirme Sorunları
+## 🎛️ Sunucu Panelleriyle Kullanım (Coolify, CapRover, Easypanel, aaPanel vb.)
 
-HuggingFace token gerekiyorsa `.env` dosyasına ekle:
-```env
-HF_TOKEN=your_token_here
-```
-
-## Performans Optimizasyonu
-
-### Bellek Kullanımı
-
-Büyük modeller için shared memory artırın:
-```yaml
-services:
-  voice-core-api:
-    shm_size: '8gb'  # docker-compose.yml içine ekle
-```
-
-### Çoklu GPU
-
-Birden fazla GPU kullanmak için:
-```env
-CUDA_VISIBLE_DEVICES=0,1
-```
-
-veya docker-compose.yml içinde:
-```yaml
-deploy:
-  resources:
-    reservations:
-      devices:
-        - driver: nvidia
-          device_ids: ['0', '1']
-          capabilities: [gpu]
-```
-
-## Veri Kalıcılığı
-
-Aşağıdaki dizinler host makineye mount edilir:
-- `./data` - Modeller, veritabanı, çıktılar
-- `./logs` - Uygulama logları
-
-Container silinse bile veriler korunur.
-
-## macOS Native Çalıştırma (Apple Silicon GPU)
-
-Docker Desktop macOS'te GPU passthrough desteklemediği için, Apple Silicon (M1/M2/M3) GPU'yu kullanmak için uygulamayı **native** olarak çalıştırmanız gerekir.
-
-### Hızlı Başlangıç (macOS)
-
-```bash
-# 1. start-macos.sh script'ini çalıştır
-./start-macos.sh
-```
-
-Bu script otomatik olarak:
-- Python 3 ve virtual environment kontrolü yapar
-- Gerekli bağımlılıkları kurar
-- MPS (Metal Performance Shaders) GPU desteğini kontrol eder
-- Uygulamayı Apple Silicon GPU ile başlatır
-
-### Manuel Kurulum (macOS)
-
-```bash
-# 1. Virtual environment oluştur
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 2. Bağımlılıkları kur
-pip install -r requirements.txt
-
-# 3. .env dosyasını hazırla
-cp .env.example .env
-
-# 4. Uygulamayı başlat
-export USE_GPU=auto
-export PYTORCH_ENABLE_MPS_FALLBACK=1
-python3 main.py
-```
-
-### GPU Doğrulama (macOS)
-
-```bash
-# MPS kullanılabilirliğini kontrol et
-python3 -c "import torch; print(f'MPS Available: {torch.backends.mps.is_available()}')"
-```
-
-### macOS Docker (CPU Only)
-
-Eğer macOS'te Docker kullanmak isterseniz (CPU modunda):
-
-```bash
-# Override dosyası ile çalıştır (GPU'suz)
-docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
-```
-
-## Güvenlik Notları
-
-- `.env` dosyası container'a read-only olarak mount edilir (`:ro`)
-- Üretim ortamında `SECRET_KEY` ve `DEFAULT_PASSWORD` değiştirilmelidir
-- API portunu (5001) sadece gerekirse dışarı açın
+Modern sunucu yönetim panelleri üzerinden tek tıkla dağıtım yaparken:
+* **Dockerfile Değişikliği Gerekmez:** Paneller uygulamanın önüne otomatik Nginx/Traefik Reverse Proxy koyar.
+* **Port Ayarı:** Panel ayarlarındaki **Container Port** kutusuna yalnızca `8000` yazmanız yeterlidir. Dışarıya rastgele host portu açmanıza gerek kalmaz.
+* **Domain & SSL:** Panelin arayüzünden domaininizi (`ses.alanadiniz.com`) eklediğinizde panel Let's Encrypt sertifikasını otomatik kurar. Laravel tarafında `trustProxies(at: '*')` aktif olduğu için SSL yönlendirmeleri sorunsuz çalışır.
+* **Ortam Değişkenleri (.env):** Eğer sunucuda doğrudan port değiştirmek isterseniz panelin Environment Variables kısmına `PORT=8085` yazabilirsiniz.

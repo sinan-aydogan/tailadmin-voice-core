@@ -90,5 +90,24 @@ class VoiceCoreTest extends TestCase
             @unlink($outputPath);
         }
     }
+
+    public function test_settings_can_update_api_key(): void
+    {
+        $response = $this->post('/settings', [
+            'models_dir' => base_path('data/models'),
+            'voice_core_api_key' => 'panel-generated-secret-key-999',
+        ]);
+
+        $response->assertRedirect();
+
+        $settingsFile = base_path('data/settings.json');
+        $this->assertFileExists($settingsFile);
+        $content = json_decode(file_get_contents($settingsFile), true);
+        $this->assertEquals('panel-generated-secret-key-999', $content['voice_core_api_key']);
+
+        if (file_exists($settingsFile)) {
+            @unlink($settingsFile);
+        }
+    }
 }
 

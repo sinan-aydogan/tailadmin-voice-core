@@ -61,6 +61,14 @@ Route::get('/settings', [SettingsController::class, 'index'])->name('settings.in
 Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
 Route::post('/settings/browse-folder', [SettingsController::class, 'browseFolder'])->name('settings.browse_folder');
 
+// API Key Management & Logs
+Route::get('/settings/api-keys', [\App\Http\Controllers\ApiKeyManagementController::class, 'index'])->name('settings.api_keys.index');
+Route::post('/settings/api-keys', [\App\Http\Controllers\ApiKeyManagementController::class, 'store'])->name('settings.api_keys.store');
+Route::post('/settings/api-keys/{id}/toggle', [\App\Http\Controllers\ApiKeyManagementController::class, 'toggle'])->name('settings.api_keys.toggle');
+Route::delete('/settings/api-keys/{id}', [\App\Http\Controllers\ApiKeyManagementController::class, 'destroy'])->name('settings.api_keys.destroy');
+Route::get('/settings/api-keys/{id}/logs', [\App\Http\Controllers\ApiKeyManagementController::class, 'logs'])->name('settings.api_keys.logs');
+Route::delete('/settings/api-keys/{id}/logs', [\App\Http\Controllers\ApiKeyManagementController::class, 'clearLogs'])->name('settings.api_keys.clear_logs');
+
 // System API
 Route::get('/api/system/stats', [SystemApiController::class, 'stats'])->name('api.system.stats');
 Route::get('/api/system/operations', [SystemApiController::class, 'operations'])->name('api.system.operations');

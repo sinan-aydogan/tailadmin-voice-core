@@ -43,14 +43,25 @@ class SettingsController extends Controller
             'default_language' => $saved['default_language'] ?? env('DEFAULT_TTS_LANGUAGE', 'tr'),
             'api_port' => (int) ($saved['api_port'] ?? env('API_PORT', 5001)),
             'hf_token' => $saved['hf_token'] ?? env('HF_TOKEN', ''),
+            'voice_core_api_key' => $saved['voice_core_api_key'] ?? env('VOICE_CORE_API_KEY', ''),
         ];
     }
 
     public function index(): Response
     {
+        $apiKeys = [];
+        try {
+            $apiKeys = \App\Models\ApiKey::withCount('logs')
+                ->orderByDesc('id')
+                ->get();
+        } catch (\Throwable $e) {
+            $apiKeys = [];
+        }
+
         return Inertia::render('Settings/Index', [
             'settings' => $this->getAllSettings(),
             'default_models_dir' => base_path('data' . DIRECTORY_SEPARATOR . 'models'),
+            'api_keys' => $apiKeys,
         ]);
     }
 
@@ -62,6 +73,7 @@ class SettingsController extends Controller
             'max_cpu_threads' => 'nullable|integer|min:1|max:64',
             'default_tts_engine' => 'nullable|string',
             'hf_token' => 'nullable|string',
+            'voice_core_api_key' => 'nullable|string',
         ]);
 
         $current = $this->getAllSettings();
@@ -83,6 +95,7 @@ class SettingsController extends Controller
             $current['default_tts_engine'] = $validated['default_tts_engine'];
         }
         $current['hf_token'] = trim($request->input('hf_token', ''));
+        $current['voice_core_api_key'] = trim($request->input('voice_core_api_key', ''));
 
         $dataDir = base_path('data');
         if (!is_dir($dataDir)) {

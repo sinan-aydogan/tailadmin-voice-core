@@ -1,26 +1,26 @@
 services:
-  voice-core-api:
+  # ==============================================================================
+  # Service 1: Isolated Python AI Engine (FastAPI + PyTorch + CUDA/CPU)
+  # ==============================================================================
+  voice-core-engine:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: voice-core-api
+      dockerfile: Dockerfile.engine
+    container_name: voice-core-engine
     restart: unless-stopped
     ports:
-      - "${API_PORT:-5001}:5001"
+      - "${ENGINE_PORT:-5001}:5001"
     volumes:
-      # Persistent storage for models, outputs, and database
+      # Persistent storage for AI models, output audios, and voice profiles
       - ./data:/app/data
-      - ./logs:/app/logs
-      # Mount .env file for configuration
-      - ./.env:/app/.env:ro
+      - ./logs/engine:/app/logs
     environment:
-      # GPU Configuration
+      # GPU / CUDA Configuration
       - USE_GPU=${USE_GPU:-auto}
       - NVIDIA_VISIBLE_DEVICES=all
-      # PyTorch CUDA settings
       - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
       - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-      # HuggingFace cache directories
+      # Cache paths inside persistent volume
       - HF_HOME=/app/data/models/.cache/huggingface
       - TORCH_HOME=/app/data/models/.cache/torch
       # Python settings
@@ -34,31 +34,45 @@ services:
               count: all
               capabilities: [gpu]
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health')"]
-      interval: 30s
+      test: ["CMD-SHELL", "curl -f http://localhost:5001/health || exit 1"]
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 30s
     networks:
       - voice-core-network
 
-  # Optional: Frontend server (can also be served by the API)
-  voice-core-ui:
+  # ==============================================================================
+  # Service 2: Main Application (Web Dashboard + REST API + Laravel Queue Worker)
+  # ==============================================================================
+  voice-core-app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: voice-core-ui
+    container_name: voice-core-app
     restart: unless-stopped
     ports:
-      - "${UI_PORT:-5002}:5002"
+      # Main entrypoint: Web UI (Inertia Vue 3) & REST API (/api/v1/...)
+      - "${PORT:-8000}:8000"
     volumes:
+      # Shared data volume with engine (audio outputs, profiles, models)
       - ./data:/app/data
-      - ./.env:/app/.env:ro
+      # Persistent SQLite database & application storage
+      - ./database:/app/database
+      - ./storage:/app/storage
     environment:
-      - API_URL=http://voice-core-api:5001
-    command: python frontend_server.py
+      - PORT=8000
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_KEY=${APP_KEY:-}
+      - DB_CONNECTION=sqlite
+      - QUEUE_CONNECTION=database
+      # Connect to the Python AI engine container via internal Docker network
+      - PYTHON_VOICE_URL=http://voice-core-engine:5001
+      # Optional API key protection for external REST clients
+      - VOICE_CORE_API_KEY=${VOICE_CORE_API_KEY:-}
     depends_on:
-      voice-core-api:
+      voice-core-engine:
         condition: service_healthy
     networks:
       - voice-core-network

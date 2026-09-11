@@ -1,72 +1,62 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Git & VCS
+.git/
+.gitignore
+.gitattributes
+.github/
 
-# Virtual environments
+# Secrets & Environment
 .env
-.venv
-venv/
-env/
+.env.*
+!.env.example
 
-# IDE
+# OS / Editor
+.DS_Store
+._*
+Thumbs.db
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Git
-.git/
-.gitignore
+# PHP / Node / Composer dependencies
+vendor/
+node_modules/
+.phpunit.result.cache
 
-# Docker
-Dockerfile
-docker-compose.yml
-.dockerignore
-
-# Documentation (not needed in container)
-*.md
-!README.md
-
-# Logs (will be created in container)
-logs/*.log
-
-# Model cache (large files, should be mounted as volume)
-data/models/.cache/
-data/models/*/.cache/
-
-# Outputs (should be mounted as volume)
-data/outputs/
-data/uploads/
-
-# Database (should be mounted as volume)
-data/*.db
-
-# Tests
-tests/
+# Python / Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+*/.venv/
+venv/
+env/
+ENV/
+.pip-cache/
 .pytest_cache/
 
-# OS
-.DS_Store
-Thumbs.db
+# Docker build artifacts
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Runtime data & storage (mounted via volumes)
+data/models/
+data/outputs/
+data/profiles/
+data/uploads/
+data/*.db
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+logs/*
+database/*.sqlite*
+
+# Documentation & temporary files
+*.md
+!README.md
+.tmp/
+*.log

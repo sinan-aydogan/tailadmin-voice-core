@@ -1,47 +1,84 @@
-# Voice Core - Docker Image with CUDA GPU Support
-# Base image: PyTorch with CUDA 12.1 support
-FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+# syntax=docker/dockerfile:1
 
-# Set working directory
+# ==============================================================================
+# Stage 1: Build Frontend Assets (Inertia Vue 3 + Tailwind CSS)
+# ==============================================================================
+FROM node:22-alpine AS frontend-builder
+
 WORKDIR /app
 
-# Install system dependencies
-# - ffmpeg: Required for audio processing
-# - libsndfile1: Required for audio file I/O
-# - git: Required for some pip dependencies
+# Copy package descriptors
+COPY package*.json ./
+
+# Install npm dependencies
+RUN npm ci --no-audit
+
+# Copy frontend source files and configuration
+COPY vite.config.js ./
+COPY resources ./resources
+COPY public ./public
+
+# Build production assets into public/build
+RUN npm run build
+
+# ==============================================================================
+# Stage 2: PHP Application Runtime (Laravel 13 + REST API + Queue Worker)
+# ==============================================================================
+FROM php:8.4-cli-bookworm
+
+WORKDIR /app
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies & PHP extensions
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    libsndfile1 \
     git \
+    curl \
+    unzip \
+    libsqlite3-dev \
+    libzip-dev \
+    && docker-php-ext-install -j$(nproc) \
+        pdo_sqlite \
+        bcmath \
+        pcntl \
+        posix \
+        zip \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better layer caching
-COPY requirements.txt .
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Install Python dependencies
-# Note: PyTorch is already installed in the base image
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy composer files and patches for dependency installation
+COPY composer.json composer.lock ./
+COPY patches ./patches
 
-# Copy application code
+# Install PHP dependencies without dev dependencies
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+# Copy full application code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p data/models data/outputs data/profiles data/uploads logs
+# Copy compiled frontend assets from Stage 1
+COPY --from=frontend-builder /app/public/build ./public/build
 
-# Expose ports
-# 5001: API Server
-# 5002: Frontend Server (optional, can be served separately)
-EXPOSE 5001 5002
+# Finish composer post-install scripts and dump-autoload
+RUN composer dump-autoload --optimize --no-dev
 
-# Environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV HF_HOME=/app/data/models/.cache/huggingface
-ENV TORCH_HOME=/app/data/models/.cache/torch
+# Setup entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5001/health')" || exit 1
+# Environment defaults
+ENV PORT=8000
+ENV APP_ENV=production
+ENV APP_DEBUG=false
+ENV DB_CONNECTION=sqlite
+ENV QUEUE_CONNECTION=database
+ENV PYTHON_VOICE_URL=http://voice-core-engine:5001
 
-# Default command: Start the API server
-CMD ["python", "main.py"]
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

@@ -1,0 +1,51 @@
+# TailAdmin Voice Core - Isolated Python AI Engine
+# Base image: PyTorch 2.1.0 with CUDA 12.1 runtime support
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+
+WORKDIR /app
+
+# Set non-interactive debian frontend
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install essential system dependencies:
+# - ffmpeg: Required for audio conversion, slicing, and resampling
+# - libsndfile1: Required for soundfile/torchaudio reading and writing
+# - git: Required for certain pip dependencies
+# - curl: Required for healthchecks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy engine requirements first for layer caching
+COPY engine/requirements.txt /app/engine/requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r /app/engine/requirements.txt
+
+# Copy engine code into /app/engine
+COPY engine /app/engine
+
+# Create persistent storage directories
+RUN mkdir -p /app/data/models /app/data/outputs /app/data/profiles /app/data/uploads /app/logs
+
+# Set working directory to engine root so "python main.py" works seamlessly
+WORKDIR /app/engine
+
+# Expose API microservice port
+EXPOSE 5001
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV HF_HOME=/app/data/models/.cache/huggingface
+ENV TORCH_HOME=/app/data/models/.cache/torch
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5001/health || exit 1
+
+# Start FastAPI server
+CMD ["python", "main.py"]

@@ -1,19 +1,20 @@
 <div align="center">
 
 # 🎙️ TailAdmin Voice Core
-### Masaüstü Yapay Zeka Ses Yönetim İstasyonu (TTS / STT / Ses Klonlama)
+### Masaüstü Yapay Zeka Ses İstasyonu & Docker Sunucu API Servisi
 
 [![GitHub Release](https://img.shields.io/github/v/release/sinan-aydogan/tailadmin-voice-core?color=3b82f6&logo=github)](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE.md)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-blueviolet)](https://github.com/sinan-aydogan/tailadmin-voice-core/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Docker-blueviolet)](https://github.com/sinan-aydogan/tailadmin-voice-core/releases)
 [![Laravel](https://img.shields.io/badge/Laravel-13.x-f43f5e?logo=laravel)](https://laravel.com)
 [![NativePHP](https://img.shields.io/badge/NativePHP-2.3.0-6366f1)](https://nativephp.com)
 [![Vue 3](https://img.shields.io/badge/Vue-3.x-42b883?logo=vue.js)](https://vuejs.org)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?logo=python)](https://python.org)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ed?logo=docker)](DOCKER.md)
 
-**NativePHP Electron + Laravel 13 + Inertia (Vue 3) + @tailadmin/ui + İzole Python Yapay Zeka Çekirdeği**
+**Kişisel Masaüstü (NativePHP Electron) + Sunucu Dağıtımı (Docker Compose + REST API v1)**
 
-[İndir (v1.0.0)](#-hızlı-indirme-v100) • [Özellikler](#-özellikler) • [Mimari](#-mimari-ve-süreç-izolasyonu) • [Kurulum](#-kurulum-ve-geliştirme) • [Destek Ol](#-destek-ve-bağış)
+[İndir (v1.0.0)](#-hızlı-indirme-v100) • [Özellikler](#-özellikler) • [REST API Dokümanı](API.md) • [Docker Kurulumu](DOCKER.md) • [Mimari](#-mimari-ve-süreç-izolasyonu) • [Geliştirme](#-kurulum-ve-geliştirme)
 
 </div>
 
@@ -57,6 +58,10 @@ Doğrudan masaüstünüzde çalıştırmak için platformunuza uygun sürümü i
   - **Yeniden Dene (Retry Modal):** Hata alan görevleri farklı motor veya model seçerek anında yeniden kuyruğa alma.
 - 📊 **Canlı Sistem Monitörü (Footer):**
   - CPU, RAM, Disk ve GPU/MPS/CUDA donanım kullanımını altbilgi çubuğunda canlı izleme.
+- 🚀 **Sunucu & REST API Servisi:**
+  - Tek komutla (`docker compose up -d`) %100 Dockerize sunucu kurulumu.
+  - Harici uygulamalar, mobil istemciler ve otomasyon botları için kapsamlı [REST API v1](API.md) uç noktaları (`/api/v1/tts`, `/api/v1/stt`, `/api/v1/models`, `/api/v1/tasks`).
+  - İsteğe bağlı API Key (`X-API-Key` / Bearer token) güvenliği.
 - 🌐 **Çok Dilli Arayüz (i18n):**
   - Türkçe ve İngilizce tam arayüz yerelleştirmesi.
 
@@ -147,6 +152,86 @@ php artisan native:build linux x64
 # macOS Apple Silicon için:
 php artisan native:build mac arm64
 ```
+
+---
+
+## 🐳 Sunucu ve Docker ile Dağıtım (API & Web Servisi)
+
+TailAdmin Voice Core'u bir sunucuya (VPS, bulut sanal makinesi veya GPU sunucusu) kurup **tam teşekküllü bir REST API ve Web Yönetim İstasyonu** olarak kullanmak için ek hiçbir yazılıma (PHP, Python, Node.js vb.) gerek yoktur.
+
+### 1. Hızlı Başlatma (Ayağa Kaldırma)
+
+```bash
+# 1. Depoyu klonlayın ve klasöre girin
+git clone https://github.com/sinan-aydogan/tailadmin-voice-core.git
+cd tailadmin-voice-core
+
+# 2. Örnek ortam dosyasını oluşturun
+cp .env.example .env
+```
+
+Sunucu donanımınıza uygun komutla tüm yığını (Web Arayüzü + REST API + Laravel Worker + Python AI Motoru) başlatın:
+
+* **GPU / CUDA Destekli Sunucularda (Önerilen):**
+  ```bash
+  docker compose up -d --build
+  ```
+
+* **CPU-Only Sunucularda veya macOS Docker Desktop Üzerinde:**
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
+  ```
+
+---
+
+### 🔌 Port Değişimi Nasıl Yapılır?
+
+> [!TIP]
+> **Önemli:** Port değişimi için **Dockerfile üzerinde hiçbir değişiklik yapmanıza gerek yoktur**.
+
+Konteynerin iç çalışma portu standart `8000`'dir. Sunucunun dışarıya açtığı portu değiştirmek için `.env` dosyasındaki `PORT` değerini güncellemeniz yeterlidir:
+
+```env
+# Varsayılan 8000 portunu örneğin 8085 yapmak için .env dosyasına yazın:
+PORT=8085
+```
+
+Ardından konteynerleri güncelleyin:
+```bash
+docker compose up -d
+```
+Artık arayüze ve API'ye `http://<sunucu-ip>:8085` adresinden erişebilirsiniz.
+
+---
+
+### 🌐 Sunucu Yönetim Panelleri ve Domaine Bağlama (Coolify, CapRover, Nginx vb.)
+
+Birçok modern sunucu paneli (Coolify, CapRover, CloudPanel, aaPanel, Easypanel, Dokku vb.) uygulamaları domaine bağlamak için dahili **Reverse Proxy** kullanır:
+
+1. **Dockerfile Değişikliği Gerekmez:** Paneller SSL sertifikasını (Let's Encrypt) ve 80/443 portunu kendileri yönetir.
+2. **Port Ayarı:** Panel arayüzündeki **Container Port** alanına yalnızca `8000` yazmanız yeterlidir. Dışarıya rastgele host portu açmanıza gerek kalmaz.
+3. **SSL / HTTPS Desteği:** Laravel katmanımızda `trustProxies` yapılandırması aktif olduğundan, `https://ses.siteniz.com` arkasında çalışırken yönlendirmeler ve asset yüklemeleri sorunsuz gerçekleşir.
+
+---
+
+### 📋 Hızlı Yönetim Komutları
+
+```bash
+# Canlı logları izleme (Web + API + Queue Worker)
+docker compose logs -f voice-core-app
+
+# Python AI motoru loglarını izleme
+docker compose logs -f voice-core-engine
+
+# Konteynerleri durdurma
+docker compose down
+
+# Sağlık durumunu kontrol etme
+curl http://localhost:8000/api/v1/health
+```
+
+* 📖 **REST API Referansı:** [API.md](API.md) (Tüm uç noktalar ve cURL/Python kod örnekleri)
+* 📋 **Detaylı Dağıtım Kılavuzu & Volumes:** [DOCKER.md](DOCKER.md)
 
 ---
 

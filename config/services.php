@@ -40,4 +40,8 @@ return [
         'binary' => env('PYTHON_BINARY', 'python'),
     ],
 
+    'voice_core' => [
+        'api_key' => env('VOICE_CORE_API_KEY'),
+    ],
+
 ];
