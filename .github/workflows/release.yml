@@ -1,0 +1,134 @@
+name: Release Multi-Platform
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag Name (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os_name }} - ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os_name: Windows
+            build_target: win
+            arch: x64
+          - os: ubuntu-latest
+            os_name: Linux
+            build_target: linux
+            arch: x64
+          - os: macos-14
+            os_name: macOS-AppleSilicon
+            build_target: mac
+            arch: arm64
+          - os: macos-13
+            os_name: macOS-Intel
+            build_target: mac
+            arch: x64
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, sqlite3, curl, zip, fileinfo
+          coverage: none
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Prepare Environment File
+        shell: bash
+        run: |
+          cp .env.example .env || cp .env .env.bak 2>/dev/null || touch .env
+          php artisan key:generate --force
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Install NPM Dependencies
+        run: npm ci
+
+      - name: Build Frontend Assets
+        run: npm run build
+
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3 libatk-bridge2.0-0 libdrm2 libgbm1 libasound2
+
+      - name: Build NativePHP Application
+        env:
+          NATIVEPHP_APP_VERSION: ${{ github.ref_name != '' && startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag_name || '1.0.0' }}
+          NATIVEPHP_BUILDING: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: php artisan native:build ${{ matrix.build_target }} ${{ matrix.arch }} --no-interaction
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nativephp-build-${{ matrix.os_name }}-${{ matrix.arch }}
+          path: |
+            nativephp/electron/dist/*.exe
+            nativephp/electron/dist/*.AppImage
+            nativephp/electron/dist/*.deb
+            nativephp/electron/dist/*.dmg
+            nativephp/electron/dist/*.zip
+            nativephp/electron/dist/*.blockmap
+          if-no-files-found: warn
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download All Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p dist-all
+          find release-artifacts -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.dmg" -o -name "*.zip" \) -exec cp {} dist-all/ \;
+          echo "=== Release Files ==="
+          ls -la dist-all/
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name != '' && startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag_name || 'v1.0.0' }}
+          name: Voice Core Release ${{ github.ref_name != '' && startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.tag_name || 'v1.0.0' }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: dist-all/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
