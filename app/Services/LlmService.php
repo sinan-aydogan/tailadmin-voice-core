@@ -47,9 +47,9 @@ class LlmService
         $baseUrl = rtrim($baseUrl ?: $settings['llm_base_url'], '/');
         $apiKey = $apiKey !== null ? $apiKey : $settings['llm_api_key'];
 
-        // Allow up to 300 seconds (5 minutes) for slow local models (Ollama, CPU inference, etc.)
-        @ini_set('max_execution_time', '300');
-        @set_time_limit(300);
+        // Allow unlimited execution time for local models (Ollama, LM Studio, CPU inference, etc.)
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
 
         try {
             switch ($provider) {
@@ -149,36 +149,46 @@ class LlmService
     }
 
     /**
-     * Generate via Ollama native endpoint or OpenAI-compatible endpoint.
+     * Generate via Ollama native endpoint or OpenAI-compatible endpoint (LM Studio, vLLM, etc.).
      */
     protected function generateWithOllama(string $baseUrl, string $model, string $prompt, string $systemPrompt): array
     {
-        $url = $baseUrl . '/api/generate';
-        $response = Http::timeout(300)->post($url, [
-            'model' => $model,
-            'prompt' => $prompt,
-            'system' => $systemPrompt,
-            'stream' => false,
-            'options' => [
-                'temperature' => 0.7,
-            ],
-        ]);
+        $isLmStudio = str_contains($baseUrl, ':1234');
 
-        if ($response->successful()) {
-            $data = $response->json();
-            $text = trim($data['response'] ?? '');
-            if (!empty($text)) {
-                return [
-                    'success' => true,
-                    'text' => $text,
-                    'provider' => 'ollama',
+        // 1. If standard Ollama (not LM Studio), try Ollama's native /api/generate endpoint
+        if (!$isLmStudio) {
+            try {
+                $url = $baseUrl . '/api/generate';
+                $response = Http::timeout(600)->post($url, [
                     'model' => $model,
-                ];
+                    'prompt' => $prompt,
+                    'system' => $systemPrompt,
+                    'stream' => false,
+                    'options' => [
+                        'temperature' => 0.7,
+                    ],
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $text = trim($data['response'] ?? '');
+                    if (!empty($text)) {
+                        return [
+                            'success' => true,
+                            'text' => $text,
+                            'provider' => 'ollama',
+                            'model' => $model,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Fallback to OpenAI-compatible endpoint below
             }
         }
 
+        // 2. Try OpenAI-compatible endpoint (/v1/chat/completions) - used by LM Studio, Ollama, vLLM, etc.
         $chatUrl = $baseUrl . '/v1/chat/completions';
-        $chatResponse = Http::timeout(300)->post($chatUrl, [
+        $chatResponse = Http::timeout(600)->post($chatUrl, [
             'model' => $model,
             'messages' => [
                 ['role' => 'system', 'content' => $systemPrompt],
@@ -189,8 +199,20 @@ class LlmService
 
         if ($chatResponse->successful()) {
             $data = $chatResponse->json();
-            $text = trim($data['choices'][0]['message']['content'] ?? '');
+            $choice = $data['choices'][0] ?? [];
+            $text = trim($choice['message']['content'] ?? '');
+
+            // Support reasoning/thinking models (e.g. Qwen 3.5 thinking, DeepSeek-R1)
+            if (empty($text) && !empty($choice['message']['reasoning_content'])) {
+                $text = trim($choice['message']['reasoning_content']);
+            }
+
+            // Clean any residual <think>...</think> blocks if present
             if (!empty($text)) {
+                $cleaned = preg_replace('/<think>.*?<\/think>/s', '', $text);
+                $cleaned = trim($cleaned);
+                $text = !empty($cleaned) ? $cleaned : $text;
+
                 return [
                     'success' => true,
                     'text' => $text,
@@ -200,7 +222,8 @@ class LlmService
             }
         }
 
-        throw new \Exception('Ollama sunucusundan geçerli yanıt alınamadı: HTTP ' . $response->status());
+        $errStatus = $chatResponse->status() ?? 'Bilinmiyor';
+        throw new \Exception('Yerel LLM sunucusundan yanıt alınamadı (HTTP ' . $errStatus . '). Modelin yüklü ve çalışır durumda olduğundan emin olun.');
     }
 
     /**
@@ -310,19 +333,57 @@ class LlmService
         try {
             switch ($provider) {
                 case 'ollama':
-                    $res = Http::timeout(5)->get($baseUrl . '/api/tags');
-                    if ($res->successful()) {
-                        $tags = $res->json('models') ?? [];
-                        $modelNames = array_map(fn($m) => $m['name'] ?? '', $tags);
+                    $modelNames = [];
+                    $isLmStudio = str_contains($baseUrl, ':1234');
+
+                    // A) Check Ollama native /api/tags
+                    if (!$isLmStudio) {
+                        try {
+                            $res = Http::timeout(5)->get($baseUrl . '/api/tags');
+                            if ($res->successful()) {
+                                $tags = $res->json('models') ?? [];
+                                $modelNames = array_values(array_filter(array_map(fn($m) => $m['name'] ?? '', $tags)));
+                            }
+                        } catch (\Throwable) {}
+                    }
+
+                    // B) Check OpenAI-compatible /v1/models (LM Studio, vLLM, LocalAI)
+                    if (empty($modelNames)) {
+                        try {
+                            $v1Res = Http::timeout(5)->get($baseUrl . '/v1/models');
+                            if ($v1Res->successful()) {
+                                $data = $v1Res->json('data') ?? [];
+                                foreach ($data as $item) {
+                                    $id = $item['id'] ?? '';
+                                    if (!empty($id) && !str_contains($id, 'embed') && !str_contains($id, 'embedding')) {
+                                        $modelNames[] = $id;
+                                    }
+                                }
+                                $modelNames = array_values(array_unique($modelNames));
+                            }
+                        } catch (\Throwable) {}
+                    }
+
+                    if (!empty($modelNames)) {
+                        $providerLabel = $isLmStudio ? 'LM Studio' : 'Ollama / Yerel LLM';
                         return [
                             'success' => true,
-                            'message' => 'Ollama bağlantısı başarılı! Kurulu model sayısı: ' . count($modelNames),
+                            'message' => "{$providerLabel} bağlantısı başarılı! Yüklü model sayısı: " . count($modelNames),
                             'models' => $modelNames,
                         ];
                     }
+
+                    if ((isset($res) && $res->successful()) || (isset($v1Res) && $v1Res->successful())) {
+                        return [
+                            'success' => true,
+                            'message' => 'Yerel sunucuya bağlanıldı ancak yüklü model bulunamadı. Lütfen model arayüzünden bir model yükleyin.',
+                            'models' => [],
+                        ];
+                    }
+
                     return [
                         'success' => false,
-                        'message' => 'Ollama sunucusuna ulaşılamadı (HTTP ' . $res->status() . '). ' . $baseUrl . ' adresinin çalıştığından emin olun.',
+                        'message' => "Yerel LLM sunucusuna ulaşılamadı. {$baseUrl} adresinin çalıştığından emin olun.",
                     ];
 
                 case 'claude':

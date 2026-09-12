@@ -18,9 +18,9 @@ class LlmController extends Controller
      */
     public function generate(Request $request): JsonResponse
     {
-        // Allow up to 300 seconds (5 minutes) for local models (Ollama, etc.) running on CPU/GPU
-        @ini_set('max_execution_time', '300');
-        @set_time_limit(300);
+        // Allow unlimited execution time for local models (Ollama, LM Studio, CPU inference, etc.)
+        @ini_set('max_execution_time', '0');
+        @set_time_limit(0);
 
         $validated = $request->validate([
             'prompt' => 'nullable|string',

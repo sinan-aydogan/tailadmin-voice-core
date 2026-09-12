@@ -526,10 +526,35 @@
                    ]"
               >
                 <span class="text-base select-none">{{ llmTestResult.success ? '✓' : '⚠' }}</span>
-                <div class="space-y-1">
+                <div class="space-y-2 flex-1">
                   <div class="font-medium">{{ llmTestResult.message }}</div>
-                  <div v-if="llmTestResult.models && llmTestResult.models.length > 0" class="text-[11px] opacity-80">
-                    Kullanılabilir Modeller: {{ llmTestResult.models.slice(0, 6).join(', ') }}
+
+                  <div v-if="llmTestResult.models && llmTestResult.models.length > 0" class="space-y-1.5 pt-1 border-t border-emerald-500/20">
+                    <div class="text-[11px] text-neutral-400">
+                      Kullanılabilir Modeller (seçmek için tıklayın):
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                      <button
+                        v-for="m in llmTestResult.models"
+                        :key="m"
+                        type="button"
+                        @click="selectModel(m)"
+                        class="px-2 py-1 rounded-lg text-[11px] font-mono border transition-all cursor-pointer flex items-center gap-1.5"
+                        :class="form.llm_model === m 
+                          ? 'bg-accent text-bg border-accent font-semibold' 
+                          : 'bg-neutral-900/80 hover:bg-neutral-800 text-neutral-200 border-neutral-700 hover:border-accent/60'"
+                      >
+                        <span>{{ m }}</span>
+                        <span v-if="form.llm_model === m" class="text-[10px]">✓ Seçili</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="form.llm_provider === 'ollama' && form.llm_base_url && form.llm_base_url.includes('1234')" class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] mt-1 space-y-0.5">
+                    <div class="font-semibold flex items-center gap-1">
+                      <span>💡 LM Studio İpucu</span>
+                    </div>
+                    <div>Hızlı yanıt almak için standart modelleri (örneğin <button type="button" @click="selectModel('google/gemma-4-e4b')" class="underline font-mono font-bold hover:text-white">google/gemma-4-e4b</button>) tercih edin. Qwen 3.5 gibi akıl yürütme (reasoning/thinking) modelleri CPU üzerinde binlerce düşünme adımı ürettiği için 5-10+ dakika sürebilir.</div>
                   </div>
                 </div>
               </div>
@@ -1220,6 +1245,13 @@ const setLlmProvider = (newProvider) => {
   }
 
   form.llm_providers_config = { ...providerConfigs.value }
+}
+
+const selectModel = (modelName) => {
+  form.llm_model = modelName
+  if (providerConfigs.value[form.llm_provider]) {
+    providerConfigs.value[form.llm_provider].model = modelName
+  }
 }
 
 const testLlmConnection = async () => {
