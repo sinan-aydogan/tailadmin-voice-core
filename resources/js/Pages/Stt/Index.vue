@@ -236,12 +236,15 @@
                   </span>
                 </button>
 
-                <!-- Retry Button (Left of Delete Button for Failed Tasks) -->
+                <!-- Retry Button (Farklı Model ile Yeniden Deşifre Et / Yeniden Dene) -->
                 <button
-                  v-if="t.status === 'failed'"
+                  v-if="t.status === 'completed' || t.status === 'failed'"
                   @click="openRetryModal(t)"
-                  class="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 transition-colors"
-                  title="Farklı Model ile Yeniden Dene"
+                  class="p-1.5 rounded-lg transition-colors"
+                  :class="t.status === 'completed' 
+                    ? 'bg-neutral-800 hover:bg-cyan-500/20 text-neutral-400 hover:text-cyan-300' 
+                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300'"
+                  :title="t.status === 'completed' ? 'Farklı Whisper Modeli ile Yeniden Deşifre Et' : 'Farklı Model ile Yeniden Dene'"
                 >
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

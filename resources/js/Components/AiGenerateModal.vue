@@ -160,7 +160,7 @@
 
         <!-- Generation Result Preview Box -->
         <div v-if="generatedResult" class="pt-4 border-t border-neutral-800 space-y-3">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between flex-wrap gap-2">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
               <span class="text-xs font-semibold text-neutral-200">Üretilen Metin</span>
@@ -168,9 +168,46 @@
                 {{ resultModel }}
               </span>
             </div>
-            <span class="text-xs text-neutral-400 font-mono">
+
+            <!-- View Switcher: Clean vs Raw -->
+            <div v-if="parsedResult.hasNotes || generatedResult.includes('*')" class="flex items-center gap-1 bg-neutral-900 p-0.5 rounded-lg border border-neutral-800 text-[11px]">
+              <button
+                type="button"
+                @click="resultViewMode = 'clean'"
+                class="px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                :class="resultViewMode === 'clean' ? 'bg-accent/20 text-accent font-semibold border border-accent/30' : 'text-neutral-400 hover:text-neutral-200'"
+              >
+                ✓ Temiz Seslendirme Metni
+              </button>
+              <button
+                type="button"
+                @click="resultViewMode = 'raw'"
+                class="px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                :class="resultViewMode === 'raw' ? 'bg-neutral-800 text-neutral-200 font-semibold' : 'text-neutral-500 hover:text-neutral-300'"
+              >
+                Ham LLM Çıktısı
+              </button>
+            </div>
+            <span v-else class="text-xs text-neutral-400 font-mono">
               {{ generatedResult.length }} karakter · ~{{ wordCount }} kelime
             </span>
+          </div>
+
+          <!-- Suno-style Voiceover Directive Card -->
+          <div v-if="parsedResult.directive" class="p-3.5 rounded-xl bg-gradient-to-r from-purple-950/40 via-neutral-900 to-amber-950/30 border border-purple-500/30 text-xs space-y-1 shadow-sm">
+            <div class="flex items-center justify-between text-[11px] font-semibold text-purple-300">
+              <div class="flex items-center gap-1.5">
+                <span>🎭 Seslendirme & Yönetmen Talimatı (Suno Tarzı)</span>
+                <span class="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono">Ayrıştırıldı</span>
+              </div>
+            </div>
+            <div class="text-neutral-200 text-xs italic font-sans leading-relaxed">
+              "{{ parsedResult.directive }}"
+            </div>
+            <div class="text-[10px] text-neutral-400 flex items-center gap-1 pt-0.5">
+              <span class="text-emerald-400 font-bold">✓ Arındırıldı:</span>
+              <span>Bu talimat ve yıldızlar seslendirme metninden ayrıldı; ses motoru "yıldız" veya talimatı okumaz.</span>
+            </div>
           </div>
 
           <!-- Warning banner if simulation was used -->
@@ -179,7 +216,17 @@
             <div>{{ resultWarning }}</div>
           </div>
 
+          <!-- Textarea: Clean Spoken Text vs Raw -->
           <textarea
+            v-if="resultViewMode === 'clean'"
+            :value="cleanEditableText"
+            @input="cleanEditableText = $event.target.value"
+            rows="5"
+            class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-accent font-sans leading-relaxed"
+            placeholder="Temiz seslendirme metni..."
+          ></textarea>
+          <textarea
+            v-else
             v-model="generatedResult"
             rows="5"
             class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-accent font-sans leading-relaxed"
@@ -224,6 +271,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { parseVoiceoverText } from '../Utils/textSanitizer'
 
 const props = defineProps({
   show: Boolean,
@@ -240,9 +288,23 @@ const customPrompt = ref('')
 const variableValues = ref({})
 const isGenerating = ref(false)
 const generatedResult = ref('')
+const cleanEditableText = ref('')
+const resultViewMode = ref('clean')
 const resultModel = ref('')
 const resultWarning = ref('')
 const errorMessage = ref(null)
+
+const parsedResult = computed(() => {
+  return parseVoiceoverText(generatedResult.value)
+})
+
+watch(generatedResult, (newVal) => {
+  if (newVal) {
+    const parsed = parseVoiceoverText(newVal)
+    cleanEditableText.value = parsed.cleanText
+    resultViewMode.value = 'clean'
+  }
+})
 
 const escapeRegex = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -438,7 +500,12 @@ const generateText = async () => {
 
 const applyText = () => {
   if (!generatedResult.value) return
-  emit('apply', generatedResult.value)
+  const textToApply = resultViewMode.value === 'clean' ? (cleanEditableText.value || parsedResult.value.cleanText) : generatedResult.value
+  emit('apply', {
+    text: textToApply,
+    directive: parsedResult.value.directive || '',
+    raw: generatedResult.value,
+  })
   closeModal()
 }
 

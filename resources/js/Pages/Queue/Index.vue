@@ -195,12 +195,15 @@
                       </svg>
                     </a>
 
-                    <!-- Retry Button (Farklı Model ile Yeniden Dene) -->
+                    <!-- Retry Button (Farklı Model ile Yeniden Üret / Yeniden Dene) -->
                     <button
-                      v-if="t.status === 'failed'"
+                      v-if="t.status === 'completed' || t.status === 'failed'"
                       @click="openRetryModal(t)"
-                      class="p-1.5 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
-                      title="Farklı Model ile Yeniden Dene"
+                      class="p-1.5 rounded-lg transition-colors"
+                      :class="t.status === 'completed' 
+                        ? 'text-neutral-400 hover:text-accent hover:bg-neutral-800' 
+                        : 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10'"
+                      :title="t.status === 'completed' ? 'Farklı Model ile Yeniden Üret' : 'Farklı Model ile Yeniden Dene'"
                     >
                       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

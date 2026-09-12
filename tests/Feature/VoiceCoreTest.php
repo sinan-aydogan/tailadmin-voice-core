@@ -109,5 +109,20 @@ class VoiceCoreTest extends TestCase
             @unlink($settingsFile);
         }
     }
+
+    public function test_tts_text_sanitizer_removes_markdown_and_voiceover_notes(): void
+    {
+        $raw = '**(Seslendirme Notu: Konuşma temposu orta hızlı, ritmik ve vurgular net olmalıdır.)** *** ### 🎤 Haber Spikeri Anons Metni **(Giriş – Enerjik ve Selamlayıcı)** Değerli izleyiciler, iyi akşamlar. **(Bülten – Dinamik ve Tarafsız Ton)** Bugün yapay zeka alanında kritik bir gelişmeye yer veriyoruz.';
+        
+        $clean = \App\Services\PythonVoiceService::sanitizeTextForTts($raw);
+
+        $this->assertStringNotContainsString('**', $clean);
+        $this->assertStringNotContainsString('###', $clean);
+        $this->assertStringNotContainsString('Seslendirme Notu', $clean);
+        $this->assertStringNotContainsString('Giriş – Enerjik', $clean);
+        $this->assertStringNotContainsString('🎤', $clean);
+        $this->assertStringContainsString('Değerli izleyiciler, iyi akşamlar.', $clean);
+        $this->assertStringContainsString('Bugün yapay zeka alanında kritik bir gelişmeye yer veriyoruz.', $clean);
+    }
 }
 

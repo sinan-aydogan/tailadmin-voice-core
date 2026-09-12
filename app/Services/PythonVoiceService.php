@@ -88,6 +88,8 @@ class PythonVoiceService
      */
     public function generateTts(string $text, string $engine = 'piper-tr', string $language = 'tr', ?string $profilePath = null, ?string $outputPath = null): array
     {
+        $text = self::sanitizeTextForTts($text);
+
         // Preferred: call HTTP microservice if online
         if ($this->isServiceOnline()) {
             $response = Http::timeout(600)->post("{$this->baseUrl}/tts/generate", [
@@ -370,5 +372,51 @@ class PythonVoiceService
             return $converted;
         }
         return mb_convert_encoding($string, 'UTF-8', 'UTF-8');
+    }
+
+    /**
+     * Sanitize text for TTS to ensure speech models (Piper, XTTS, etc.)
+     * do not pronounce markdown formatting, asterisks, emojis, or stage directions aloud.
+     */
+    public static function sanitizeTextForTts(string $text): string
+    {
+        if (empty($text)) {
+            return '';
+        }
+
+        // 1. Remove voiceover / director notes blocks: (Seslendirme Notu: ...) or [Yönetmen Notu: ...]
+        $text = preg_replace('/(?:\*{0,2})[\[\(](?:seslendirme\s*notu|y\x{00F6}netmen\s*notu|ton|tarz|talimat|ses\s*tonu|not)[:\-–\s]+[^\]\)]+[\]\)](?:\*{0,2})/iu', ' ', $text);
+
+        // 2. Remove Markdown headings (### 🎤 Title)
+        $text = preg_replace('/(?:^|\n)\s*#{1,6}\s+[^\n]+/u', ' ', $text);
+        $text = preg_replace('/#{1,6}\s+[^*\n]+(?=\*\*|\*|\n|$)/iu', ' ', $text);
+        $text = preg_replace('/#{1,6}\s+/u', ' ', $text);
+
+        // 3. Remove stage / section directions in parentheses or brackets:
+        // e.g. **(Giriş – Enerjik)**, (Bülten – Dinamik), (Kapanış – Güven Veren)
+        $text = preg_replace('/(?:\*{0,2})[\[\(](?:giri\x{015F}|geli\x{015F}me|b\x{00FC}lten|kapan\x{0131}\x{015F}|anons|m\x{00FC}zik|es|ton|arka\s*plan|efekt|enerjik|dinamik|tarafs\x{0131}z|g\x{00FC}ven|selamlay\x{0131}c\x{0131}|seslendirme|spiker|not|talimat)[^\]\)]*[\]\)](?:\*{0,2})/iu', ' ', $text);
+        $text = preg_replace('/\*\*\([^)]+\)\*\*/u', ' ', $text);
+        $text = preg_replace('/\[\([^)]+\)\]/u', ' ', $text);
+
+        // 4. Remove horizontal dividers & decorative asterisks
+        $text = preg_replace('/[\*\-_]{3,}/u', ' ', $text);
+
+        // 5. Remove inline markdown bold, italic, code
+        $text = preg_replace('/\*\*([^*]+)\*\*/u', '$1', $text);
+        $text = preg_replace('/\*([^*]+)\*/u', '$1', $text);
+        $text = preg_replace('/__([^_]+)__/u', '$1', $text);
+        $text = preg_replace('/_([^_]+)_/u', '$1', $text);
+        $text = preg_replace('/`([^`]+)`/u', '$1', $text);
+        $text = preg_replace('/~~([^~]+)~~/u', '$1', $text);
+
+        // 6. Remove emojis
+        $text = preg_replace('/[\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F1E0}-\x{1F1FF}]/u', ' ', $text);
+
+        // 7. Remove orphaned symbols
+        $text = preg_replace('/[*#~]/u', '', $text);
+
+        // 8. Normalize whitespace
+        $text = preg_replace('/\s+/u', ' ', $text);
+        return trim($text);
     }
 }

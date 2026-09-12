@@ -9,7 +9,18 @@
           <form @submit.prevent="submit" class="space-y-4">
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="block text-xs font-medium text-neutral-400">Metin</label>
+                <div class="flex items-center gap-2">
+                  <label class="block text-xs font-medium text-neutral-400">Metin</label>
+                  <button
+                    v-if="hasFormattingToClean"
+                    type="button"
+                    @click="cleanTextManually"
+                    class="px-2.5 py-0.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[11px] font-medium transition-all flex items-center gap-1 cursor-pointer"
+                    title="Metindeki yıldızları (**), başlıkları (###), emojileri ve seslendirme notlarını temizle"
+                  >
+                    <span>🧹 Yıldız & Notları Arındır</span>
+                  </button>
+                </div>
                 <button
                   type="button"
                   @click="openAiModal('custom')"
@@ -18,6 +29,25 @@
                 >
                   <span>✨ AI ile Metin Üret</span>
                 </button>
+              </div>
+
+              <!-- Suno-style Voiceover & Director Directive Card -->
+              <div v-if="voiceoverDirective" class="mb-3 p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-neutral-900 to-amber-950/30 border border-purple-500/30 text-xs space-y-1.5 shadow-lg shadow-purple-500/5">
+                <div class="flex items-center justify-between text-[11px] font-semibold text-purple-300">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm">🎭</span>
+                    <span>Seslendirme & Yönetmen Talimatı (Suno Tarzı)</span>
+                    <span class="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono">Ayrıştırıldı</span>
+                  </div>
+                  <button type="button" @click="voiceoverDirective = ''" class="text-neutral-500 hover:text-neutral-300 text-xs cursor-pointer p-0.5" title="Talimatı Kaldır">✕</button>
+                </div>
+                <div class="text-neutral-200 text-xs italic font-sans leading-relaxed">
+                  "{{ voiceoverDirective }}"
+                </div>
+                <div class="text-[10px] text-neutral-400 flex items-center gap-1 pt-0.5">
+                  <span class="text-emerald-400 font-bold">✓ Korundu:</span>
+                  <span>Bu talimat seslendirme metninden ayrılmıştır; ses motoru "yıldız" veya talimatı seslendirmez.</span>
+                </div>
               </div>
               <textarea
                 v-model="form.text"
@@ -356,12 +386,15 @@
                     </svg>
                   </a>
 
-                  <!-- Retry Button (Left of Delete Button for Failed Tasks) -->
+                  <!-- Retry Button (Farklı Model ile Yeniden Üret / Yeniden Dene) -->
                   <button
-                    v-if="t.status === 'failed'"
+                    v-if="t.status === 'completed' || t.status === 'failed'"
                     @click="openRetryModal(t)"
-                    class="p-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 transition-colors"
-                    title="Farklı Model ile Yeniden Dene"
+                    class="p-2 rounded-xl transition-colors"
+                    :class="t.status === 'completed' 
+                      ? 'bg-neutral-800 hover:bg-accent/20 hover:text-accent text-neutral-300' 
+                      : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300'"
+                    :title="t.status === 'completed' ? 'Farklı Model / Ses ile Yeniden Üret' : 'Farklı Model ile Yeniden Dene'"
                   >
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -433,6 +466,7 @@ import AudioPlayerModal from '../../Components/AudioPlayerModal.vue'
 import RetryTaskModal from '../../Components/RetryTaskModal.vue'
 import AiGenerateModal from '../../Components/AiGenerateModal.vue'
 import { VOICE_LANGUAGES } from '../../i18n'
+import { parseVoiceoverText } from '../../Utils/textSanitizer'
 
 const props = defineProps({
   profiles: Array,
@@ -448,14 +482,50 @@ const showAiModal = ref(false)
 const aiModalTemplateId = ref('custom')
 const savedPrompts = ref([])
 const activeRightTab = ref('prompts') // 'prompts' | 'models'
+const voiceoverDirective = ref('')
 
 const openAiModal = (templateId = 'custom') => {
   aiModalTemplateId.value = templateId
   showAiModal.value = true
 }
 
-const onAiTextApplied = (generatedText) => {
-  form.text = generatedText
+const onAiTextApplied = (payload) => {
+  if (typeof payload === 'object' && payload !== null) {
+    form.text = payload.text || ''
+    if (payload.directive) {
+      voiceoverDirective.value = payload.directive
+    }
+  } else {
+    const parsed = parseVoiceoverText(payload)
+    form.text = parsed.cleanText
+    if (parsed.directive) {
+      voiceoverDirective.value = parsed.directive
+    }
+  }
+}
+
+const hasFormattingToClean = computed(() => {
+  if (!form.text) return false
+  const t = form.text
+  return t.includes('*') || 
+         t.includes('#') || 
+         t.toLowerCase().includes('seslendirme notu') || 
+         t.toLowerCase().includes('yönetmen notu') ||
+         /\*\*\([^\)]+\)\*\*/.test(t) ||
+         stageRegexCheck(t) ||
+         /[\u{1F300}-\u{1F9FF}]/u.test(t)
+})
+
+const stageRegexCheck = (str) => {
+  return /[\[\(](?:giriş|gelişme|bülten|kapanış|anons|müzik|es|ton|arka\s*plan|efekt|enerjik|dinamik|tarafsız|güven|selamlayıcı|seslendirme|spiker|not|talimat)[^\]\)]*[\]\)]/i.test(str)
+}
+
+const cleanTextManually = () => {
+  const parsed = parseVoiceoverText(form.text)
+  form.text = parsed.cleanText
+  if (parsed.directive) {
+    voiceoverDirective.value = parsed.directive
+  }
 }
 
 const fetchSavedPrompts = async () => {
@@ -574,6 +644,7 @@ const submit = () => {
   form.post('/tts/generate', {
     onSuccess: () => {
       form.text = ''
+      voiceoverDirective.value = ''
       window.dispatchEvent(new CustomEvent('voice-task-created'))
       // Immediately pull fresh list
       fetchTasks()

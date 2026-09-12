@@ -18,19 +18,21 @@
         @click.stop
       >
         <!-- Top Glow Accent -->
-        <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-accent"></div>
+        <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r"
+             :class="task.status === 'completed' ? 'from-accent via-cyan-400 to-emerald-400' : 'from-amber-500 via-orange-400 to-accent'"></div>
 
         <!-- Header -->
         <div class="p-6 border-b border-neutral-800/80 flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center"
+                 :class="task.status === 'completed' ? 'bg-accent/15 border border-accent/30 text-accent' : 'bg-amber-500/15 border border-amber-500/30 text-amber-400'">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </div>
             <div>
               <h3 class="text-base font-bold text-neutral-100 flex items-center gap-2">
-                <span>İşlemi Yeniden Dene</span>
+                <span>{{ task.status === 'completed' ? 'Farklı Model ile Yeniden Üret' : 'İşlemi Yeniden Dene' }}</span>
                 <span class="text-xs font-mono font-normal text-neutral-500">#{{ task.id }}</span>
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
                       :class="task.type === 'tts' ? 'bg-accent/20 text-accent-300' : 'bg-cyan-500/20 text-cyan-400'">
@@ -38,7 +40,7 @@
                 </span>
               </h3>
               <p class="text-xs text-neutral-400 mt-0.5">
-                Model veya ayarları değiştirerek görevi tekrar kuyruğa alabilirsiniz.
+                {{ task.status === 'completed' ? 'Mevcut içeriği farklı bir model veya ses profili seçerek yeniden üretin.' : 'Model veya ayarları değiştirerek görevi tekrar kuyruğa alabilirsiniz.' }}
               </p>
             </div>
           </div>
@@ -215,16 +217,19 @@
             type="button"
             @click="submitRetry"
             :disabled="isSubmitting"
-            class="px-5 py-2 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-neutral-950 flex items-center gap-2 transition-all disabled:opacity-50 font-bold shadow-lg shadow-amber-500/10"
+            class="px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50 font-bold shadow-lg"
+            :class="task.status === 'completed' 
+              ? 'bg-accent text-bg hover:opacity-90 shadow-accent/10' 
+              : 'bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-amber-500/10'"
           >
-            <svg v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin text-neutral-950" fill="none" viewBox="0 0 24 24">
+            <svg v-if="isSubmitting" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" :class="task.status === 'completed' ? 'text-bg' : 'text-neutral-950'">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
             </svg>
             <svg v-else class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span>{{ isSubmitting ? 'Kuyruğa Ekleniyor...' : 'Farklı Model ile Yeniden Başlat' }}</span>
+            <span>{{ isSubmitting ? (task.status === 'completed' ? 'Üretim Başlatılıyor...' : 'Kuyruğa Ekleniyor...') : (task.status === 'completed' ? 'Farklı Model ile Yeniden Üret' : 'Farklı Model ile Yeniden Başlat') }}</span>
           </button>
         </div>
       </div>
