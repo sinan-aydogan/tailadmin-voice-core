@@ -11,6 +11,8 @@ use App\Http\Controllers\PlaylistController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SystemApiController;
 use App\Http\Controllers\SupportController;
+use App\Http\Controllers\PromptController;
+use App\Http\Controllers\LlmController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -77,4 +79,16 @@ Route::get('/api/audio/{filename}', [SystemApiController::class, 'audio'])->name
 Route::get('/api/tasks/{type}', [SystemApiController::class, 'tasks'])->name('api.tasks');
 Route::delete('/api/tasks/{id}', [SystemApiController::class, 'deleteTask'])->name('api.tasks.delete');
 Route::post('/api/system/open-url', [SystemApiController::class, 'openUrl'])->name('api.system.open_url');
+
+// Prompts Management
+Route::get('/prompts', [PromptController::class, 'index'])->name('prompts.index');
+Route::post('/prompts', [PromptController::class, 'store'])->name('prompts.store');
+Route::put('/prompts/{id}', [PromptController::class, 'update'])->name('prompts.update');
+Route::post('/prompts/{id}/favorite', [PromptController::class, 'toggleFavorite'])->name('prompts.favorite');
+Route::delete('/prompts/{id}', [PromptController::class, 'destroy'])->name('prompts.destroy');
+Route::get('/api/prompts', [PromptController::class, 'apiIndex'])->name('api.prompts.index');
+
+// LLM Text Generation & Connection Testing
+Route::post('/api/llm/generate', [LlmController::class, 'generate'])->name('api.llm.generate');
+Route::post('/api/llm/test-connection', [LlmController::class, 'testConnection'])->name('api.llm.test_connection');
 

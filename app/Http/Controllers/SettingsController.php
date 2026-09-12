@@ -44,6 +44,11 @@ class SettingsController extends Controller
             'api_port' => (int) ($saved['api_port'] ?? env('API_PORT', 5001)),
             'hf_token' => $saved['hf_token'] ?? env('HF_TOKEN', ''),
             'voice_core_api_key' => $saved['voice_core_api_key'] ?? env('VOICE_CORE_API_KEY', ''),
+            'llm_provider' => $saved['llm_provider'] ?? env('LLM_PROVIDER', 'ollama'),
+            'llm_base_url' => $saved['llm_base_url'] ?? env('LLM_BASE_URL', 'http://127.0.0.1:11434'),
+            'llm_api_key' => $saved['llm_api_key'] ?? env('LLM_API_KEY', ''),
+            'llm_model' => $saved['llm_model'] ?? env('LLM_MODEL', 'llama3:latest'),
+            'llm_system_prompt' => $saved['llm_system_prompt'] ?? env('LLM_SYSTEM_PROMPT', 'Sen seslendirme metinleri hazırlayan yaratıcı, akıcı ve profesyonel bir yapay zeka asistanısın. Yanıtlarında gereksiz selamlama veya açıklama yapmadan yalnızca doğrudan seslendirilecek metni ver.'),
         ];
     }
 
@@ -74,6 +79,11 @@ class SettingsController extends Controller
             'default_tts_engine' => 'nullable|string',
             'hf_token' => 'nullable|string',
             'voice_core_api_key' => 'nullable|string',
+            'llm_provider' => 'nullable|string',
+            'llm_base_url' => 'nullable|string',
+            'llm_api_key' => 'nullable|string',
+            'llm_model' => 'nullable|string',
+            'llm_system_prompt' => 'nullable|string',
         ]);
 
         $current = $this->getAllSettings();
@@ -96,6 +106,11 @@ class SettingsController extends Controller
         }
         $current['hf_token'] = trim($request->input('hf_token', ''));
         $current['voice_core_api_key'] = trim($request->input('voice_core_api_key', ''));
+        $current['llm_provider'] = trim($request->input('llm_provider', 'ollama'));
+        $current['llm_base_url'] = trim($request->input('llm_base_url', 'http://127.0.0.1:11434'));
+        $current['llm_api_key'] = trim($request->input('llm_api_key', ''));
+        $current['llm_model'] = trim($request->input('llm_model', 'llama3:latest'));
+        $current['llm_system_prompt'] = trim($request->input('llm_system_prompt', ''));
 
         $dataDir = base_path('data');
         if (!is_dir($dataDir)) {

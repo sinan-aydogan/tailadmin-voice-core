@@ -308,6 +308,247 @@
               </div>
             </div>
           </div>
+
+          <!-- LLM Text Generation Engine Card -->
+          <div class="p-6 rounded-2xl bg-surface border border-neutral-800 space-y-5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                  <span class="text-base select-none">✨</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h2 class="text-base font-semibold text-neutral-100">Yapay Zeka (LLM) Metin Motoru</h2>
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider"
+                          :class="form.llm_provider === 'ollama' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-purple-500/15 text-purple-400 border border-purple-500/30'">
+                      {{ form.llm_provider }}
+                    </span>
+                  </div>
+                  <p class="text-xs text-neutral-500 mt-0.5">Metin Okuma ve seslendirme sayfalarında "AI ile Metin Üret" özelliği için kullanılacak dil modeli.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-4 pt-1">
+              <!-- Provider Selector -->
+              <div>
+                <label class="block text-xs font-medium text-neutral-400 mb-1.5">LLM Sağlayıcısı</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <button
+                    type="button"
+                    @click="setLlmProvider('ollama')"
+                    :class="[
+                      'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                      form.llm_provider === 'ollama'
+                        ? 'bg-purple-500/15 border-purple-500 text-neutral-100 font-semibold shadow-sm'
+                        : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 text-neutral-400'
+                    ]"
+                  >
+                    <div class="text-xs font-semibold flex items-center gap-1.5">
+                      <span>🦙 Ollama</span>
+                    </div>
+                    <div class="text-[10px] text-neutral-500 mt-0.5">Yerel & Ücretsiz</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="setLlmProvider('claude')"
+                    :class="[
+                      'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                      form.llm_provider === 'claude'
+                        ? 'bg-purple-500/15 border-purple-500 text-neutral-100 font-semibold shadow-sm'
+                        : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 text-neutral-400'
+                    ]"
+                  >
+                    <div class="text-xs font-semibold flex items-center gap-1.5">
+                      <span>🟣 Claude API</span>
+                    </div>
+                    <div class="text-[10px] text-neutral-500 mt-0.5">Anthropic 3.5 & 3.7</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="setLlmProvider('openai')"
+                    :class="[
+                      'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                      form.llm_provider === 'openai'
+                        ? 'bg-purple-500/15 border-purple-500 text-neutral-100 font-semibold shadow-sm'
+                        : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 text-neutral-400'
+                    ]"
+                  >
+                    <div class="text-xs font-semibold flex items-center gap-1.5">
+                      <span>🟢 OpenAI API</span>
+                    </div>
+                    <div class="text-[10px] text-neutral-500 mt-0.5">GPT-4o & Mini</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="setLlmProvider('gemini')"
+                    :class="[
+                      'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                      form.llm_provider === 'gemini'
+                        ? 'bg-purple-500/15 border-purple-500 text-neutral-100 font-semibold shadow-sm'
+                        : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 text-neutral-400'
+                    ]"
+                  >
+                    <div class="text-xs font-semibold flex items-center gap-1.5">
+                      <span>✨ Gemini API</span>
+                    </div>
+                    <div class="text-[10px] text-neutral-500 mt-0.5">Google 2.0 Flash</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="setLlmProvider('deepseek')"
+                    :class="[
+                      'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                      form.llm_provider === 'deepseek'
+                        ? 'bg-purple-500/15 border-purple-500 text-neutral-100 font-semibold shadow-sm'
+                        : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 text-neutral-400'
+                    ]"
+                  >
+                    <div class="text-xs font-semibold flex items-center gap-1.5">
+                      <span>🐳 DeepSeek</span>
+                    </div>
+                    <div class="text-[10px] text-neutral-500 mt-0.5">V3 & R1 Modelleri</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="setLlmProvider('groq')"
+                    :class="[
+                      'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                      form.llm_provider === 'groq'
+                        ? 'bg-purple-500/15 border-purple-500 text-neutral-100 font-semibold shadow-sm'
+                        : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 text-neutral-400'
+                    ]"
+                  >
+                    <div class="text-xs font-semibold flex items-center gap-1.5">
+                      <span>⚡ Groq Cloud</span>
+                    </div>
+                    <div class="text-[10px] text-neutral-500 mt-0.5">Ultra Hızlı Llama 3.3</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="setLlmProvider('openrouter')"
+                    :class="[
+                      'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                      form.llm_provider === 'openrouter'
+                        ? 'bg-purple-500/15 border-purple-500 text-neutral-100 font-semibold shadow-sm'
+                        : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 text-neutral-400'
+                    ]"
+                  >
+                    <div class="text-xs font-semibold flex items-center gap-1.5">
+                      <span>🌐 OpenRouter</span>
+                    </div>
+                    <div class="text-[10px] text-neutral-500 mt-0.5">Tüm AI Modelleri</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="setLlmProvider('mock')"
+                    :class="[
+                      'p-3 rounded-xl border text-left transition-all cursor-pointer',
+                      form.llm_provider === 'mock'
+                        ? 'bg-purple-500/15 border-purple-500 text-neutral-100 font-semibold shadow-sm'
+                        : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 text-neutral-400'
+                    ]"
+                  >
+                    <div class="text-xs font-semibold flex items-center gap-1.5">
+                      <span>🧪 Simülasyon</span>
+                    </div>
+                    <div class="text-[10px] text-neutral-500 mt-0.5">Test & Çevrimdışı</div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Endpoint / Base URL (if Ollama or OpenAI compatible) -->
+              <div v-if="form.llm_provider === 'ollama' || form.llm_provider === 'openai' || form.llm_provider === 'groq' || form.llm_provider === 'deepseek' || form.llm_provider === 'openrouter'">
+                <label class="block text-xs font-medium text-neutral-400 mb-1.5">
+                  {{ form.llm_provider === 'ollama' ? 'Ollama API URL' : 'API Base URL Endpoint' }}
+                </label>
+                <input
+                  v-model="form.llm_base_url"
+                  type="text"
+                  :placeholder="
+                    form.llm_provider === 'ollama' ? 'http://127.0.0.1:11434' :
+                    form.llm_provider === 'deepseek' ? 'https://api.deepseek.com' :
+                    form.llm_provider === 'groq' ? 'https://api.groq.com/openai/v1' :
+                    form.llm_provider === 'openrouter' ? 'https://openrouter.ai/api/v1' :
+                    'https://api.openai.com/v1'
+                  "
+                  class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs font-mono text-neutral-100 focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              <!-- API Key (for all external cloud providers) -->
+              <div v-if="form.llm_provider !== 'ollama' && form.llm_provider !== 'mock'">
+                <label class="block text-xs font-medium text-neutral-400 mb-1.5">
+                  {{ form.llm_provider === 'claude' ? 'Anthropic API Anahtarı (sk-ant-...)' : 'API Anahtarı (API Key)' }}
+                </label>
+                <input
+                  v-model="form.llm_api_key"
+                  type="password"
+                  :placeholder="form.llm_provider === 'claude' ? 'sk-ant-...' : 'sk-...'"
+                  class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs font-mono text-neutral-100 focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              <!-- Model Name -->
+              <div>
+                <label class="block text-xs font-medium text-neutral-400 mb-1.5">Model Adı</label>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model="form.llm_model"
+                    type="text"
+                    placeholder="llama3:latest, gpt-4o-mini, gemini-2.0-flash vb."
+                    class="flex-1 rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs font-mono text-neutral-100 focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    @click="testLlmConnection"
+                    :disabled="isTestingLlm"
+                    class="px-4 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap border border-neutral-700 cursor-pointer"
+                  >
+                    <span v-if="isTestingLlm" class="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
+                    <span>{{ isTestingLlm ? 'Test Ediliyor...' : 'Bağlantıyı Test Et' }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Test Result Alert -->
+              <div v-if="llmTestResult"
+                   :class="[
+                     'p-3.5 rounded-xl border text-xs flex items-start gap-2.5',
+                     llmTestResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'
+                   ]"
+              >
+                <span class="text-base select-none">{{ llmTestResult.success ? '✓' : '⚠' }}</span>
+                <div class="space-y-1">
+                  <div class="font-medium">{{ llmTestResult.message }}</div>
+                  <div v-if="llmTestResult.models && llmTestResult.models.length > 0" class="text-[11px] opacity-80">
+                    Kullanılabilir Modeller: {{ llmTestResult.models.slice(0, 6).join(', ') }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- System Prompt -->
+              <div>
+                <label class="block text-xs font-medium text-neutral-400 mb-1.5">Varsayılan Sistem Talimatı (System Prompt)</label>
+                <textarea
+                  v-model="form.llm_system_prompt"
+                  rows="2"
+                  placeholder="Sen seslendirme metinleri hazırlayan yaratıcı, akıcı bir yapay zeka asistanısın..."
+                  class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs text-neutral-100 focus:outline-none focus:border-accent"
+                ></textarea>
+                <div class="text-[11px] text-neutral-500 mt-1">
+                  LLM'in konuşma diline ve seslendirme ritmine uygun Türkçe içerik üretmesi için yönlendirici talimat.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- ==================== TAB 3: DONANIM & PERFORMANS ==================== -->
@@ -909,6 +1150,68 @@ const isApiProtected = computed(() => {
   return activeKeysCount.value > 0 || !!form.voice_core_api_key
 })
 
+const isTestingLlm = ref(false)
+const llmTestResult = ref(null)
+
+const setLlmProvider = (provider) => {
+  form.llm_provider = provider
+  llmTestResult.value = null
+  if (provider === 'ollama') {
+    form.llm_base_url = 'http://127.0.0.1:11434'
+    form.llm_model = 'llama3:latest'
+  } else if (provider === 'claude') {
+    form.llm_base_url = 'https://api.anthropic.com/v1'
+    form.llm_model = 'claude-3-5-sonnet-20241022'
+  } else if (provider === 'openai') {
+    form.llm_base_url = 'https://api.openai.com/v1'
+    form.llm_model = 'gpt-4o-mini'
+  } else if (provider === 'gemini') {
+    form.llm_base_url = ''
+    form.llm_model = 'gemini-2.0-flash'
+  } else if (provider === 'groq') {
+    form.llm_base_url = 'https://api.groq.com/openai/v1'
+    form.llm_model = 'llama-3.3-70b-versatile'
+  } else if (provider === 'deepseek') {
+    form.llm_base_url = 'https://api.deepseek.com'
+    form.llm_model = 'deepseek-chat'
+  } else if (provider === 'openrouter') {
+    form.llm_base_url = 'https://openrouter.ai/api/v1'
+    form.llm_model = 'meta-llama/llama-3.3-70b-instruct'
+  } else if (provider === 'mock') {
+    form.llm_model = 'simulated-voice-model'
+  }
+}
+
+const testLlmConnection = async () => {
+  isTestingLlm.value = true
+  llmTestResult.value = null
+  try {
+    const res = await fetch('/api/llm/test-connection', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+      },
+      body: JSON.stringify({
+        provider: form.llm_provider,
+        base_url: form.llm_base_url,
+        api_key: form.llm_api_key,
+      })
+    })
+    const data = await res.json()
+    llmTestResult.value = data
+  } catch (err) {
+    llmTestResult.value = {
+      success: false,
+      message: 'Bağlantı hatası: ' + err.message
+    }
+  } finally {
+    isTestingLlm.value = false
+  }
+}
+
 const form = useForm({
   models_dir: props.settings?.models_dir || props.default_models_dir || '',
   use_gpu: props.settings?.use_gpu || 'auto',
@@ -916,6 +1219,11 @@ const form = useForm({
   default_tts_engine: props.settings?.default_tts_engine || 'piper-tr',
   hf_token: props.settings?.hf_token || '',
   voice_core_api_key: props.settings?.voice_core_api_key || '',
+  llm_provider: props.settings?.llm_provider || 'ollama',
+  llm_base_url: props.settings?.llm_base_url || 'http://127.0.0.1:11434',
+  llm_api_key: props.settings?.llm_api_key || '',
+  llm_model: props.settings?.llm_model || 'llama3:latest',
+  llm_system_prompt: props.settings?.llm_system_prompt || '',
 })
 
 const currentApiUrl = computed(() => {

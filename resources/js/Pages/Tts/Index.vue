@@ -8,7 +8,17 @@
 
           <form @submit.prevent="submit" class="space-y-4">
             <div>
-              <label class="block text-xs font-medium text-neutral-400 mb-1.5">Metin</label>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-medium text-neutral-400">Metin</label>
+                <button
+                  type="button"
+                  @click="openAiModal('custom')"
+                  class="px-3 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 text-xs font-medium transition-all flex items-center gap-1.5 shadow-sm shadow-purple-500/5 cursor-pointer"
+                  title="Yapay zeka ile yaratıcı seslendirme metni üret"
+                >
+                  <span>✨ AI ile Metin Üret</span>
+                </button>
+              </div>
               <textarea
                 v-model="form.text"
                 rows="5"
@@ -117,14 +127,115 @@
         </div>
       </div>
 
-      <!-- Quick Info / Status -->
+      <!-- Quick Info / Prompts & Status -->
       <div class="space-y-6">
         <div class="p-6 rounded-2xl bg-surface border border-neutral-800 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-neutral-200">Model Durumları</h3>
-            <a href="/models" class="text-xs text-accent-400 hover:underline">Modelleri Yönet</a>
+          <!-- Dual Tab Switcher -->
+          <div class="flex items-center justify-between border-b border-neutral-800/80 pb-2.5">
+            <div class="flex items-center gap-1 bg-neutral-900 p-1 rounded-xl border border-neutral-800">
+              <button
+                type="button"
+                @click="activeRightTab = 'prompts'"
+                :class="[
+                  'px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
+                  activeRightTab === 'prompts'
+                    ? 'bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30 shadow-sm'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                ]"
+              >
+                <span>💡 Promptlar</span>
+                <span v-if="savedPrompts.length > 0" class="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-800 text-neutral-400">
+                  {{ savedPrompts.length }}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                @click="activeRightTab = 'models'"
+                :class="[
+                  'px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5',
+                  activeRightTab === 'models'
+                    ? 'bg-accent/20 text-accent-300 font-semibold border border-accent/30 shadow-sm'
+                    : 'text-neutral-400 hover:text-neutral-200'
+                ]"
+              >
+                <span>🎙️ Modeller</span>
+              </button>
+            </div>
+
+            <a
+              :href="activeRightTab === 'prompts' ? '/prompts' : '/models'"
+              class="text-xs text-accent-400 hover:underline"
+            >
+              {{ activeRightTab === 'prompts' ? 'Şablonları Yönet' : 'Modelleri Yönet' }}
+            </a>
           </div>
-          <div class="text-xs text-neutral-400 space-y-2.5 max-h-80 overflow-y-auto pr-1">
+
+          <!-- TAB 1: SAVED PROMPTS -->
+          <div v-if="activeRightTab === 'prompts'" class="space-y-2.5">
+            <div class="text-[11px] text-neutral-400 flex items-center justify-between">
+              <span>Kayıtlı Şablonlar:</span>
+              <button
+                type="button"
+                @click="openAiModal('custom')"
+                class="text-purple-400 hover:text-purple-300 font-medium cursor-pointer"
+              >
+                + Serbest Prompt
+              </button>
+            </div>
+
+            <div v-if="savedPrompts.length > 0" class="space-y-2 max-h-96 overflow-y-auto pr-1">
+              <div
+                v-for="p in savedPrompts"
+                :key="p.id"
+                class="p-3 rounded-xl bg-neutral-900/80 border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col justify-between gap-2.5 group"
+              >
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0 flex-1">
+                    <div class="font-medium text-xs text-neutral-200 group-hover:text-purple-300 transition-colors flex items-center gap-1.5 truncate">
+                      <span v-if="p.is_favorite" class="text-amber-400 text-xs">★</span>
+                      <span>{{ p.title }}</span>
+                    </div>
+                    <div class="text-[11px] text-neutral-500 line-clamp-1 mt-0.5">
+                      {{ p.description || p.content }}
+                    </div>
+                  </div>
+                  <span class="px-2 py-0.5 rounded-md bg-neutral-800 text-[10px] text-neutral-400 shrink-0">
+                    {{ p.category || 'Genel' }}
+                  </span>
+                </div>
+
+                <div class="flex items-center justify-between gap-2 pt-1 border-t border-neutral-800/60">
+                  <div class="flex items-center gap-1 flex-wrap">
+                    <span
+                      v-for="v in (p.extracted_variables || []).slice(0, 3)"
+                      :key="v"
+                      class="px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-300 font-mono text-[9px]"
+                    >
+                      {{ v }}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    @click="openAiModal(p.id)"
+                    class="px-2.5 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Kullan</span>
+                    <span>✨</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="p-4 rounded-xl bg-neutral-900/40 border border-neutral-800 text-center text-xs text-neutral-500">
+              Henüz kayıtlı prompt yok.
+              <a href="/prompts" class="text-accent block mt-1 hover:underline">İlk şablonu oluşturun</a>
+            </div>
+          </div>
+
+          <!-- TAB 2: MODEL STATUSES -->
+          <div v-else class="text-xs text-neutral-400 space-y-2.5 max-h-80 overflow-y-auto pr-1">
             <div v-for="m in ttsModels" :key="m.id"
                  class="p-3 rounded-xl bg-neutral-900/80 border border-neutral-800 flex items-center justify-between gap-2">
               <div class="min-w-0 flex-1">
@@ -303,6 +414,14 @@
       @close="showRetryModal = false"
       @retried="onTaskRetried"
     />
+
+    <!-- AI Generate Text Modal -->
+    <AiGenerateModal
+      :show="showAiModal"
+      :initial-template-id="aiModalTemplateId"
+      @close="showAiModal = false"
+      @apply="onAiTextApplied"
+    />
   </AppLayout>
 </template>
 
@@ -312,6 +431,7 @@ import { useForm } from '@inertiajs/vue3'
 import AppLayout from '../../Layouts/AppLayout.vue'
 import AudioPlayerModal from '../../Components/AudioPlayerModal.vue'
 import RetryTaskModal from '../../Components/RetryTaskModal.vue'
+import AiGenerateModal from '../../Components/AiGenerateModal.vue'
 import { VOICE_LANGUAGES } from '../../i18n'
 
 const props = defineProps({
@@ -322,6 +442,33 @@ const props = defineProps({
 
 const tasksList = ref(props.tasks ? [...props.tasks] : [])
 const isRefreshing = ref(false)
+
+// AI Modal & Right tab state
+const showAiModal = ref(false)
+const aiModalTemplateId = ref('custom')
+const savedPrompts = ref([])
+const activeRightTab = ref('prompts') // 'prompts' | 'models'
+
+const openAiModal = (templateId = 'custom') => {
+  aiModalTemplateId.value = templateId
+  showAiModal.value = true
+}
+
+const onAiTextApplied = (generatedText) => {
+  form.text = generatedText
+}
+
+const fetchSavedPrompts = async () => {
+  try {
+    const res = await fetch('/api/prompts')
+    if (res.ok) {
+      const data = await res.json()
+      savedPrompts.value = data.templates || []
+    }
+  } catch (e) {
+    console.warn('Promptlar alınamadı:', e)
+  }
+}
 
 const showPlayerModal = ref(false)
 const selectedTask = ref(null)
@@ -454,6 +601,17 @@ onMounted(() => {
       form.engine = downloadedModels.value[0].id
     }
   }
+  fetchSavedPrompts()
+
+  // If URL contains ?prompt_id=... open AI modal automatically
+  if (typeof window !== 'undefined' && window.location.search) {
+    const params = new URLSearchParams(window.location.search)
+    const promptId = params.get('prompt_id')
+    if (promptId) {
+      openAiModal(promptId)
+    }
+  }
+
   pollTimer = setTimeout(runAdaptivePoll, 2500)
 })
 

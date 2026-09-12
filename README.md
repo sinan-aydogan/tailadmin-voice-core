@@ -14,23 +14,25 @@
 
 **Kişisel Masaüstü (NativePHP Electron) + Sunucu Dağıtımı (Docker Compose + REST API v1)**
 
-[İndir (v1.0.0)](#-hızlı-indirme-v100) • [Özellikler](#-özellikler) • [REST API Dokümanı](API.md) • [Docker Kurulumu](DOCKER.md) • [Mimari](#-mimari-ve-süreç-izolasyonu) • [Geliştirme](#-kurulum-ve-geliştirme)
+[İndir (v1.1.0)](#-hızlı-indirme-v110) • [Özellikler](#-özellikler) • [REST API Dokümanı](API.md) • [Docker Kurulumu](DOCKER.md) • [Mimari](#-mimari-ve-süreç-izolasyonu) • [Geliştirme](#-kurulum-ve-geliştirme)
 
 </div>
 
+<!-- GitAds-Verify: QR5X8PA5WQFZ32X7AQM7K2WVA3L4CYO7 -->
+
 ---
 
-## 📥 Hızlı İndirme (v1.0.0)
+## 📥 Hızlı İndirme (v1.1.0)
 
 Doğrudan masaüstünüzde çalıştırmak için platformunuza uygun sürümü indirin:
 
 | Platform | Mimari | İndirme Bağlantısı | Tür |
 |---|---|---|---|
-| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/electron.exe) | Windows Kurulum / Çalıştırılabilir Dosya |
-| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.0.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/Voice.Core-v1.0.0.AppImage) | Taşınabilir Universal Linux AppImage |
-| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.0.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/voice-core_v1.0.0_amd64.deb) | Debian / Ubuntu Kurulum Paketi |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.0.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/Voice.Core-v1.0.0-arm64.dmg) | macOS Disk İmajı (M1 / M2 / M3 / M4) |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.0.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.0.0/Voice.Core-v1.0.0-arm64.zip) | macOS Taşınabilir Uygulama Arşivi |
+| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/electron.exe) | Windows Kurulum / Çalıştırılabilir Dosya |
+| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.1.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0.AppImage) | Taşınabilir Universal Linux AppImage |
+| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.1.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/voice-core_v1.1.0_amd64.deb) | Debian / Ubuntu Kurulum Paketi |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.dmg) | macOS Disk İmajı (M1 / M2 / M3 / M4) |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.zip) | macOS Taşınabilir Uygulama Arşivi |
 
 > Tüm sürümleri ve değişiklik geçmişini [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) sayfasında bulabilirsiniz.
 
@@ -62,6 +64,10 @@ Doğrudan masaüstünüzde çalıştırmak için platformunuza uygun sürümü i
   - Tek komutla (`docker compose up -d`) %100 Dockerize sunucu kurulumu.
   - Harici uygulamalar, mobil istemciler ve otomasyon botları için kapsamlı [REST API v1](API.md) uç noktaları (`/api/v1/tts`, `/api/v1/stt`, `/api/v1/models`, `/api/v1/tasks`).
   - İsteğe bağlı API Key (`X-API-Key` / Bearer token) güvenliği.
+- 🤖 **Yapay Zeka (LLM) Metin Üretim Motoru & Şablon Yöneticisi:**
+  - **Çoklu LLM Desteği:** Anthropic Claude (3.5 / 3.7 Sonnet, Haiku), OpenAI (GPT-4o), Google Gemini 2.0 Flash, DeepSeek (V3 & R1), Groq Cloud (Llama 3.3 Ultra Hızlı), OpenRouter ve yerel Ollama desteği.
+  - **Dinamik Değişkenli Prompt Şablonları:** `$1`, `$2` gibi parametrik yer tutucular içeren özel şablonlar oluşturma, kategorize etme ve tek tıkla seslendirme metnine dönüştürme.
+  - **Akıllı Simülasyon Fallback:** API anahtarı veya internet bağlantısı olmasa dahi kesintisiz arayüz testi.
 - 🌐 **Çok Dilli Arayüz (i18n):**
   - Türkçe ve İngilizce tam arayüz yerelleştirmesi.
 
