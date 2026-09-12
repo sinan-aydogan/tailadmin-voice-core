@@ -193,12 +193,12 @@
               </button>
             </div>
 
-            <a
+            <Link
               :href="activeRightTab === 'prompts' ? '/prompts' : '/models'"
               class="text-xs text-accent-400 hover:underline"
             >
               {{ activeRightTab === 'prompts' ? 'Şablonları Yönet' : 'Modelleri Yönet' }}
-            </a>
+            </Link>
           </div>
 
           <!-- TAB 1: SAVED PROMPTS -->
@@ -260,7 +260,7 @@
 
             <div v-else class="p-4 rounded-xl bg-neutral-900/40 border border-neutral-800 text-center text-xs text-neutral-500">
               Henüz kayıtlı prompt yok.
-              <a href="/prompts" class="text-accent block mt-1 hover:underline">İlk şablonu oluşturun</a>
+              <Link href="/prompts" class="text-accent block mt-1 hover:underline">İlk şablonu oluşturun</Link>
             </div>
           </div>
 
@@ -460,7 +460,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useForm } from '@inertiajs/vue3'
+import { Link, useForm } from '@inertiajs/vue3'
 import AppLayout from '../../Layouts/AppLayout.vue'
 import AudioPlayerModal from '../../Components/AudioPlayerModal.vue'
 import RetryTaskModal from '../../Components/RetryTaskModal.vue'

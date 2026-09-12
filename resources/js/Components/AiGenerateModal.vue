@@ -17,9 +17,15 @@
             </div>
             <div class="flex items-center justify-between gap-4 text-xs text-neutral-400 mt-0.5">
               <p>Kayıtlı prompt şablonlarından seçin veya serbest talimat girerek LLM ile seslendirme metni üretin.</p>
-              <a v-if="llmInfo?.base_url" href="/settings#models" target="_blank" class="hidden sm:inline-flex items-center gap-1 text-[11px] text-neutral-500 hover:text-accent font-mono shrink-0" title="LLM Ayarlarını Düzenle">
+              <button
+                v-if="llmInfo?.base_url"
+                type="button"
+                @click="goToSettings"
+                class="hidden sm:inline-flex items-center gap-1 text-[11px] text-neutral-500 hover:text-accent font-mono shrink-0 cursor-pointer bg-transparent border-0 p-0"
+                title="LLM Ayarlarını Düzenle"
+              >
                 <span>🔗 {{ llmInfo.base_url }}</span>
-              </a>
+              </button>
             </div>
           </div>
         </div>
@@ -31,12 +37,16 @@
         <div>
           <div class="flex items-center justify-between mb-1.5">
             <label class="block text-xs font-medium text-neutral-300">Prompt Şablonu</label>
-            <a href="/prompts" target="_blank" class="text-[11px] text-accent hover:underline flex items-center gap-1">
+            <button
+              type="button"
+              @click="goToPrompts"
+              class="text-[11px] text-accent hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+            >
               <span>Şablonları Yönet</span>
-              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
-            </a>
+            </button>
           </div>
 
           <select
@@ -271,6 +281,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { router } from '@inertiajs/vue3'
 import { parseVoiceoverText } from '../Utils/textSanitizer'
 
 const props = defineProps({
@@ -511,5 +522,15 @@ const applyText = () => {
 
 const closeModal = () => {
   emit('close')
+}
+
+const goToPrompts = () => {
+  closeModal()
+  router.visit('/prompts')
+}
+
+const goToSettings = () => {
+  closeModal()
+  router.visit('/settings')
 }
 </script>
