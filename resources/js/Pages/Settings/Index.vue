@@ -1153,33 +1153,73 @@ const isApiProtected = computed(() => {
 const isTestingLlm = ref(false)
 const llmTestResult = ref(null)
 
-const setLlmProvider = (provider) => {
-  form.llm_provider = provider
-  llmTestResult.value = null
-  if (provider === 'ollama') {
-    form.llm_base_url = 'http://127.0.0.1:11434'
-    form.llm_model = 'llama3:latest'
-  } else if (provider === 'claude') {
-    form.llm_base_url = 'https://api.anthropic.com/v1'
-    form.llm_model = 'claude-3-5-sonnet-20241022'
-  } else if (provider === 'openai') {
-    form.llm_base_url = 'https://api.openai.com/v1'
-    form.llm_model = 'gpt-4o-mini'
-  } else if (provider === 'gemini') {
-    form.llm_base_url = ''
-    form.llm_model = 'gemini-2.0-flash'
-  } else if (provider === 'groq') {
-    form.llm_base_url = 'https://api.groq.com/openai/v1'
-    form.llm_model = 'llama-3.3-70b-versatile'
-  } else if (provider === 'deepseek') {
-    form.llm_base_url = 'https://api.deepseek.com'
-    form.llm_model = 'deepseek-chat'
-  } else if (provider === 'openrouter') {
-    form.llm_base_url = 'https://openrouter.ai/api/v1'
-    form.llm_model = 'meta-llama/llama-3.3-70b-instruct'
-  } else if (provider === 'mock') {
-    form.llm_model = 'simulated-voice-model'
+const initialProvidersConfig = {
+  ollama: {
+    base_url: (props.settings?.llm_provider === 'ollama' ? props.settings?.llm_base_url : null) || props.settings?.llm_providers_config?.ollama?.base_url || 'http://127.0.0.1:11434',
+    model: (props.settings?.llm_provider === 'ollama' ? props.settings?.llm_model : null) || props.settings?.llm_providers_config?.ollama?.model || 'llama3:latest',
+    api_key: '',
+  },
+  claude: {
+    base_url: 'https://api.anthropic.com/v1',
+    model: (props.settings?.llm_provider === 'claude' ? props.settings?.llm_model : null) || props.settings?.llm_providers_config?.claude?.model || 'claude-3-5-sonnet-20241022',
+    api_key: (props.settings?.llm_provider === 'claude' ? props.settings?.llm_api_key : null) || props.settings?.llm_providers_config?.claude?.api_key || '',
+  },
+  openai: {
+    base_url: (props.settings?.llm_provider === 'openai' ? props.settings?.llm_base_url : null) || props.settings?.llm_providers_config?.openai?.base_url || 'https://api.openai.com/v1',
+    model: (props.settings?.llm_provider === 'openai' ? props.settings?.llm_model : null) || props.settings?.llm_providers_config?.openai?.model || 'gpt-4o-mini',
+    api_key: (props.settings?.llm_provider === 'openai' ? props.settings?.llm_api_key : null) || props.settings?.llm_providers_config?.openai?.api_key || '',
+  },
+  gemini: {
+    base_url: '',
+    model: (props.settings?.llm_provider === 'gemini' ? props.settings?.llm_model : null) || props.settings?.llm_providers_config?.gemini?.model || 'gemini-2.0-flash',
+    api_key: (props.settings?.llm_provider === 'gemini' ? props.settings?.llm_api_key : null) || props.settings?.llm_providers_config?.gemini?.api_key || '',
+  },
+  deepseek: {
+    base_url: (props.settings?.llm_provider === 'deepseek' ? props.settings?.llm_base_url : null) || props.settings?.llm_providers_config?.deepseek?.base_url || 'https://api.deepseek.com',
+    model: (props.settings?.llm_provider === 'deepseek' ? props.settings?.llm_model : null) || props.settings?.llm_providers_config?.deepseek?.model || 'deepseek-chat',
+    api_key: (props.settings?.llm_provider === 'deepseek' ? props.settings?.llm_api_key : null) || props.settings?.llm_providers_config?.deepseek?.api_key || '',
+  },
+  groq: {
+    base_url: (props.settings?.llm_provider === 'groq' ? props.settings?.llm_base_url : null) || props.settings?.llm_providers_config?.groq?.base_url || 'https://api.groq.com/openai/v1',
+    model: (props.settings?.llm_provider === 'groq' ? props.settings?.llm_model : null) || props.settings?.llm_providers_config?.groq?.model || 'llama-3.3-70b-versatile',
+    api_key: (props.settings?.llm_provider === 'groq' ? props.settings?.llm_api_key : null) || props.settings?.llm_providers_config?.groq?.api_key || '',
+  },
+  openrouter: {
+    base_url: (props.settings?.llm_provider === 'openrouter' ? props.settings?.llm_base_url : null) || props.settings?.llm_providers_config?.openrouter?.base_url || 'https://openrouter.ai/api/v1',
+    model: (props.settings?.llm_provider === 'openrouter' ? props.settings?.llm_model : null) || props.settings?.llm_providers_config?.openrouter?.model || 'meta-llama/llama-3.3-70b-instruct',
+    api_key: (props.settings?.llm_provider === 'openrouter' ? props.settings?.llm_api_key : null) || props.settings?.llm_providers_config?.openrouter?.api_key || '',
+  },
+  mock: {
+    base_url: '',
+    model: 'simulated-voice-model',
+    api_key: '',
+  },
+}
+
+const providerConfigs = ref({ ...initialProvidersConfig })
+
+const setLlmProvider = (newProvider) => {
+  if (form.llm_provider === newProvider) return
+
+  // Save current values to active provider cache
+  if (providerConfigs.value[form.llm_provider]) {
+    providerConfigs.value[form.llm_provider].base_url = form.llm_base_url
+    providerConfigs.value[form.llm_provider].model = form.llm_model
+    providerConfigs.value[form.llm_provider].api_key = form.llm_api_key
   }
+
+  form.llm_provider = newProvider
+  llmTestResult.value = null
+
+  // Restore new provider's configured values
+  const targetConfig = providerConfigs.value[newProvider]
+  if (targetConfig) {
+    form.llm_base_url = targetConfig.base_url !== undefined ? targetConfig.base_url : ''
+    form.llm_model = targetConfig.model || ''
+    form.llm_api_key = targetConfig.api_key || ''
+  }
+
+  form.llm_providers_config = { ...providerConfigs.value }
 }
 
 const testLlmConnection = async () => {
@@ -1220,10 +1260,11 @@ const form = useForm({
   hf_token: props.settings?.hf_token || '',
   voice_core_api_key: props.settings?.voice_core_api_key || '',
   llm_provider: props.settings?.llm_provider || 'ollama',
-  llm_base_url: props.settings?.llm_base_url || 'http://127.0.0.1:11434',
+  llm_base_url: props.settings?.llm_base_url !== undefined ? props.settings.llm_base_url : 'http://127.0.0.1:11434',
   llm_api_key: props.settings?.llm_api_key || '',
   llm_model: props.settings?.llm_model || 'llama3:latest',
   llm_system_prompt: props.settings?.llm_system_prompt || '',
+  llm_providers_config: props.settings?.llm_providers_config || {},
 })
 
 const currentApiUrl = computed(() => {

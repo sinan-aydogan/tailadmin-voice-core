@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Log;
 
 class LlmService
 {
-    protected function getSettings(): array
+    public function getSettings(): array
     {
         $file = base_path('data' . DIRECTORY_SEPARATOR . 'settings.json');
         $saved = [];
@@ -25,6 +25,7 @@ class LlmService
             'llm_api_key' => $saved['llm_api_key'] ?? env('LLM_API_KEY', ''),
             'llm_model' => $saved['llm_model'] ?? env('LLM_MODEL', 'llama3:latest'),
             'llm_system_prompt' => $saved['llm_system_prompt'] ?? env('LLM_SYSTEM_PROMPT', 'Sen seslendirme metinleri hazırlayan yaratıcı, akıcı ve profesyonel bir yapay zeka asistanısın. Yanıtlarında gereksiz selamlama veya açıklama yapmadan yalnızca doğrudan seslendirilecek metni ver.'),
+            'llm_providers_config' => $saved['llm_providers_config'] ?? [],
         ];
     }
 

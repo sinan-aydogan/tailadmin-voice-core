@@ -49,6 +49,7 @@ class SettingsController extends Controller
             'llm_api_key' => $saved['llm_api_key'] ?? env('LLM_API_KEY', ''),
             'llm_model' => $saved['llm_model'] ?? env('LLM_MODEL', 'llama3:latest'),
             'llm_system_prompt' => $saved['llm_system_prompt'] ?? env('LLM_SYSTEM_PROMPT', 'Sen seslendirme metinleri hazırlayan yaratıcı, akıcı ve profesyonel bir yapay zeka asistanısın. Yanıtlarında gereksiz selamlama veya açıklama yapmadan yalnızca doğrudan seslendirilecek metni ver.'),
+            'llm_providers_config' => $saved['llm_providers_config'] ?? [],
         ];
     }
 
@@ -84,6 +85,7 @@ class SettingsController extends Controller
             'llm_api_key' => 'nullable|string',
             'llm_model' => 'nullable|string',
             'llm_system_prompt' => 'nullable|string',
+            'llm_providers_config' => 'nullable|array',
         ]);
 
         $current = $this->getAllSettings();
@@ -111,6 +113,9 @@ class SettingsController extends Controller
         $current['llm_api_key'] = trim($request->input('llm_api_key', ''));
         $current['llm_model'] = trim($request->input('llm_model', 'llama3:latest'));
         $current['llm_system_prompt'] = trim($request->input('llm_system_prompt', ''));
+        if ($request->has('llm_providers_config')) {
+            $current['llm_providers_config'] = $request->input('llm_providers_config', []);
+        }
 
         $dataDir = base_path('data');
         if (!is_dir($dataDir)) {

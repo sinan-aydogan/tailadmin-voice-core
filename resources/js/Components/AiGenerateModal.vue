@@ -8,15 +8,19 @@
             <span class="text-base select-none">✨</span>
           </div>
           <div>
-            <h2 class="text-base font-semibold text-neutral-100 flex items-center gap-2">
-              <span>AI ile Metin Üret</span>
-              <span v-if="activeProvider" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase bg-neutral-800 text-neutral-400 border border-neutral-700">
-                {{ activeProvider }}
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 class="text-base font-semibold text-neutral-100">AI ile Metin Üret</h2>
+              <span v-if="llmInfo" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1" :title="llmInfo.base_url || 'Varsayılan Uç Nokta'">
+                <span>{{ llmInfo.provider }}</span>
+                <span v-if="llmInfo.model" class="text-neutral-400 font-normal">({{ llmInfo.model }})</span>
               </span>
-            </h2>
-            <p class="text-xs text-neutral-400 mt-0.5">
-              Kayıtlı prompt şablonlarından seçin veya serbest talimat girerek LLM ile seslendirme metni üretin.
-            </p>
+            </div>
+            <div class="flex items-center justify-between gap-4 text-xs text-neutral-400 mt-0.5">
+              <p>Kayıtlı prompt şablonlarından seçin veya serbest talimat girerek LLM ile seslendirme metni üretin.</p>
+              <a v-if="llmInfo?.base_url" href="/settings#models" target="_blank" class="hidden sm:inline-flex items-center gap-1 text-[11px] text-neutral-500 hover:text-accent font-mono shrink-0" title="LLM Ayarlarını Düzenle">
+                <span>🔗 {{ llmInfo.base_url }}</span>
+              </a>
+            </div>
           </div>
         </div>
         <button @click="closeModal" class="text-neutral-400 hover:text-neutral-200 cursor-pointer p-1">✕</button>
@@ -230,6 +234,7 @@ const emit = defineEmits(['close', 'apply'])
 
 const templates = ref([])
 const activeProvider = ref('')
+const llmInfo = ref(null)
 const selectedTemplateId = ref('custom')
 const customPrompt = ref('')
 const variableValues = ref({})
@@ -249,6 +254,10 @@ const fetchTemplates = async () => {
     if (res.ok) {
       const data = await res.json()
       templates.value = data.templates || []
+      if (data.llm_info) {
+        llmInfo.value = data.llm_info
+        activeProvider.value = data.llm_info.provider || ''
+      }
       if (selectedTemplateId.value && selectedTemplateId.value !== 'custom') {
         handleTemplateChange()
       }

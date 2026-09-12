@@ -72,9 +72,16 @@ class PromptController extends Controller
                 return $t;
             });
 
+        $llmSettings = (new \App\Services\LlmService())->getSettings();
+
         return response()->json([
             'success' => true,
             'templates' => $templates,
+            'llm_info' => [
+                'provider' => $llmSettings['llm_provider'],
+                'model' => $llmSettings['llm_model'],
+                'base_url' => $llmSettings['llm_base_url'],
+            ],
         ]);
     }
 
