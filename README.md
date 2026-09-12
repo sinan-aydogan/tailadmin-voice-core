@@ -1,6 +1,8 @@
 <div align="center">
 
 # 🎙️ TailAdmin Voice Core
+
+### Desktop AI Voice Workstation & Docker Server REST API
 ### Masaüstü Yapay Zeka Ses İstasyonu & Docker Sunucu API Servisi
 
 [![GitHub Release](https://img.shields.io/github/v/release/sinan-aydogan/tailadmin-voice-core?color=3b82f6&logo=github)](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/latest)
@@ -12,19 +14,186 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?logo=python)](https://python.org)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ed?logo=docker)](DOCKER.md)
 
-**Kişisel Masaüstü (NativePHP Electron) + Sunucu Dağıtımı (Docker Compose + REST API v1)**
+**Personal Desktop App (NativePHP Electron) + Server Production Deployment (Docker Compose + REST API v1)**
 
-[İndir (v1.1.0)](#-hızlı-indirme-v110) • [Özellikler](#-özellikler) • [REST API Dokümanı](API.md) • [Docker Kurulumu](DOCKER.md) • [Mimari](#-mimari-ve-süreç-izolasyonu) • [Geliştirme](#-kurulum-ve-geliştirme)
+🌐 **Languages / Diller:**  
+[🇬🇧 English](#-english) • [🇹🇷 Türkçe](#-türkçe)
+
+---
+
+<!-- GitAds-Verify: QR5X8PA5WQFZ32X7AQM7K2WVA3L4CYO7 -->
 
 </div>
 
-<!-- GitAds-Verify: QR5X8PA5WQFZ32X7AQM7K2WVA3L4CYO7 -->
+---
+
+<a name="-english"></a>
+# 🇬🇧 English
+
+TailAdmin Voice Core is an open-source, non-freezing desktop AI voice workstation and server-ready REST API service. Built with **NativePHP (Electron)**, **Laravel 13**, **Inertia.js**, **Vue 3**, and an isolated **Python AI Engine** (FastAPI / CLI), it brings state-of-the-art speech synthesis (TTS), speech recognition (STT), voice cloning, and LLM text generation to your desktop and cloud infrastructure.
+
+[Downloads](#-downloads-v110) • [Key Features](#-key-features) • [Architecture](#-architecture--process-isolation) • [Quick Start](#-quick-start--development) • [Docker Deployment](DOCKER.md) • [REST API Docs](API.md) • [Sponsors](#-sponsors--donations)
+
+---
+
+## 📥 Downloads (v1.1.0)
+
+Pre-built binaries for your desktop operating system:
+
+| Platform | Architecture | Download Link | Type |
+|---|---|---|---|
+| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/electron.exe) | Windows Installer / Executable |
+| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.1.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0.AppImage) | Universal Linux AppImage |
+| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.1.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/voice-core_v1.1.0_amd64.deb) | Debian / Ubuntu Package |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.dmg) | macOS DMG (M1 / M2 / M3 / M4) |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.zip) | Portable Application Archive |
+
+> Release notes and version history are available on the [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) page.
+
+---
+
+## ✨ Key Features
+
+- 🔊 **Advanced Text-to-Speech (TTS) Engines:**
+  - **Piper TTS:** Ultra-fast, lightweight ONNX-based speech synthesis (5-10x faster than real-time) supporting Turkish, English, German, French, and more.
+  - **XTTS v2:** Zero-shot realistic voice cloning using a 3-6 second reference audio sample.
+  - **Bark:** Expressive, human-like speech synthesis with natural breaths, laughter, and emotional tone.
+  - **Tortoise TTS:** High-fidelity, nuanced voice acting.
+  - **MusicGen:** Generate background music and ambient sound effects from text descriptions.
+- 🎭 **Suno-Style Voiceover Directives & Text Sanitizer:**
+  - Automatically detects and separates director instructions (e.g. `(Voiceover Note: Medium tempo, confident tone)`) into a dedicated style prompt card.
+  - Automatic markdown and symbol stripping: removes asterisks (`**`), headers (`###`), and emojis so speech engines never read formatting symbols aloud.
+  - **"🧹 Clean Text"** button on the editor for instant one-click markdown & note sanitization.
+- 🎙️ **Speech-to-Text (STT) Transcription:**
+  - **Faster-Whisper:** Highly accurate audio transcription supporting 90+ languages with minimal CPU/GPU memory footprint.
+- 👤 **Voice Profiles & Cloning Studio:**
+  - Upload audio samples or record directly to build custom voice cloning profiles.
+- 🔄 **Re-run & Retry with Different Model:**
+  - Available for **both completed and failed tasks**: regenerate any voiceover or transcription with a different engine or voice profile in one click.
+- 📋 **Batch Audio Playlists:**
+  - Split long articles into chapters and generate queued audio using single or mixed engines.
+- 🤖 **Creative AI Text Generation (Multi-Provider LLM):**
+  - Connect Anthropic Claude (3.5/3.7 Sonnet), OpenAI (GPT-4o), Google Gemini 2.0 Flash, DeepSeek, Groq, OpenRouter, or local Ollama / LM Studio.
+  - Parametric Prompt Templates with dynamic `$1`, `$2` variable placeholders.
+- 🖥️ **60 FPS Modern Desktop Experience:**
+  - Built with `@tailadmin/ui` and Tailwind CSS, featuring dark mode, waveform visualizer, and hardware monitors.
+- 🐳 **Server Production & REST API:**
+  - Single command (`docker compose up -d`) deployment for VPS and cloud GPU instances with comprehensive [REST API v1](API.md) endpoints.
+
+---
+
+## 🚀 Architecture & Process Isolation
+
+Heavy AI inference (PyTorch) in traditional desktop apps freezes the UI due to the Python GIL. TailAdmin Voice Core completely isolates processes:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                   NativePHP Electron Shell (Desktop)                   │
+├────────────────────────────────────────────────────────────────────────┤
+│                 Inertia.js + Vue 3 (@tailadmin/ui)                     │
+│                (60 FPS Smooth UI - Never Freezes)                      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ HTTP / Inertia IPC
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                          Laravel 13 Backend                            │
+│   • Controllers & Routes (Desktop API & Inertia Web Pages)             │
+│   • SQLite Database (WAL Mode - High Concurrency Read/Write)           │
+│   • Laravel Queue (GenerateTtsJob, TranscribeSttJob, DownloadModelJob) │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Process::run() / CLI / FastAPI
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                 Isolated Python AI Core (engine/)                      │
+│   • Piper TTS (ONNX Real-Time Engine)                                  │
+│   • XTTS v2 (Zero-shot Voice Cloning)                                  │
+│   • Bark & Tortoise TTS (Expressive Speech)                            │
+│   • Faster-Whisper (STT - Speech to Text)                              │
+│   • HuggingFace & Piper Model Downloader                               │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🛠️ Quick Start & Development
+
+### Prerequisites
+- **PHP** >= 8.3 or 8.4 (`mbstring`, `xml`, `intl`, `pdo_sqlite`, `sqlite3`, `curl`, `zip`, `fileinfo`)
+- **Composer** >= 2.0
+- **Node.js** >= 20 or 22 & **npm**
+- **Python** >= 3.10 (with PyTorch, Piper, and Whisper dependencies)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/sinan-aydogan/tailadmin-voice-core.git
+cd tailadmin-voice-core
+
+# 2. Install dependencies
+composer install
+npm install
+
+# 3. Environment configuration & database migration
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+
+# 4. Build assets
+npm run build
+
+# 5. Launch the desktop application in development mode
+php artisan native:run
+```
+
+### Packaging Desktop Installers
+```bash
+# Windows x64:
+php artisan native:build win x64
+
+# Linux x64:
+php artisan native:build linux x64
+
+# macOS Apple Silicon (M1/M2/M3/M4):
+php artisan native:build mac arm64
+```
+
+---
+
+## 🐳 Docker Server & REST API Deployment
+
+To deploy TailAdmin Voice Core as a headless or web-accessible **cloud voice server**:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/sinan-aydogan/tailadmin-voice-core.git
+cd tailadmin-voice-core
+cp .env.example .env
+
+# 2. Launch with Docker Compose (CUDA / GPU recommended)
+docker compose up -d --build
+
+# Or for CPU-only servers:
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
+```
+
+- 📖 **REST API v1 Documentation:** [API.md](API.md)
+- 📋 **Docker Guide & Volumes:** [DOCKER.md](DOCKER.md)
+
+---
+
+<br/>
+
+---
+
+<a name="-türkçe"></a>
+# 🇹🇷 Türkçe
+
+TailAdmin Voice Core; donmasız, tam süreç izolasyonuna sahip açık kaynaklı bir masaüstü yapay zeka ses istasyonu ve sunucu REST API servisidir. **NativePHP (Electron)**, **Laravel 13**, **Inertia.js**, **Vue 3** ve izole **Python AI Çekirdeği** (FastAPI / CLI) üzerine inşa edilmiştir.
+
+[İndir (v1.1.0)](#-hızlı-indirme-v110) • [Özellikler](#-özellikler-tr) • [Mimari](#-mimari-ve-süreç-izolasyonu-tr) • [Geliştirme](#-kurulum-ve-geliştirme-tr) • [Docker Dağıtımı](DOCKER.md) • [REST API Dokümanı](API.md) • [Destek & Sponsorlar](#-destek-ve-bağış)
 
 ---
 
 ## 📥 Hızlı İndirme (v1.1.0)
 
-Doğrudan masaüstünüzde çalıştırmak için platformunuza uygun sürümü indirin:
+Masaüstünüzde doğrudan çalıştırmak için platformunuza uygun sürümü indirin:
 
 | Platform | Mimari | İndirme Bağlantısı | Tür |
 |---|---|---|---|
@@ -34,10 +203,11 @@ Doğrudan masaüstünüzde çalıştırmak için platformunuza uygun sürümü i
 | **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.dmg) | macOS Disk İmajı (M1 / M2 / M3 / M4) |
 | **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.zip) | macOS Taşınabilir Uygulama Arşivi |
 
-> Tüm sürümleri ve değişiklik geçmişini [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) sayfasında bulabilirsiniz.
+> Tüm sürümleri ve geçmiş sürümleri [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) sayfasında bulabilirsiniz.
 
 ---
 
+<a name="-özellikler-tr"></a>
 ## ✨ Özellikler
 
 - 🔊 **Gelişmiş Metinden Sese (TTS) Motorları:**
@@ -46,63 +216,38 @@ Doğrudan masaüstünüzde çalıştırmak için platformunuza uygun sürümü i
   - **Bark:** Duygulu, nefes ve tonlama vurgularına sahip doğal insan konuşması üretimi.
   - **Tortoise TTS:** Derinlikli, yüksek doğruluklu metin seslendirme.
   - **MusicGen:** Metin tanımlarından müzik ve atmosferik ses üretimi.
+- 🎭 **Suno Tarzı Seslendirme Talimatları & Metin Arındırıcı:**
+  - Metin içindeki `(Seslendirme Notu: ...)` veya `[Yönetmen Notu: ...]` talimatlarını otomatik olarak ayrı bir stil kartına ayırır.
+  - Yıldız (`**`), başlık (`###`) ve emojileri temizleyerek ses motorunun sembolleri seslendirmesini engeller.
+  - Metin kutusu üzerindeki **"🧹 Yıldız & Notları Arındır"** butonu ile tek tıkla temiz seslendirme metni elde etme.
 - 🎙️ **Sesten Metne (STT - Speech to Text):**
   - **Faster-Whisper:** Türkçe dahil 90+ dilde düşük kaynak tüketimi ve yüksek doğruluk oranı ile ses kaydından metin çıkarma ve transkripsiyon.
 - 👤 **Ses Profili ve Örnek Yönetimi:**
   - Kendi sesinizi veya özel konuşmacı seslerini yükleyip referans ses profilleri oluşturma.
+- 🔄 **Farklı Model ile Yeniden Üretme (Retry & Rerun):**
+  - Hem **tamamlanan** hem de **başarısız olan** işlemler için tek tıkla farklı bir motor veya ses profili seçerek yeniden seslendirme yapabilme.
 - 📋 **Çalma Listeleri & Toplu Üretim (Playlists):**
   - Uzun metinleri parçalara bölerek tek veya karma motorlarla sıralı/toplu seslendirme kuyruğu oluşturma.
 - 🧩 **Entegre Model Yöneticisi:**
   - Hugging Face ve Piper açık kaynak modellerini tek tıkla otomatik indirme, doğrulama (integrity check) ve disk kullanım yönetimi.
+- 🤖 **Yapay Zeka (LLM) Metin Üretim Motoru & Şablon Yöneticisi:**
+  - **Çoklu LLM Desteği:** Anthropic Claude (3.5 / 3.7 Sonnet), OpenAI (GPT-4o), Google Gemini 2.0 Flash, DeepSeek, Groq Cloud (Llama 3.3 Ultra Hızlı), OpenRouter ve yerel LM Studio / Ollama desteği.
+  - **Dinamik Değişkenli Prompt Şablonları:** `$1`, `$2` gibi parametrik yer tutucular içeren özel şablonlar oluşturma ve tek tıkla seslendirme metnine dönüştürme.
 - 🖥️ **60 FPS Modern Masaüstü Deneyimi:**
-  - `@tailadmin/ui` tasarım sistemi ve Tailwind CSS ile tamamen koyu mod uyumlu, responsive ve modern arayüz.
-  - Dahili **Gelişmiş Ses Oynatıcı:** Canlı waveform görselleştirici, önceki/sonraki parça geçişi, hız ayarı ve tek tıkla WAV/MP3 indirme.
-  - **Yeniden Dene (Retry Modal):** Hata alan görevleri farklı motor veya model seçerek anında yeniden kuyruğa alma.
+  - `@tailadmin/ui` tasarım sistemi ve Tailwind CSS ile tamamen koyu mod uyumlu arayüz.
+  - Dahili **Gelişmiş Ses Oynatıcı:** Canlı waveform görselleştirici, önceki/sonraki parça geçişi, hız ayarı ve WAV/MP3 indirme.
 - 📊 **Canlı Sistem Monitörü (Footer):**
   - CPU, RAM, Disk ve GPU/MPS/CUDA donanım kullanımını altbilgi çubuğunda canlı izleme.
 - 🚀 **Sunucu & REST API Servisi:**
   - Tek komutla (`docker compose up -d`) %100 Dockerize sunucu kurulumu.
-  - Harici uygulamalar, mobil istemciler ve otomasyon botları için kapsamlı [REST API v1](API.md) uç noktaları (`/api/v1/tts`, `/api/v1/stt`, `/api/v1/models`, `/api/v1/tasks`).
-  - İsteğe bağlı API Key (`X-API-Key` / Bearer token) güvenliği.
-- 🤖 **Yapay Zeka (LLM) Metin Üretim Motoru & Şablon Yöneticisi:**
-  - **Çoklu LLM Desteği:** Anthropic Claude (3.5 / 3.7 Sonnet, Haiku), OpenAI (GPT-4o), Google Gemini 2.0 Flash, DeepSeek (V3 & R1), Groq Cloud (Llama 3.3 Ultra Hızlı), OpenRouter ve yerel Ollama desteği.
-  - **Dinamik Değişkenli Prompt Şablonları:** `$1`, `$2` gibi parametrik yer tutucular içeren özel şablonlar oluşturma, kategorize etme ve tek tıkla seslendirme metnine dönüştürme.
-  - **Akıllı Simülasyon Fallback:** API anahtarı veya internet bağlantısı olmasa dahi kesintisiz arayüz testi.
-- 🌐 **Çok Dilli Arayüz (i18n):**
-  - Türkçe ve İngilizce tam arayüz yerelleştirmesi.
+  - Kapsamlı [REST API v1](API.md) uç noktaları (`/api/v1/tts`, `/api/v1/stt`, `/api/v1/models`, `/api/v1/tasks`).
 
 ---
 
+<a name="-mimari-ve-süreç-izolasyonu-tr"></a>
 ## 🚀 Mimari ve Süreç İzolasyonu
 
-Yapay zeka çıkarım (inference) ve model indirme işlemleri geleneksel monolitik masaüstü uygulamalarında kullanıcı arayüzünü (UI) Python GIL (Global Interpreter Lock) nedeniyle kilitler. 
-
-TailAdmin Voice Core, **Tam Süreç İzolasyonu (Process Isolation)** mimarisiyle tasarlanmıştır:
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   NativePHP Electron Shell (Masaüstü)                  │
-├────────────────────────────────────────────────────────────────────────┤
-│                 Inertia.js + Vue 3 (@tailadmin/ui)                     │
-│                (60 FPS Akıcı UI - Asla Donmaz / Kilitlenmez)           │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ HTTP / Inertia IPC
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                          Laravel 13 Backend                            │
-│   • Controllers & Routes (Masaüstü API / Sayfalar)                     │
-│   • SQLite Database (WAL Mode - Eşzamanlı Okuma/Yazma)                 │
-│   • Laravel Queue (GenerateTtsJob, TranscribeSttJob, DownloadModelJob) │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Process::run() / CLI / HTTP
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                 İzole Python AI Çekirdeği (engine/)                    │
-│   • Piper TTS (ONNX Ultra Fast)                                        │
-│   • XTTS v2 (Zero-shot Voice Cloning)                                  │
-│   • Bark & Tortoise TTS (Doğal Konuşma)                                │
-│   • Faster-Whisper (STT - Transkripsiyon)                              │
-│   • HuggingFace & Piper Model Yöneticisi                               │
-└────────────────────────────────────────────────────────────────────────┘
-```
+Yapay zeka çıkarım (inference) ve model indirme işlemleri geleneksel monolitik masaüstü uygulamalarında kullanıcı arayüzünü (UI) Python GIL nedeniyle kilitler. TailAdmin Voice Core, **Tam Süreç İzolasyonu** mimarisiyle tasarlanmıştır:
 
 1. **Arayüz Katmanı:** Electron üzerinde koşan Vue 3 arayüzü yalnızca Laravel backend ile konuşur; yapay zeka çıkarımlarından tamamen yalıtılmıştır.
 2. **Kuyruk Katmanı:** Ses üretimi ve model indirme görevleri Laravel veritabanı kuyruğuna alınır (`jobs`).
@@ -110,175 +255,46 @@ TailAdmin Voice Core, **Tam Süreç İzolasyonu (Process Isolation)** mimarisiyl
 
 ---
 
+<a name="-kurulum-ve-geliştirme-tr"></a>
 ## 🛠️ Kurulum ve Geliştirme
 
 ### Gereksinimler
-- **PHP** >= 8.3 veya 8.4 (`mbstring`, `xml`, `intl`, `pdo_sqlite`, `sqlite3`, `curl`, `zip`, `fileinfo` eklentileri ile)
+- **PHP** >= 8.3 veya 8.4 (`mbstring`, `xml`, `intl`, `pdo_sqlite`, `sqlite3`, `curl`, `zip`, `fileinfo`)
 - **Composer** >= 2.0
 - **Node.js** >= 20 veya 22 & **npm**
 - **Python** >= 3.10 (PyTorch, Piper, Whisper bağımlılıkları ile)
 
-### 1. Depoyu Klonlayın
 ```bash
+# 1. Depoyu Klonlayın
 git clone https://github.com/sinan-aydogan/tailadmin-voice-core.git
 cd tailadmin-voice-core
-```
 
-### 2. PHP ve Node Bağımlılıklarını Kurun
-```bash
+# 2. Bağımlılıkları Kurun
 composer install
 npm install
-```
 
-### 3. Ortam Değişkenlerini ve Veritabanını Hazırlayın
-```bash
+# 3. Ortam Dosyası ve Veritabanı
 cp .env.example .env
 php artisan key:generate
 php artisan migrate
-```
 
-### 4. Varlıkları Derleyin
-```bash
+# 4. Varlıkları Derleyin
 npm run build
-```
 
-### 5. Masaüstü Uygulamasını Geliştirme Modunda Başlatın
-```bash
+# 5. Geliştirme Modunda Başlatın
 php artisan native:run
 ```
 
-### 6. Masaüstü Yükleyicilerini Paketleyin (Build)
-```bash
-# Windows x64 için:
-php artisan native:build win x64
-
-# Linux x64 için:
-php artisan native:build linux x64
-
-# macOS Apple Silicon için:
-php artisan native:build mac arm64
-```
-
 ---
 
-## 🐳 Sunucu ve Docker ile Dağıtım (API & Web Servisi)
+<a name="-destek-ve-bağış"></a>
+## 💖 Destek ve Bağış / Sponsors & Donations
 
-TailAdmin Voice Core'u bir sunucuya (VPS, bulut sanal makinesi veya GPU sunucusu) kurup **tam teşekküllü bir REST API ve Web Yönetim İstasyonu** olarak kullanmak için ek hiçbir yazılıma (PHP, Python, Node.js vb.) gerek yoktur.
-
-### 1. Hızlı Başlatma (Ayağa Kaldırma)
-
-```bash
-# 1. Depoyu klonlayın ve klasöre girin
-git clone https://github.com/sinan-aydogan/tailadmin-voice-core.git
-cd tailadmin-voice-core
-
-# 2. Örnek ortam dosyasını oluşturun
-cp .env.example .env
-```
-
-Sunucu donanımınıza uygun komutla tüm yığını (Web Arayüzü + REST API + Laravel Worker + Python AI Motoru) başlatın:
-
-* **GPU / CUDA Destekli Sunucularda (Önerilen):**
-  ```bash
-  docker compose up -d --build
-  ```
-
-* **CPU-Only Sunucularda veya macOS Docker Desktop Üzerinde:**
-  ```bash
-  docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
-  ```
-
----
-
-### 🔌 Port Değişimi Nasıl Yapılır?
-
-> [!TIP]
-> **Önemli:** Port değişimi için **Dockerfile üzerinde hiçbir değişiklik yapmanıza gerek yoktur**.
-
-Konteynerin iç çalışma portu standart `8000`'dir. Sunucunun dışarıya açtığı portu değiştirmek için `.env` dosyasındaki `PORT` değerini güncellemeniz yeterlidir:
-
-```env
-# Varsayılan 8000 portunu örneğin 8085 yapmak için .env dosyasına yazın:
-PORT=8085
-```
-
-Ardından konteynerleri güncelleyin:
-```bash
-docker compose up -d
-```
-Artık arayüze ve API'ye `http://<sunucu-ip>:8085` adresinden erişebilirsiniz.
-
----
-
-### 🌐 Sunucu Yönetim Panelleri ve Domaine Bağlama (Coolify, CapRover, Nginx vb.)
-
-Birçok modern sunucu paneli (Coolify, CapRover, CloudPanel, aaPanel, Easypanel, Dokku vb.) uygulamaları domaine bağlamak için dahili **Reverse Proxy** kullanır:
-
-1. **Dockerfile Değişikliği Gerekmez:** Paneller SSL sertifikasını (Let's Encrypt) ve 80/443 portunu kendileri yönetir.
-2. **Port Ayarı:** Panel arayüzündeki **Container Port** alanına yalnızca `8000` yazmanız yeterlidir. Dışarıya rastgele host portu açmanıza gerek kalmaz.
-3. **SSL / HTTPS Desteği:** Laravel katmanımızda `trustProxies` yapılandırması aktif olduğundan, `https://ses.siteniz.com` arkasında çalışırken yönlendirmeler ve asset yüklemeleri sorunsuz gerçekleşir.
-
----
-
-### 📋 Hızlı Yönetim Komutları
-
-```bash
-# Canlı logları izleme (Web + API + Queue Worker)
-docker compose logs -f voice-core-app
-
-# Python AI motoru loglarını izleme
-docker compose logs -f voice-core-engine
-
-# Konteynerleri durdurma
-docker compose down
-
-# Sağlık durumunu kontrol etme
-curl http://localhost:8000/api/v1/health
-```
-
-* 📖 **REST API Referansı:** [API.md](API.md) (Tüm uç noktalar ve cURL/Python kod örnekleri)
-* 📋 **Detaylı Dağıtım Kılavuzu & Volumes:** [DOCKER.md](DOCKER.md)
-
----
-
-## 📂 Dizin Yapısı
-
-```text
-tailadmin-voice-core/
-├── app/
-│   ├── Http/Controllers/     # Laravel Inertia Controller katmanı
-│   ├── Jobs/                 # Arka plan kuyruk işleri (TTS, STT, Model İndirme)
-│   ├── Models/               # Eloquent ORM modelleri (Playlist, Profile, Task vb.)
-│   ├── Providers/            # NativeAppServiceProvider ve uygulama servisleri
-│   └── Services/             # Python CLI köprüsü ve kuyruk izleme servisleri
-├── config/
-│   └── nativephp.php         # NativePHP masaüstü ve updater konfigürasyonu
-├── engine/                   # İzole Python Yapay Zeka Çekirdeği
-│   ├── app/
-│   │   ├── cli.py            # Bağımsız CLI giriş noktası (donmasız çalıştırma)
-│   │   ├── tts/              # TTS motorları (piper, xtts, bark, tortoise, musicgen)
-│   │   ├── stt/              # Whisper STT motoru
-│   │   └── downloader/       # Model indirme ve bütünlük kontrolü
-│   └── requirements.txt      # Python kütüphane gereksinimleri
-├── resources/
-│   ├── js/
-│   │   ├── Components/       # AudioPlayerModal, RetryTaskModal, SystemFooter vb.
-│   │   ├── Layouts/          # AppLayout navigasyon ve düzen bileşenleri
-│   │   └── Pages/            # Inertia sayfaları (Dashboard, Tts, Stt, Models, Playlists vb.)
-│   └── css/                  # @tailadmin/ui ve Tailwind CSS stilleri
-├── patches/                  # Upstream kütüphane yamaları
-└── .github/workflows/        # Çoklu platform GitHub Actions Release iş akışı
-```
-
----
-
-## 💖 Destek ve Bağış
-
-Voice Core tamamen açık kaynaklı ve ücretsiz bir projedir. Projenin gelişimine katkıda bulunmak veya bir kahve ısmarlamak isterseniz:
+Voice Core is completely free and open-source. / Voice Core tamamen açık kaynaklı ve ücretsiz bir projedir.
 
 <p align="left">
   <a href="https://ko-fi.com/sinanaydogan" target="_blank">
-    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Ko-fi ile Destek Ol">
+    <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support on Ko-fi">
   </a>
   &nbsp;&nbsp;
   <a href="https://www.buymeacoffee.com/sinanaydogan" target="_blank">
@@ -286,7 +302,7 @@ Voice Core tamamen açık kaynaklı ve ücretsiz bir projedir. Projenin gelişim
   </a>
 </p>
 
-### 🌟 Destekçilerimiz & Sponsorlar
+### 🌟 Destekçilerimiz & Sponsorlar / Sponsors
 
 <table border="0">
   <tr>
@@ -296,22 +312,24 @@ Voice Core tamamen açık kaynaklı ve ücretsiz bir projedir. Projenin gelişim
       </a>
     </td>
     <td>
-      <strong><a href="https://panelica.com" target="_blank" rel="noopener noreferrer">Panelica</a></strong> — Modern sunucu ve altyapı yönetim paneli. Voice Core projesinin açık kaynak geliştirme süreçlerine verdikleri destek için teşekkür ederiz.
+      <strong><a href="https://panelica.com" target="_blank" rel="noopener noreferrer">Panelica</a></strong> — Modern server and infrastructure management panel. Thank you for supporting open-source development of Voice Core. / Modern sunucu ve altyapı yönetim paneli. Açık kaynak geliştirme süreçlerine verdikleri destek için teşekkür ederiz.
     </td>
   </tr>
 </table>
 
 ---
 
-## 🔗 Bağlantılar & Ekosistem
+## 🔗 Bağlantılar & Ekosistem / Links & Ecosystem
 
-- **Yapımcı:** [TailAdmin](https://tailadmin.dev)
+- **Author / Yapımcı:** [TailAdmin](https://tailadmin.dev)
 - **UI Kit:** [@tailadmin/ui (npm)](https://www.npmjs.com/package/@tailadmin/ui)
-- **Kaynak Kod:** [sinan-aydogan/tailadmin-voice-core](https://github.com/sinan-aydogan/tailadmin-voice-core)
-- **Sürüm Paketleri:** [GitHub Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases)
+- **Source Code / Kaynak Kod:** [sinan-aydogan/tailadmin-voice-core](https://github.com/sinan-aydogan/tailadmin-voice-core)
+- **Releases / Sürümler:** [GitHub Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases)
+- **REST API Guide:** [API.md](API.md)
+- **Docker Deployment:** [DOCKER.md](DOCKER.md)
 
 ---
 
-## 📄 Lisans
+## 📄 Lisans / License
 
-Bu proje [MIT Lisansı](LICENSE.md) kapsamında lisanslanmıştır. Dilediğiniz gibi kullanabilir, katkıda bulunabilir ve genişletebilirsiniz.
+Distributed under the [MIT License](LICENSE.md). Feel free to use, customize, and contribute. / [MIT Lisansı](LICENSE.md) kapsamında lisanslanmıştır. Dilediğiniz gibi kullanabilir, katkıda bulunabilir ve genişletebilirsiniz.
