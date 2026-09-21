@@ -136,6 +136,7 @@ class PythonVoiceService
         }
 
         $result = Process::path($this->enginePath)
+            ->env($this->getExecutionEnvironment())
             ->timeout(600)
             ->run($cmd);
 
@@ -188,6 +189,7 @@ class PythonVoiceService
         }
 
         $result = Process::path($this->enginePath)
+            ->env($this->getExecutionEnvironment())
             ->timeout(600)
             ->run($cmd);
 
@@ -270,6 +272,8 @@ class PythonVoiceService
             $env['HUGGING_FACE_HUB_TOKEN'] = $hfToken;
         }
 
+        $env = $this->getExecutionEnvironment($env);
+
         $process = Process::path($this->enginePath)
             ->timeout(3600)
             ->env($env)
@@ -313,6 +317,7 @@ class PythonVoiceService
             }
 
             $result = Process::path($this->enginePath)
+                ->env($this->getExecutionEnvironment())
                 ->timeout(10)
                 ->run([$this->pythonBin, '-m', 'app.cli', 'models']);
 
@@ -426,5 +431,54 @@ class PythonVoiceService
         // 8. Normalize whitespace
         $text = preg_replace('/\s+/u', ' ', $text);
         return trim($text);
+    }
+
+    /**
+     * Get safe execution environment variables for Python subprocesses.
+     * On Windows, ensures SystemRoot and PATH are present so Winsock (WSAStartup / _overlapped / asyncio)
+     * does not fail with WinError 10106 (WSAEPROVIDERFAILEDINIT).
+     */
+    protected function getExecutionEnvironment(?array $additionalEnv = null): array
+    {
+        $env = [];
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $systemRoot = getenv('SystemRoot') ?: getenv('SYSTEMROOT') ?: 'C:\\Windows';
+            $winDir = getenv('WINDIR') ?: getenv('windir') ?: $systemRoot;
+            $systemDrive = getenv('SYSTEMDRIVE') ?: 'C:';
+            $path = getenv('PATH') ?: getenv('Path') ?: "{$systemRoot}\\system32;{$systemRoot};{$systemRoot}\\System32\\Wbem";
+            $temp = getenv('TEMP') ?: getenv('TMP') ?: sys_get_temp_dir();
+
+            $env['SystemRoot'] = $systemRoot;
+            $env['SYSTEMROOT'] = $systemRoot;
+            $env['WINDIR'] = $winDir;
+            $env['SYSTEMDRIVE'] = $systemDrive;
+            $env['PATH'] = $path;
+            $env['TEMP'] = $temp;
+            $env['TMP'] = $temp;
+
+            if ($appData = getenv('APPDATA')) {
+                $env['APPDATA'] = $appData;
+            }
+            if ($localAppData = getenv('LOCALAPPDATA')) {
+                $env['LOCALAPPDATA'] = $localAppData;
+            }
+            if ($userProfile = getenv('USERPROFILE')) {
+                $env['USERPROFILE'] = $userProfile;
+            }
+        } else {
+            if ($path = getenv('PATH')) {
+                $env['PATH'] = $path;
+            }
+            if ($home = getenv('HOME')) {
+                $env['HOME'] = $home;
+            }
+        }
+
+        if ($additionalEnv) {
+            $env = array_merge($env, $additionalEnv);
+        }
+
+        return $env;
     }
 }
