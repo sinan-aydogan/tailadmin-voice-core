@@ -73,6 +73,43 @@ class Agent extends Model
         return $this->hasMany(AgentRun::class);
     }
 
+    public function apiKey(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: function ($value) {
+                if (empty($value)) {
+                    return null;
+                }
+                try {
+                    return decrypt($value);
+                } catch (\Throwable) {
+                    return $value;
+                }
+            },
+            set: function ($value) {
+                if (empty($value)) {
+                    return null;
+                }
+                try {
+                    decrypt($value);
+                    return $value;
+                } catch (\Throwable) {
+                    return encrypt($value);
+                }
+            }
+        );
+    }
+
+    public function duplicate(): static
+    {
+        $clone = $this->replicate(['trigger_slug', 'created_at', 'updated_at']);
+        $clone->name = ($this->name ?? 'Ajan') . ' (Kopya)';
+        $clone->trigger_slug = static::generateUniqueSlug();
+        $clone->save();
+
+        return $clone;
+    }
+
     public function findTool(string $name): ?array
     {
         foreach ($this->tools ?? [] as $tool) {

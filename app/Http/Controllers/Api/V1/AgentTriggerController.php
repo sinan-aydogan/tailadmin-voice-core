@@ -173,6 +173,7 @@ class AgentTriggerController extends Controller
             $run->update([
                 'status' => 'completed',
                 'final_reply' => $result['reply_text'] ?? null,
+                'final_output' => $result['final'] ?? null,
                 'completed_at' => now(),
             ]);
 
@@ -248,8 +249,9 @@ class AgentTriggerController extends Controller
         ];
 
         if ($run->status === 'completed') {
+            $finalData = $run->final_output ?? ($run->final_reply !== null ? ['mode' => 'text', 'value' => $run->final_reply] : null);
             $response = array_merge($response, $this->formatFinalOutput(
-                $run->final_reply !== null ? ['mode' => 'text', 'value' => $run->final_reply] : null,
+                $finalData,
                 $run->id
             ));
         }

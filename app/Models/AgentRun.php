@@ -14,6 +14,7 @@ class AgentRun extends Model
         'status',
         'trigger_payload',
         'final_reply',
+        'final_output',
         'error_message',
         'started_at',
         'completed_at',
@@ -21,6 +22,7 @@ class AgentRun extends Model
 
     protected $casts = [
         'trigger_payload' => 'array',
+        'final_output' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];

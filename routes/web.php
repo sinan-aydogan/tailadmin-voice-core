@@ -121,5 +121,8 @@ Route::get('/agents/{id}/voice', [AgentController::class, 'voice'])->name('agent
 Route::put('/agents/{id}', [AgentController::class, 'update'])->name('agents.update');
 Route::post('/agents/{id}/toggle', [AgentController::class, 'toggle'])->name('agents.toggle');
 Route::delete('/agents/{id}', [AgentController::class, 'destroy'])->name('agents.destroy');
+Route::post('/agents/{id}/duplicate', [AgentController::class, 'duplicate'])->name('agents.duplicate');
+Route::get('/agents/{id}/runs', [AgentController::class, 'runs'])->name('agents.runs');
+Route::post('/agents/{id}/clear-session', [AgentController::class, 'clearSession'])->name('agents.clear_session');
 Route::post('/agents/{id}/test-run', [AgentController::class, 'testRun'])->name('agents.test_run');
 

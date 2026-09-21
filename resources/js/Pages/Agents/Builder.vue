@@ -31,6 +31,15 @@
           </button>
           <button
             type="button"
+            @click="openRunHistory"
+            class="px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+            title="Geçmiş çalışmaları ve adım detaylarını incele"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>Geçmiş</span>
+          </button>
+          <button
+            type="button"
             @click="showTestModal = true"
             class="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
           >
@@ -222,7 +231,22 @@
         </div>
 
         <TextField label="Mesaj (text)" v-model="testMessage" placeholder="Ankara hava durumu nedir?" />
-        <TextField label="Konuşma Kimliği (conversation_id, isteğe bağlı)" v-model="testConversationId" placeholder="test-1" />
+        
+        <div class="flex items-center gap-2">
+          <div class="flex-1 min-w-0">
+            <TextField label="Konuşma Kimliği (conversation_id, isteğe bağlı)" v-model="testConversationId" placeholder="test-1" />
+          </div>
+          <button
+            v-if="testConversationId.trim()"
+            type="button"
+            @click="clearCurrentTestSession"
+            class="mt-5 px-3 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+            title="Bu konuşma kimliğinin hafızasını sıfırla"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            <span>Hafızayı Temizle</span>
+          </button>
+        </div>
 
         <div>
           <label class="block text-xs font-medium text-neutral-400 mb-1">Örnek Ses Dosyası (isteğe bağlı)</label>
@@ -253,6 +277,97 @@
             </div>
             <pre v-if="step.output" class="mt-1.5 text-neutral-500 whitespace-pre-wrap break-all">{{ JSON.stringify(step.output, null, 2) }}</pre>
             <div v-if="step.error_message" class="mt-1.5 text-red-400">{{ step.error_message }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Run History Modal -->
+    <div v-if="showHistoryModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div class="w-full max-w-3xl rounded-2xl bg-surface border border-neutral-800 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-neutral-800 pb-3">
+          <div class="flex items-center gap-2.5">
+            <h2 class="text-base font-semibold text-neutral-100">Çalışma Geçmişi</h2>
+            <span v-if="historyRuns.length" class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-mono">
+              {{ historyRuns.length }}
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              @click="clearAllSessions"
+              class="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 text-xs font-medium transition-colors cursor-pointer"
+              title="Tüm oturumların konuşma hafızasını temizle"
+            >
+              Hafızaları Temizle
+            </button>
+            <button @click="showHistoryModal = false" class="text-neutral-400 hover:text-neutral-200 cursor-pointer text-sm p-1">✕</button>
+          </div>
+        </div>
+
+        <div v-if="loadingHistory" class="p-8 text-center text-xs text-neutral-400 flex items-center justify-center gap-2">
+          <span class="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
+          <span>Geçmiş yükleniyor...</span>
+        </div>
+
+        <div v-else-if="!historyRuns.length" class="p-8 text-center text-xs text-neutral-500">
+          Bu ajana ait henüz bir çalışma kaydı bulunmuyor.
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="r in historyRuns"
+            :key="r.id"
+            class="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2.5"
+          >
+            <div class="flex items-center justify-between text-xs cursor-pointer select-none" @click="toggleRunExpanded(r.id)">
+              <div class="flex items-center gap-2">
+                <span
+                  class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider"
+                  :class="r.status === 'completed' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : (r.status === 'failed' ? 'bg-red-500/15 text-red-400 border border-red-500/30' : 'bg-amber-500/15 text-amber-400 border border-amber-500/30')"
+                >
+                  {{ r.status }}
+                </span>
+                <span class="font-mono text-neutral-400">#{{ r.id }}</span>
+                <span class="text-neutral-500">{{ formatDate(r.created_at) }}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-[11px] text-neutral-500 font-mono">{{ (r.steps || []).length }} adım</span>
+                <span class="text-neutral-400 text-xs">{{ expandedRunId === r.id ? '▲ Gizle' : '▼ Detay' }}</span>
+              </div>
+            </div>
+
+            <p v-if="r.final_reply" class="text-xs text-neutral-300 line-clamp-2 bg-neutral-950/60 p-2.5 rounded-lg border border-neutral-800/80 font-sans">
+              {{ r.final_reply }}
+            </p>
+            <p v-if="r.error_message" class="text-xs text-red-400 bg-red-500/10 p-2.5 rounded-lg border border-red-500/20">
+              {{ r.error_message }}
+            </p>
+
+            <!-- Expanded Steps Trace -->
+            <div v-if="expandedRunId === r.id" class="pt-2 border-t border-neutral-800 space-y-2">
+              <h4 class="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">Adım Ayrıntıları (Execution Trace)</h4>
+              <div v-for="step in r.steps || []" :key="step.id" class="p-2.5 rounded-lg bg-neutral-950 border border-neutral-800/80 text-[11px] space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-mono text-neutral-300">
+                    <span class="text-accent">{{ step.step_number }}.</span> {{ step.step_type }}
+                    <template v-if="step.tool_name"> · <span class="text-amber-300 font-semibold">{{ step.tool_name }}</span></template>
+                  </span>
+                  <span class="text-neutral-500 font-mono">{{ step.duration_ms }}ms</span>
+                </div>
+                <div v-if="step.input_data && Object.keys(step.input_data).length" class="text-neutral-400">
+                  <span class="text-[10px] text-neutral-500 block font-medium">Girdi:</span>
+                  <pre class="text-[10px] bg-neutral-900/60 p-1.5 rounded text-neutral-400 overflow-x-auto">{{ JSON.stringify(step.input_data, null, 2) }}</pre>
+                </div>
+                <div v-if="step.output" class="text-neutral-400">
+                  <span class="text-[10px] text-neutral-500 block font-medium">Çıktı:</span>
+                  <pre class="text-[10px] bg-neutral-900/60 p-1.5 rounded text-neutral-400 overflow-x-auto">{{ JSON.stringify(step.output, null, 2) }}</pre>
+                </div>
+                <div v-if="step.error_message" class="text-red-400 text-[10px]">
+                  {{ step.error_message }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -417,6 +532,59 @@ async function runTest() {
     testResult.value = e.response?.data || { success: false, message: e.message }
   } finally {
     testing.value = false
+  }
+}
+
+// --- Run History & Session Management ---
+const showHistoryModal = ref(false)
+const loadingHistory = ref(false)
+const historyRuns = ref([])
+const expandedRunId = ref(null)
+
+async function openRunHistory() {
+  showHistoryModal.value = true
+  loadingHistory.value = true
+  try {
+    const { data } = await axios.get(`/agents/${agent.id}/runs`)
+    historyRuns.value = data.runs?.data || []
+  } catch (e) {
+    historyRuns.value = []
+  } finally {
+    loadingHistory.value = false
+  }
+}
+
+function toggleRunExpanded(runId) {
+  expandedRunId.value = expandedRunId.value === runId ? null : runId
+}
+
+async function clearAllSessions() {
+  if (!confirm('Tüm oturum konuşma geçmişleri temizlenecek. Devam etmek istiyor musunuz?')) return
+  try {
+    await axios.post(`/agents/${agent.id}/clear-session`)
+    alert('Oturum hafızaları temizlendi.')
+  } catch (e) {
+    alert('Hafıza temizlenemedi: ' + e.message)
+  }
+}
+
+async function clearCurrentTestSession() {
+  if (!testConversationId.value.trim()) return
+  try {
+    await axios.post(`/agents/${agent.id}/clear-session`, { session_id: testConversationId.value.trim() })
+    alert(`"${testConversationId.value.trim()}" oturum hafızası temizlendi.`)
+  } catch (e) {
+    alert('Hafıza temizlenemedi: ' + e.message)
+  }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })
+  } catch {
+    return dateStr
   }
 }
 

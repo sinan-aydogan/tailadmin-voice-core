@@ -179,6 +179,10 @@ export const translations = {
       empty_title: 'Henüz bir ajan oluşturulmadı',
       empty_desc: 'Akışlarınızı araç (tool) olarak kullanan, konuşma sürdürebilen ilk ajanınızı oluşturun.',
       empty_cta: 'Yeni Ajan Oluştur',
+      duplicate: 'Klonla',
+      run_history: 'Çalışma Geçmişi',
+      reset_session: 'Yeni Sohbet',
+      session_cleared: 'Oturum hafızası temizlendi.',
     },
     knowledge: {
       title: 'Bilgi Kaynakları',
@@ -373,6 +377,10 @@ export const translations = {
       empty_title: 'No agent created yet',
       empty_desc: 'Create your first agent that uses your Flows as tools and can hold a conversation.',
       empty_cta: 'Create New Agent',
+      duplicate: 'Duplicate',
+      run_history: 'Run History',
+      reset_session: 'New Chat',
+      session_cleared: 'Session memory cleared.',
     },
     knowledge: {
       title: 'Knowledge Base',

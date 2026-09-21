@@ -36,6 +36,7 @@ class AgentRunJob implements ShouldQueue
             $run->update([
                 'status' => 'completed',
                 'final_reply' => $result['reply_text'] ?? null,
+                'final_output' => $result['final'] ?? null,
                 'completed_at' => now(),
             ]);
 

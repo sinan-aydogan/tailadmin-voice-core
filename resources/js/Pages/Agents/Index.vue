@@ -65,6 +65,16 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                 </Link>
+                <button
+                  type="button"
+                  @click="duplicateAgent(agent)"
+                  class="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-accent-300 transition-colors cursor-pointer"
+                  :title="t('agents.duplicate')"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                  </svg>
+                </button>
                 <button type="button" @click="deleteAgent(agent)" class="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-500 hover:text-red-400 transition-colors cursor-pointer" :title="t('common.delete')">
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -145,6 +155,10 @@ function toggleActive(agent) {
 function deleteAgent(agent) {
   if (!confirm(t('agents.delete_confirm').replace('{name}', agent.name))) return
   router.delete(`/agents/${agent.id}`, { preserveScroll: true })
+}
+
+function duplicateAgent(agent) {
+  router.post(`/agents/${agent.id}/duplicate`)
 }
 
 const copiedId = ref(null)

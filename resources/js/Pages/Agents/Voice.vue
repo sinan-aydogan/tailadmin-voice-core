@@ -31,14 +31,26 @@
 
         <div class="text-xs font-medium" :class="stateColorClass">{{ stateLabel }}</div>
 
-        <button
-          type="button"
-          @click="toggleSession"
-          class="px-6 py-2.5 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90 cursor-pointer"
-          :class="running ? 'bg-red-500/90 text-white' : 'bg-accent text-bg'"
-        >
-          {{ running ? 'Görüşmeyi Bitir' : 'Görüşmeyi Başlat' }}
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="toggleSession"
+            class="px-6 py-2.5 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90 cursor-pointer"
+            :class="running ? 'bg-red-500/90 text-white' : 'bg-accent text-bg'"
+          >
+            {{ running ? 'Görüşmeyi Bitir' : 'Görüşmeyi Başlat' }}
+          </button>
+
+          <button
+            type="button"
+            @click="resetConversation"
+            class="px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+            title="Konuşmayı ve oturumu sıfırla"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <span>Yeni Sohbet</span>
+          </button>
+        </div>
 
         <p v-if="micError" class="text-[11px] text-red-400 text-center leading-relaxed">{{ micError }}</p>
         <p v-else class="text-[11px] text-neutral-500 text-center leading-relaxed max-w-sm">
@@ -48,7 +60,17 @@
 
       <!-- Transcript -->
       <div v-if="turns.length" class="p-5 rounded-2xl bg-surface border border-neutral-800 space-y-3">
-        <h2 class="text-xs font-semibold text-neutral-200 uppercase tracking-wide">Konuşma</h2>
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-semibold text-neutral-200 uppercase tracking-wide">Konuşma</h2>
+          <button
+            type="button"
+            @click="resetConversation"
+            class="text-[11px] text-neutral-500 hover:text-accent cursor-pointer flex items-center gap-1 transition-colors"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <span>Yeni Sohbet Başlat</span>
+          </button>
+        </div>
         <div class="space-y-2.5 max-h-96 overflow-y-auto">
           <div v-for="(turn, idx) in turns" :key="idx" class="flex" :class="turn.role === 'user' ? 'justify-end' : 'justify-start'">
             <div
@@ -314,6 +336,17 @@ async function endUtterance() {
     turns.value.push({ role: 'assistant', text: 'Hata', error: msg })
     state.value = 'listening'
   }
+}
+
+async function resetConversation() {
+  if (conversationId) {
+    try {
+      await axios.post(`/agents/${agent.id}/clear-session`, { session_id: conversationId })
+    } catch {}
+  }
+  conversationId = 'voice-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
+  turns.value = []
+  stopTtsPlayback()
 }
 
 function stopSession() {
