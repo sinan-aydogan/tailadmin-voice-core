@@ -1,6 +1,17 @@
 """
 Project configuration and environment variables.
 """
+import sys
+import os
+
+# On Windows, ensure SystemRoot and WINDIR are present in os.environ before
+# importing pydantic_settings/asyncio to avoid Winsock WSAEPROVIDERFAILEDINIT (WinError 10106).
+if sys.platform == "win32":
+    if "SystemRoot" not in os.environ and "SYSTEMROOT" not in os.environ:
+        os.environ["SystemRoot"] = os.environ.get("WINDIR", r"C:\Windows")
+    if "WINDIR" not in os.environ and "windir" not in os.environ:
+        os.environ["WINDIR"] = os.environ.get("SystemRoot", r"C:\Windows")
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 from pathlib import Path

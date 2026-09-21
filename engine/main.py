@@ -3,6 +3,16 @@ FastAPI application entrypoint (Backend).
 Serves API endpoints on port 5001.
 """
 import sys
+import os
+
+# On Windows, ensure SystemRoot and WINDIR are present in os.environ before
+# importing asyncio / Winsock to prevent WSAEPROVIDERFAILEDINIT (WinError 10106).
+if sys.platform == "win32":
+    if "SystemRoot" not in os.environ and "SYSTEMROOT" not in os.environ:
+        os.environ["SystemRoot"] = os.environ.get("WINDIR", r"C:\Windows")
+    if "WINDIR" not in os.environ and "windir" not in os.environ:
+        os.environ["WINDIR"] = os.environ.get("SystemRoot", r"C:\Windows")
+
 import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Request, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
