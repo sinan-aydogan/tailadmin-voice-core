@@ -23,8 +23,9 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-Route::get('/support', [SupportController::class, 'index'])->name('support.index');
 Route::get('/documentation', [DocumentationController::class, 'index'])->name('documentation.index');
+Route::get('/docs/asset/{asset}', [\App\Http\Controllers\SwaggerAssetSanitizerController::class, 'show'])->name('l5-swagger.default.asset');
+Route::get('/support', [SupportController::class, 'index'])->name('support.index');
 
 // TTS
 Route::get('/tts', [TtsController::class, 'index'])->name('tts.index');

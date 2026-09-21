@@ -11,10 +11,34 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import AppLayout from '../../Layouts/AppLayout.vue'
 import { useI18n } from '../../i18n'
 
+const props = defineProps({
+  swaggerUrl: {
+    type: String,
+    default: '/api/documentation'
+  },
+  apiUrl: {
+    type: String,
+    default: '/api/v1'
+  },
+  docsJsonUrl: {
+    type: String,
+    default: '/docs'
+  },
+  hasApiKeyAuth: {
+    type: Boolean,
+    default: false
+  },
+  activeKeysCount: {
+    type: Number,
+    default: 0
+  }
+})
+
 const { t } = useI18n()
 
-const docsUrl = '/api/documentation'
+const iframeUrl = computed(() => props.swaggerUrl || '/api/documentation')
 </script>

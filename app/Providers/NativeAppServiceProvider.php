@@ -23,6 +23,16 @@ class NativeAppServiceProvider implements ProvidesPhpIni
             ->rememberState();
 
         \App\Services\QueueWorkerService::ensureRunning();
+
+        // Ensure Swagger API documentation exists for local desktop app
+        $docsPath = storage_path('api-docs/api-docs.json');
+        if (!file_exists($docsPath)) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('l5-swagger:generate');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to auto-generate Swagger docs on native boot: ' . $e->getMessage());
+            }
+        }
     }
 
     /**

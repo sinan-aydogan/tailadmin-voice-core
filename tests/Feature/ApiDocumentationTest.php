@@ -28,14 +28,21 @@ class ApiDocumentationTest extends TestCase
         $this->assertArrayHasKey('/api/v1/tasks', $spec['paths']);
         $this->assertArrayHasKey('/api/v1/models', $spec['paths']);
         $this->assertArrayHasKey('/api/v1/profiles', $spec['paths']);
+        $this->assertArrayHasKey('/api/v1/flows/{slug}/run', $spec['paths']);
+        $this->assertArrayHasKey('/api/v1/agents/{slug}/run', $spec['paths']);
     }
 
-    public function test_in_app_documentation_page_embeds_swagger_ui(): void
+    public function test_in_app_documentation_page_loads_successfully(): void
     {
         $response = $this->get('/documentation');
 
         $response->assertStatus(200);
-        $response->assertSee('Documentation\/Index', false);
+        $response->assertInertia(fn ($page) => $page
+            ->component('Documentation/Index')
+            ->has('apiUrl')
+            ->has('swaggerUrl')
+            ->has('docsJsonUrl')
+        );
     }
 
     public function test_swagger_ui_page_references_static_bundle_not_dynamic_route(): void
@@ -59,5 +66,19 @@ class ApiDocumentationTest extends TestCase
 
         $this->assertFileExists($publicFile);
         $this->assertSame(file_get_contents($vendorFile), file_get_contents($publicFile));
+    }
+
+    public function test_open_url_endpoint_supports_relative_documentation_path(): void
+    {
+        if (class_exists(\Native\Desktop\Facades\Shell::class)) {
+            \Native\Desktop\Facades\Shell::fake();
+        }
+
+        $response = $this->postJson('/api/system/open-url', [
+            'url' => '/api/documentation',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
     }
 }
