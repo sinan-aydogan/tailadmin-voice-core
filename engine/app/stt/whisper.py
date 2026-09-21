@@ -120,6 +120,10 @@ class WhisperEngine(BaseSTT):
         """Run Whisper transcription asynchronously in a separate thread/process to avoid blocking API."""
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        if os.path.getsize(audio_path) < 100:
+            logger.warning(f"Audio file is too small ({os.path.getsize(audio_path)} bytes): {audio_path}")
+            return ""
             
         loop = asyncio.get_event_loop()
         sync_func = partial(

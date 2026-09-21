@@ -81,8 +81,7 @@ const SPEECH_RMS_THRESHOLD = 0.035
 const SPEECH_ONSET_MS = 200 // sustained energy above threshold before we call it "speech"
 const SILENCE_HANGOVER_MS = 900 // sustained silence before we consider the utterance done
 const MIN_UTTERANCE_MS = 350
-const PRE_ROLL_CHUNKS = 3 // ~timeslice*3 of audio kept before speech onset so we don't clip the first syllable
-const TIMESLICE_MS = 250
+const PRE_ROLL_BUFFERS = 5 // ~85ms * 5 = ~425ms of audio before speech onset
 
 // state: idle | listening | recording | processing | speaking
 const state = ref('idle')
@@ -92,14 +91,13 @@ const turns = ref([])
 const micLevel = ref(0)
 
 let audioCtx = null
-let analyser = null
-let dataArray = null
 let mediaStream = null
-let recorder = null
-let rafId = null
+let sourceNode = null
+let scriptProcessor = null
+let muteGain = null
 
-let rollingChunks = [] // pre-roll buffer, always the last PRE_ROLL_CHUNKS blobs
-let utteranceChunks = null // set while capturing an utterance
+let rollingPcm = [] // pre-roll buffer of Float32Array chunks
+let utterancePcm = [] // chunks recorded during speech
 let aboveSince = null
 let belowSince = null
 let utteranceStartedAt = 0
@@ -124,96 +122,85 @@ async function toggleSession() {
 async function startSession() {
   micError.value = ''
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      }
+    })
   } catch (e) {
     micError.value = 'Mikrofon erişimi reddedildi veya kullanılamıyor: ' + e.message
     return
   }
 
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-  analyser = audioCtx.createAnalyser()
-  analyser.fftSize = 2048
-  dataArray = new Uint8Array(analyser.fftSize)
-  audioCtx.createMediaStreamSource(mediaStream).connect(analyser)
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    sourceNode = audioCtx.createMediaStreamSource(mediaStream)
 
-  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-    ? 'audio/webm;codecs=opus'
-    : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '')
+    // Use 4096 buffer size (~85ms @ 48kHz, ~93ms @ 44.1kHz, ~256ms @ 16kHz)
+    scriptProcessor = audioCtx.createScriptProcessor(4096, 1, 1)
 
-  recorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : {})
-  recorder.ondataavailable = (e) => {
-    if (!e.data || e.data.size === 0) return
-    if (utteranceChunks) {
-      utteranceChunks.push(e.data)
-    } else {
-      rollingChunks.push(e.data)
-      if (rollingChunks.length > PRE_ROLL_CHUNKS) rollingChunks.shift()
-    }
+    // ScriptProcessor needs to connect to destination to receive events in some browsers.
+    // Connect through a zero-gain node so microphone audio is not played back to user's speakers.
+    muteGain = audioCtx.createGain()
+    muteGain.gain.value = 0
+
+    sourceNode.connect(scriptProcessor)
+    scriptProcessor.connect(muteGain)
+    muteGain.connect(audioCtx.destination)
+
+    scriptProcessor.onaudioprocess = handleAudioProcess
+  } catch (err) {
+    micError.value = 'Ses işleme başlatılamadı: ' + err.message
+    stopSession()
+    return
   }
-  recorder.start(TIMESLICE_MS)
 
   conversationId = 'voice-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
   turns.value = []
+  rollingPcm = []
+  utterancePcm = []
   running.value = true
   state.value = 'listening'
   resetVadTimers()
-  vadLoop()
 }
 
-function stopSession() {
-  running.value = false
-  state.value = 'idle'
-  if (rafId) cancelAnimationFrame(rafId)
-  rafId = null
-  if (abortController) abortController.abort()
-  stopTtsPlayback()
-  if (recorder && recorder.state !== 'inactive') recorder.stop()
-  recorder = null
-  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop())
-  mediaStream = null
-  if (audioCtx) audioCtx.close()
-  audioCtx = null
-  analyser = null
-  rollingChunks = []
-  utteranceChunks = null
-  micLevel.value = 0
-}
+function handleAudioProcess(e) {
+  if (!running.value) return
 
-function getRms() {
-  analyser.getByteTimeDomainData(dataArray)
+  const input = e.inputBuffer.getChannelData(0)
   let sum = 0
-  for (let i = 0; i < dataArray.length; i++) {
-    const v = (dataArray[i] - 128) / 128
-    sum += v * v
+  for (let i = 0; i < input.length; i++) {
+    sum += input[i] * input[i]
   }
-  return Math.sqrt(sum / dataArray.length)
-}
-
-function vadLoop() {
-  if (!running.value || !analyser) return
-
-  const rms = getRms()
+  const rms = Math.sqrt(sum / input.length)
   micLevel.value = Math.min(1, rms / 0.15)
+
+  const chunk = new Float32Array(input)
   const now = performance.now()
   const isSpeech = rms > SPEECH_RMS_THRESHOLD
 
-  if (isSpeech) {
-    belowSince = null
-    if (aboveSince === null) aboveSince = now
-
-    const sustained = (now - aboveSince) >= SPEECH_ONSET_MS
-
-    if (sustained && (state.value === 'listening')) {
-      beginUtterance()
-    } else if (sustained && (state.value === 'processing' || state.value === 'speaking')) {
-      // Barge-in: user started talking while the agent was thinking/speaking.
-      if (abortController) abortController.abort()
-      stopTtsPlayback()
-      beginUtterance()
+  if (state.value === 'listening') {
+    rollingPcm.push(chunk)
+    if (rollingPcm.length > PRE_ROLL_BUFFERS) {
+      rollingPcm.shift()
     }
-  } else {
-    aboveSince = null
-    if (state.value === 'recording') {
+
+    if (isSpeech) {
+      if (aboveSince === null) aboveSince = now
+      if ((now - aboveSince) >= SPEECH_ONSET_MS) {
+        beginUtterance()
+      }
+    } else {
+      aboveSince = null
+    }
+  } else if (state.value === 'recording') {
+    utterancePcm.push(chunk)
+
+    if (isSpeech) {
+      belowSince = null
+    } else {
       if (belowSince === null) belowSince = now
       const silenceLong = (now - belowSince) >= SILENCE_HANGOVER_MS
       const longEnough = (now - utteranceStartedAt) >= MIN_UTTERANCE_MS
@@ -221,30 +208,65 @@ function vadLoop() {
         endUtterance()
       }
     }
+  } else if (state.value === 'processing' || state.value === 'speaking') {
+    // Barge-in: user spoke while agent was thinking or speaking
+    if (isSpeech) {
+      if (aboveSince === null) aboveSince = now
+      if ((now - aboveSince) >= SPEECH_ONSET_MS) {
+        if (abortController) abortController.abort()
+        stopTtsPlayback()
+        beginUtterance()
+      }
+    } else {
+      aboveSince = null
+    }
   }
-
-  rafId = requestAnimationFrame(vadLoop)
 }
 
 function beginUtterance() {
-  utteranceChunks = [...rollingChunks]
+  utterancePcm = [...rollingPcm]
   utteranceStartedAt = performance.now()
   belowSince = null
+  aboveSince = null
   state.value = 'recording'
 }
 
 async function endUtterance() {
-  const chunks = utteranceChunks
-  utteranceChunks = null
-  rollingChunks = []
-  resetVadTimers()
   state.value = 'processing'
+  resetVadTimers()
 
-  const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' })
+  const chunks = utterancePcm
+  utterancePcm = []
+  rollingPcm = []
+
+  let totalLen = 0
+  for (let i = 0; i < chunks.length; i++) {
+    totalLen += chunks[i].length
+  }
+
+  // If audio is practically empty (< 250ms), return to listening
+  const minSamples = (audioCtx?.sampleRate || 16000) * 0.25
+  if (totalLen < minSamples) {
+    state.value = 'listening'
+    return
+  }
+
+  const merged = new Float32Array(totalLen)
+  let offset = 0
+  for (let i = 0; i < chunks.length; i++) {
+    merged.set(chunks[i], offset)
+    offset += chunks[i].length
+  }
+
+  // Resample to 16kHz mono PCM for optimal Whisper performance
+  const sampleRate = audioCtx?.sampleRate || 48000
+  const downsampled = downsampleBuffer(merged, sampleRate, 16000)
+  const wavBuffer = encodeWav(downsampled, 16000)
+  const blob = new Blob([wavBuffer], { type: 'audio/wav' })
 
   const formData = new FormData()
   formData.append('body[conversation_id]', conversationId)
-  formData.append('audio', blob, 'utterance.webm')
+  formData.append('audio', blob, 'utterance.wav')
 
   abortController = new AbortController()
   const myConversationTurnAbort = abortController
@@ -258,6 +280,11 @@ async function endUtterance() {
     if (myConversationTurnAbort.signal.aborted) return
 
     if (!data.success) {
+      if (data.message && data.message.includes('boş')) {
+        // Empty / background noise utterance, resume listening smoothly
+        state.value = 'listening'
+        return
+      }
       turns.value.push({ role: 'assistant', text: 'Hata', error: data.message || 'Ajan çalıştırılamadı.' })
       state.value = 'listening'
       return
@@ -279,9 +306,47 @@ async function endUtterance() {
     }
   } catch (e) {
     if (e.name === 'CanceledError' || e.name === 'AbortError') return
-    turns.value.push({ role: 'assistant', text: 'Hata', error: e.response?.data?.message || e.message })
+    const msg = e.response?.data?.message || e.message
+    if (msg && msg.includes('boş')) {
+      state.value = 'listening'
+      return
+    }
+    turns.value.push({ role: 'assistant', text: 'Hata', error: msg })
     state.value = 'listening'
   }
+}
+
+function stopSession() {
+  running.value = false
+  state.value = 'idle'
+  if (abortController) abortController.abort()
+  stopTtsPlayback()
+
+  if (scriptProcessor) {
+    scriptProcessor.disconnect()
+    scriptProcessor.onaudioprocess = null
+    scriptProcessor = null
+  }
+  if (sourceNode) {
+    sourceNode.disconnect()
+    sourceNode = null
+  }
+  if (muteGain) {
+    muteGain.disconnect()
+    muteGain = null
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(t => t.stop())
+    mediaStream = null
+  }
+  if (audioCtx && audioCtx.state !== 'closed') {
+    audioCtx.close().catch(() => {})
+    audioCtx = null
+  }
+
+  rollingPcm = []
+  utterancePcm = []
+  micLevel.value = 0
 }
 
 function playTtsAndListen(url) {
@@ -306,6 +371,71 @@ function stopTtsPlayback() {
     ttsAudioEl.onerror = null
     ttsAudioEl = null
   }
+}
+
+// Downsample Float32Array to target sample rate (e.g. 16kHz)
+function downsampleBuffer(buffer, sourceRate, targetRate = 16000) {
+  if (sourceRate === targetRate || sourceRate < targetRate) return buffer
+  const ratio = sourceRate / targetRate
+  const newLength = Math.round(buffer.length / ratio)
+  const result = new Float32Array(newLength)
+  let offsetResult = 0
+  let offsetBuffer = 0
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio)
+    let accum = 0
+    let count = 0
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i]
+      count++
+    }
+    result[offsetResult] = count > 0 ? accum / count : 0
+    offsetResult++
+    offsetBuffer = nextOffsetBuffer
+  }
+  return result
+}
+
+// Encode Float32Array to 16-bit PCM mono WAV
+function encodeWav(samples, sampleRate = 16000) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2)
+  const view = new DataView(buffer)
+
+  const writeString = (v, offset, str) => {
+    for (let i = 0; i < str.length; i++) {
+      v.setUint8(offset + i, str.charCodeAt(i))
+    }
+  }
+
+  // RIFF identifier
+  writeString(view, 0, 'RIFF')
+  view.setUint32(4, 36 + samples.length * 2, true)
+  writeString(view, 8, 'WAVE')
+
+  // fmt chunk
+  writeString(view, 12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true) // PCM format
+  view.setUint16(22, 1, true) // Mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true) // byte rate (sampleRate * 1 * 16 / 8)
+  view.setUint16(32, 2, true) // block align (1 * 16 / 8)
+  view.setUint16(34, 16, true) // 16-bit
+
+  // data chunk
+  writeString(view, 36, 'data')
+  view.setUint32(40, samples.length * 2, true)
+
+  // 16-bit PCM samples with clipping protection
+  let offset = 44
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]))
+    const val = s < 0 ? s * 0x8000 : s * 0x7FFF
+    view.setInt16(offset, val, true)
+    offset += 2
+  }
+
+  return buffer
 }
 
 onBeforeUnmount(() => {
