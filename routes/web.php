@@ -13,6 +13,9 @@ use App\Http\Controllers\SystemApiController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\PromptController;
 use App\Http\Controllers\LlmController;
+use App\Http\Controllers\FlowController;
+use App\Http\Controllers\KnowledgeController;
+use App\Http\Controllers\AgentController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -91,4 +94,29 @@ Route::get('/api/prompts', [PromptController::class, 'apiIndex'])->name('api.pro
 // LLM Text Generation & Connection Testing
 Route::post('/api/llm/generate', [LlmController::class, 'generate'])->name('api.llm.generate');
 Route::post('/api/llm/test-connection', [LlmController::class, 'testConnection'])->name('api.llm.test_connection');
+
+// Flows (Automation Builder)
+Route::get('/flows', [FlowController::class, 'index'])->name('flows.index');
+Route::post('/flows', [FlowController::class, 'store'])->name('flows.store');
+Route::get('/flows/{id}/edit', [FlowController::class, 'edit'])->name('flows.edit');
+Route::put('/flows/{id}', [FlowController::class, 'update'])->name('flows.update');
+Route::post('/flows/{id}/toggle', [FlowController::class, 'toggle'])->name('flows.toggle');
+Route::delete('/flows/{id}', [FlowController::class, 'destroy'])->name('flows.destroy');
+Route::post('/flows/{id}/test-run', [FlowController::class, 'testRun'])->name('flows.test_run');
+
+// Knowledge Base (RAG documents)
+Route::get('/knowledge', [KnowledgeController::class, 'index'])->name('knowledge.index');
+Route::post('/knowledge', [KnowledgeController::class, 'store'])->name('knowledge.store');
+Route::get('/knowledge/{id}', [KnowledgeController::class, 'show'])->name('knowledge.show');
+Route::delete('/knowledge/{id}', [KnowledgeController::class, 'destroy'])->name('knowledge.destroy');
+
+// Agents (Flows-as-tools, LLM tool-calling loop)
+Route::get('/agents', [AgentController::class, 'index'])->name('agents.index');
+Route::post('/agents', [AgentController::class, 'store'])->name('agents.store');
+Route::get('/agents/{id}/edit', [AgentController::class, 'edit'])->name('agents.edit');
+Route::get('/agents/{id}/voice', [AgentController::class, 'voice'])->name('agents.voice');
+Route::put('/agents/{id}', [AgentController::class, 'update'])->name('agents.update');
+Route::post('/agents/{id}/toggle', [AgentController::class, 'toggle'])->name('agents.toggle');
+Route::delete('/agents/{id}', [AgentController::class, 'destroy'])->name('agents.destroy');
+Route::post('/agents/{id}/test-run', [AgentController::class, 'testRun'])->name('agents.test_run');
 

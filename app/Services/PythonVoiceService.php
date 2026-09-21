@@ -81,6 +81,14 @@ class PythonVoiceService
                 return;
             }
         }
+
+        // Not our bug to fix: this usually means the OS's networking stack
+        // is broken on this machine (e.g. a corrupted Windows Winsock catalog
+        // — WinError 10106 — from VPN/antivirus software), which stops
+        // Python's asyncio event loop from binding a socket. STT/TTS still
+        // work via the synchronous CLI fallback in generateTts()/transcribeStt(),
+        // so this is a heads-up, not a failure.
+        Log::warning("Python Voice Core microservice did not come online within 5s — falling back to the CLI path for STT/TTS. If this persists, check for a broken network stack on this machine (e.g. run 'netsh winsock reset' as Administrator on Windows).");
     }
 
     /**
