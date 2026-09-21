@@ -36,6 +36,10 @@ php artisan migrate --force
 # Ensure storage symlink exists
 php artisan storage:link --force 2>/dev/null || true
 
+# Generate Swagger/OpenAPI documentation
+echo "Generating API documentation..."
+php artisan l5-swagger:generate
+
 # Start background queue worker
 echo "Starting Laravel Queue Worker in background..."
 php artisan queue:work --queue=default,tts,stt,downloads --sleep=2 --timeout=600 --tries=1 &

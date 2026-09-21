@@ -7,12 +7,20 @@ use App\Models\VoiceProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 
 class ProfileApiController extends Controller
 {
-    /**
-     * List all voice cloning profiles.
-     */
+    #[OA\Get(
+        path: '/api/v1/profiles',
+        summary: 'Ses klonlama profillerini listeleme',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Profiles'],
+        responses: [
+            new OA\Response(response: 200, description: 'Profil listesi'),
+            new OA\Response(response: 401, description: 'Geçersiz veya eksik API anahtarı'),
+        ]
+    )]
     public function index(): JsonResponse
     {
         $profiles = VoiceProfile::latest()->get()->map(function ($profile) {
@@ -35,9 +43,30 @@ class ProfileApiController extends Controller
         ]);
     }
 
-    /**
-     * Create a new voice profile with reference audio for zero-shot cloning.
-     */
+    #[OA\Post(
+        path: '/api/v1/profiles',
+        summary: 'Referans ses ile yeni bir ses klonlama profili oluşturma',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Profiles'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'multipart/form-data',
+                schema: new OA\Schema(
+                    required: ['name'],
+                    properties: [
+                        new OA\Property(property: 'name', type: 'string', maxLength: 100, description: 'Profil adı'),
+                        new OA\Property(property: 'description', type: 'string', maxLength: 500, nullable: true, description: 'Açıklama'),
+                        new OA\Property(property: 'sample', type: 'string', format: 'binary', nullable: true, description: 'Referans ses dosyası (wav, mp3, ogg, m4a, webm; maks. 20MB)'),
+                    ]
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Profil oluşturuldu'),
+            new OA\Response(response: 422, description: 'Doğrulama hatası'),
+        ]
+    )]
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -80,9 +109,19 @@ class ProfileApiController extends Controller
         ], 201);
     }
 
-    /**
-     * Delete a voice profile.
-     */
+    #[OA\Delete(
+        path: '/api/v1/profiles/{id}',
+        summary: 'Bir ses profilini silme',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Profiles'],
+        parameters: [
+            new OA\Parameter(name: 'id', description: 'Profil ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Profil silindi'),
+            new OA\Response(response: 404, description: 'Profil bulunamadı'),
+        ]
+    )]
     public function destroy(int $id): JsonResponse
     {
         $profile = VoiceProfile::find($id);

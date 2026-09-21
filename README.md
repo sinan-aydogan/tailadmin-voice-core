@@ -174,6 +174,7 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --buil
 ```
 
 - 📖 **REST API v1 Documentation:** [API.md](API.md)
+- 🧪 **Interactive Swagger UI:** `http://<host>:<port>/api/documentation` (OpenAPI spec at `/docs`)
 - 📋 **Docker Guide & Volumes:** [DOCKER.md](DOCKER.md)
 
 ---

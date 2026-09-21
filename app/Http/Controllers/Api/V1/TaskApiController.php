@@ -6,12 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Models\VoiceTask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class TaskApiController extends Controller
 {
-    /**
-     * List recent voice tasks with filtering.
-     */
+    #[OA\Get(
+        path: '/api/v1/tasks',
+        summary: 'Ses görevlerini listeleme ve filtreleme',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'type', description: 'Görev tipine göre filtre (tts, stt)', in: 'query', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'status', description: 'Duruma göre filtre (pending, running, completed, failed)', in: 'query', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'limit', description: 'Maksimum kayıt sayısı (1-100, varsayılan 20)', in: 'query', schema: new OA\Schema(type: 'integer', default: 20)),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Görev listesi'),
+            new OA\Response(response: 401, description: 'Geçersiz veya eksik API anahtarı'),
+        ]
+    )]
     public function index(Request $request): JsonResponse
     {
         $query = VoiceTask::query();
@@ -36,9 +49,19 @@ class TaskApiController extends Controller
         ]);
     }
 
-    /**
-     * Get details of a single task.
-     */
+    #[OA\Get(
+        path: '/api/v1/tasks/{id}',
+        summary: 'Tek bir görevin detayını alma',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'id', description: 'Görev ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Görev detayı'),
+            new OA\Response(response: 404, description: 'Görev bulunamadı'),
+        ]
+    )]
     public function show(int $id): JsonResponse
     {
         $task = VoiceTask::find($id);
@@ -55,9 +78,19 @@ class TaskApiController extends Controller
         ]);
     }
 
-    /**
-     * Delete a task and its associated output/upload files.
-     */
+    #[OA\Delete(
+        path: '/api/v1/tasks/{id}',
+        summary: 'Görevi ve ilişkili dosyaları silme',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'id', description: 'Görev ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Görev silindi'),
+            new OA\Response(response: 404, description: 'Görev bulunamadı'),
+        ]
+    )]
     public function destroy(int $id): JsonResponse
     {
         $task = VoiceTask::find($id);
