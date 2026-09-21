@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\V1\SttApiController;
 use App\Http\Controllers\Api\V1\TaskApiController;
 use App\Http\Controllers\Api\V1\ModelApiController;
 use App\Http\Controllers\Api\V1\ProfileApiController;
+use App\Http\Controllers\Api\V1\FlowTriggerController;
+use App\Http\Controllers\Api\V1\AgentTriggerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,4 +53,12 @@ Route::prefix('v1')->middleware(['api.key'])->group(function () {
     Route::get('/profiles', [ProfileApiController::class, 'index'])->name('api.v1.profiles.index');
     Route::post('/profiles', [ProfileApiController::class, 'store'])->name('api.v1.profiles.store');
     Route::delete('/profiles/{id}', [ProfileApiController::class, 'destroy'])->name('api.v1.profiles.destroy');
+
+    // Flows (Automation Webhooks)
+    Route::post('/flows/{slug}/run', [FlowTriggerController::class, 'run'])->name('api.v1.flows.run');
+    Route::get('/flows/runs/{id}', [FlowTriggerController::class, 'runStatus'])->name('api.v1.flows.run_status');
+
+    // Agents (Tool-calling webhooks)
+    Route::post('/agents/{slug}/run', [AgentTriggerController::class, 'run'])->name('api.v1.agents.run');
+    Route::get('/agents/runs/{id}', [AgentTriggerController::class, 'runStatus'])->name('api.v1.agents.run_status');
 });
