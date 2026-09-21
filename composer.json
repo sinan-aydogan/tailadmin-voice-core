@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "darkaonline/l5-swagger": "^11.1",
         "inertiajs/inertia-laravel": "^3.3",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
@@ -41,6 +42,7 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
+            "@php artisan l5-swagger:generate --ansi",
             "npm install",
             "npm run build"
         ],
@@ -55,7 +57,9 @@
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
-            "@php -r \"@mkdir('vendor/nativephp/desktop/resources/electron/electron-plugin/dist/server', 0777, true); @copy('patches/pdfPageSize.js', 'vendor/nativephp/desktop/resources/electron/electron-plugin/dist/server/pdfPageSize.js');\""
+            "@php -r \"@mkdir('vendor/nativephp/desktop/resources/electron/electron-plugin/dist/server', 0777, true); @copy('patches/pdfPageSize.js', 'vendor/nativephp/desktop/resources/electron/electron-plugin/dist/server/pdfPageSize.js');\"",
+            "@php -r \"$s='vendor/swagger-api/swagger-ui/dist'; $d='public/vendor/swagger-ui'; if(is_dir($s)){ @mkdir($d, 0777, true); foreach(new DirectoryIterator($s) as $f){ if($f->isDot() || !$f->isFile()) continue; copy($f->getPathname(), $d.'/'.$f->getFilename()); } }\"",
+            "@php patches/patch-swagger-ui.php"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force",

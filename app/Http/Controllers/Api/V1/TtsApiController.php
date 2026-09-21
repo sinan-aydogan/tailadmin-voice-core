@@ -11,12 +11,37 @@ use App\Services\QueueWorkerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 
 class TtsApiController extends Controller
 {
-    /**
-     * Generate speech from text (TTS).
-     */
+    #[OA\Post(
+        path: '/api/v1/tts/generate',
+        summary: 'Metinden ses üretimi (TTS)',
+        description: 'Metni yapay zeka modelleriyle sese dönüştürür. `sync=false` (varsayılan) isteği kuyruğa atar ve `task_id` döner; `sync=true` üretim tamamlanana kadar bekler ve sonucu doğrudan döner.',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['TTS'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['text'],
+                properties: [
+                    new OA\Property(property: 'text', type: 'string', maxLength: 10000, description: 'Seslendirilecek metin'),
+                    new OA\Property(property: 'engine', type: 'string', example: 'piper-tr', description: 'TTS motoru (piper-tr, piper-en, xtts-v2, bark, tortoise, musicgen-small)'),
+                    new OA\Property(property: 'language', type: 'string', example: 'tr', description: 'Dil kodu'),
+                    new OA\Property(property: 'profile_id', type: 'integer', nullable: true, description: 'Ses klonlama (XTTS) için referans profil ID'),
+                    new OA\Property(property: 'sync', type: 'boolean', default: false, description: 'true ise senkron, false ise kuyruk modunda çalışır'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Senkron üretim tamamlandı'),
+            new OA\Response(response: 202, description: 'Görev kuyruğa alındı (asenkron)'),
+            new OA\Response(response: 404, description: 'Belirtilen ses profili bulunamadı'),
+            new OA\Response(response: 422, description: 'Doğrulama hatası'),
+            new OA\Response(response: 500, description: 'TTS üretimi başarısız oldu'),
+        ]
+    )]
     public function generate(Request $request, PythonVoiceService $service): JsonResponse
     {
         $validated = $request->validate([

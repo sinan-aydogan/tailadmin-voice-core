@@ -10,12 +10,38 @@ use App\Services\QueueWorkerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 
 class SttApiController extends Controller
 {
-    /**
-     * Transcribe speech from audio file (STT).
-     */
+    #[OA\Post(
+        path: '/api/v1/stt/transcribe',
+        summary: 'Sesten metne deşifre (STT)',
+        description: 'Yüklenen ses dosyasını metne dönüştürür. `sync=false` (varsayılan) isteği kuyruğa atar ve `task_id` döner; `sync=true` işlem tamamlanana kadar bekler ve sonucu doğrudan döner.',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['STT'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'multipart/form-data',
+                schema: new OA\Schema(
+                    required: ['audio'],
+                    properties: [
+                        new OA\Property(property: 'audio', type: 'string', format: 'binary', description: 'Ses dosyası (wav, mp3, ogg, m4a, flac, webm; maks. 100MB)'),
+                        new OA\Property(property: 'language', type: 'string', example: 'tr', description: 'Dil kodu'),
+                        new OA\Property(property: 'model_size', type: 'string', nullable: true, description: 'Whisper model boyutu'),
+                        new OA\Property(property: 'sync', type: 'boolean', default: false, description: 'true ise senkron, false ise kuyruk modunda çalışır'),
+                    ]
+                )
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Senkron deşifre tamamlandı'),
+            new OA\Response(response: 202, description: 'Görev kuyruğa alındı (asenkron)'),
+            new OA\Response(response: 422, description: 'Doğrulama hatası'),
+            new OA\Response(response: 500, description: 'Deşifre işlemi başarısız oldu'),
+        ]
+    )]
     public function transcribe(Request $request, PythonVoiceService $service): JsonResponse
     {
         $validated = $request->validate([

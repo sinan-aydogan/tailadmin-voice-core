@@ -12,17 +12,114 @@ use App\Support\ChannelResponseFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\Response;
 
+#[OA\Tag(
+    name: 'Flows',
+    description: 'Görsel iş akışlarının (Visual Flows) tetiklenmesi, yürütülmesi ve asenkron durum sorgulaması'
+)]
 class FlowTriggerController extends Controller
 {
     use ChannelResponseFormatter;
 
-    /**
-     * Trigger a flow by its webhook slug. Runs synchronously by default and
-     * returns the flow's `output.response` node value directly in the HTTP
-     * response; pass ?async=1 to queue it instead and poll for the result.
-     */
+    #[OA\Post(
+        path: '/api/v1/flows/{slug}/run',
+        summary: 'Görsel akışı (Flow) tetikle ve çalıştır',
+        description: 'Benzersiz slug değerine sahip görsel akışı tetikler. Varsayılan olarak senkron çalışır ve akışın yanıtını doğrudan döner. ?async=1 parametresi ile asenkron kuyruğa gönderilebilir.',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Flows'],
+        parameters: [
+            new OA\Parameter(
+                name: 'slug',
+                description: 'Tetiklenecek akışın URL slug değeri',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'string', example: 'musteri-destek-akisi')
+            ),
+            new OA\Parameter(
+                name: 'async',
+                description: 'İşlemin arka plan kuyruğunda asenkron çalıştırılıp çalıştırılmayacağı',
+                in: 'query',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false)
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            description: 'Akış girdileri (JSON payload ve isteğe bağlı multipart audio dosyası)',
+            required: false,
+            content: [
+                new OA\MediaType(
+                    mediaType: 'application/json',
+                    schema: new OA\Schema(
+                        description: 'Akış bağlamına aktarılacak değişkenler',
+                        type: 'object',
+                        example: ['user_id' => '123', 'message' => 'Merhaba, sipariş durumumu öğrenmek istiyorum']
+                    )
+                ),
+                new OA\MediaType(
+                    mediaType: 'multipart/form-data',
+                    schema: new OA\Schema(
+                        properties: [
+                            new OA\Property(property: 'audio', description: 'İsteğe bağlı ses dosyası (STT düğümleri için)', type: 'string', format: 'binary'),
+                            new OA\Property(property: 'message', description: 'Metin mesajı', type: 'string'),
+                        ],
+                        type: 'object'
+                    )
+                ),
+            ]
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Akış başarıyla tamamlandı (Senkron yanıt)',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'run_id', type: 'integer', example: 42),
+                        new OA\Property(property: 'text', type: 'string', example: 'Talebiniz başarıyla alındı.'),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 202,
+                description: 'Akış arka plan kuyruğuna alındı (Asenkron)',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Akış çalıştırma kuyruğa alındı.'),
+                        new OA\Property(property: 'run_id', type: 'integer', example: 42),
+                        new OA\Property(property: 'status', type: 'string', example: 'pending'),
+                        new OA\Property(property: 'poll_url', type: 'string', example: 'http://127.0.0.1:8100/api/v1/flows/runs/42'),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Akış bulunamadı',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string', example: 'Akış bulunamadı.'),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 423,
+                description: 'Akış pasif durumda',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'message', type: 'string', example: 'Bu akış şu anda pasif durumda.'),
+                    ],
+                    type: 'object'
+                )
+            ),
+        ]
+    )]
     public function run(Request $request, string $slug, FlowExecutorService $executor): Response
     {
         $flow = Flow::where('trigger_slug', $slug)->first();
@@ -111,9 +208,42 @@ class FlowTriggerController extends Controller
         }
     }
 
-    /**
-     * Poll the status/result of an asynchronously dispatched flow run.
-     */
+    #[OA\Get(
+        path: '/api/v1/flows/runs/{id}',
+        summary: 'Akış çalışma durumunu sorgula',
+        description: 'Asenkron tetiklenmiş akış çalışmasının (FlowRun) durumunu, log kayıtlarını ve nihai çıktısını döner.',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Flows'],
+        parameters: [
+            new OA\Parameter(
+                name: 'id',
+                description: 'Çalışma (Run) ID',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'integer', example: 42)
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Akış çalışma durumu ve sonucu',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'run_id', type: 'integer', example: 42),
+                        new OA\Property(property: 'status', type: 'string', enum: ['pending', 'running', 'completed', 'failed'], example: 'completed'),
+                        new OA\Property(property: 'error_message', type: 'string', nullable: true),
+                        new OA\Property(property: 'output', type: 'object', nullable: true),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Çalışma kaydı bulunamadı'
+            ),
+        ]
+    )]
     public function runStatus($id): JsonResponse
     {
         $run = FlowRun::with('logs')->find($id);

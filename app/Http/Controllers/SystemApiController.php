@@ -236,7 +236,16 @@ class SystemApiController extends Controller
     public function openUrl(\Illuminate\Http\Request $request): JsonResponse
     {
         $url = $request->input('url');
-        if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
+        if (!$url) {
+            return response()->json(['success' => false, 'message' => 'URL is required'], 422);
+        }
+
+        // Support relative internal URLs such as /api/documentation
+        if (str_starts_with($url, '/')) {
+            $url = url($url);
+        }
+
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
             return response()->json(['success' => false, 'message' => 'Invalid URL'], 422);
         }
 

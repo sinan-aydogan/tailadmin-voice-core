@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\TtsController;
 use App\Http\Controllers\SttController;
 use App\Http\Controllers\ProfileController;
@@ -22,6 +23,8 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/documentation', [DocumentationController::class, 'index'])->name('documentation.index');
+Route::get('/docs/asset/{asset}', [\App\Http\Controllers\SwaggerAssetSanitizerController::class, 'show'])->name('l5-swagger.default.asset');
 Route::get('/support', [SupportController::class, 'index'])->name('support.index');
 
 // TTS

@@ -4,8 +4,10 @@
 /public/build
 /public/hot
 /public/storage
+/public/vendor/swagger-ui
 /storage/*.key
 /storage/pail
+/storage/api-docs
 /nativephp/
 .env
 

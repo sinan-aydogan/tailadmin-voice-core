@@ -8,12 +8,21 @@ use App\Models\ModelDownload;
 use App\Services\PythonVoiceService;
 use App\Services\QueueWorkerService;
 use Illuminate\Http\JsonResponse;
+use OpenApi\Attributes as OA;
 
 class ModelApiController extends Controller
 {
-    /**
-     * List all supported AI models with download status and sizes.
-     */
+    #[OA\Get(
+        path: '/api/v1/models',
+        summary: 'Desteklenen AI modellerini listeleme',
+        description: 'İndirme durumu ve boyutlarıyla birlikte desteklenen tüm AI modellerini döner.',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Models'],
+        responses: [
+            new OA\Response(response: 200, description: 'Model listesi'),
+            new OA\Response(response: 401, description: 'Geçersiz veya eksik API anahtarı'),
+        ]
+    )]
     public function index(PythonVoiceService $service): JsonResponse
     {
         $models = $service->getAvailableModels();
@@ -24,9 +33,20 @@ class ModelApiController extends Controller
         ]);
     }
 
-    /**
-     * Trigger background download for a specific AI model.
-     */
+    #[OA\Post(
+        path: '/api/v1/models/download/{modelId}',
+        summary: 'Bir AI modeli için arka planda indirme tetikleme',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Models'],
+        parameters: [
+            new OA\Parameter(name: 'modelId', description: 'Model kimliği', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Model zaten hazır ya da indirme zaten sürüyor'),
+            new OA\Response(response: 202, description: 'İndirme görevi kuyruğa alındı'),
+            new OA\Response(response: 404, description: 'Model tanınmıyor'),
+        ]
+    )]
     public function download(string $modelId, PythonVoiceService $service): JsonResponse
     {
         $models = $service->getAvailableModels();
@@ -91,9 +111,15 @@ class ModelApiController extends Controller
         ], 202);
     }
 
-    /**
-     * Get status of active and recent model downloads.
-     */
+    #[OA\Get(
+        path: '/api/v1/models/downloads',
+        summary: 'Aktif ve son model indirmelerinin durumu',
+        security: [['ApiKeyAuth' => []]],
+        tags: ['Models'],
+        responses: [
+            new OA\Response(response: 200, description: 'İndirme durumları listesi'),
+        ]
+    )]
     public function downloads(): JsonResponse
     {
         $downloads = ModelDownload::latest()->limit(20)->get();

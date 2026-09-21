@@ -19,6 +19,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Auto-generate Swagger API documentation if it does not exist yet
+        $docsPath = storage_path('api-docs/api-docs.json');
+        if (!file_exists($docsPath) && !app()->runningInConsole()) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('l5-swagger:generate');
+            } catch (\Throwable $e) {
+                // Silently skip if generating docs fails
+            }
+        }
     }
 }

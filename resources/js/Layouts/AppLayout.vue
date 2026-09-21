@@ -49,6 +49,20 @@
           <!-- Divider -->
           <div class="pt-2 my-1 border-t border-neutral-800"></div>
 
+          <!-- API Dökümantasyonu Link -->
+          <Link
+            href="/documentation"
+            class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors"
+            :class="$page.url.startsWith('/documentation') ? 'bg-accent/15 text-accent-300 font-semibold shadow-sm shadow-accent/5' : 'text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800/60'"
+          >
+            <span class="w-5 h-5 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </span>
+            <span class="truncate">{{ t('nav.api_docs', 'API Dokümantasyonu') }}</span>
+          </Link>
+
           <!-- Destek Ol Link -->
           <Link
             href="/support"
