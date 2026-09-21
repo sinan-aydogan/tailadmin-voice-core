@@ -136,6 +136,46 @@ class AgentController extends Controller
         return redirect()->route('agents.index')->with('success', 'Ajan silindi.');
     }
 
+    public function duplicate($id)
+    {
+        $agent = Agent::findOrFail($id);
+        $clone = $agent->duplicate();
+
+        return redirect()->route('agents.edit', $clone->id)->with('success', 'Ajan başarıyla kopyalandı.');
+    }
+
+    public function runs($id)
+    {
+        $agent = Agent::findOrFail($id);
+        $runs = $agent->runs()
+            ->with(['steps' => fn($q) => $q->orderBy('step_number', 'asc')])
+            ->latest()
+            ->paginate(15);
+
+        return response()->json([
+            'success' => true,
+            'runs' => $runs,
+        ]);
+    }
+
+    public function clearSession(Request $request, $id)
+    {
+        $agent = Agent::findOrFail($id);
+        $conversationId = $request->input('conversation_id') ?? $request->input('session_id');
+
+        if ($conversationId) {
+            $session = $agent->sessions()->where('conversation_id', $conversationId)->first();
+            $session?->clearMessages();
+        } else {
+            $agent->sessions()->each(fn($s) => $s->clearMessages());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Oturum hafızası temizlendi.',
+        ]);
+    }
+
     /**
      * Synchronously run the agent with sample input, returning the full
      * agent_run_steps trace (LLM turns + tool calls) for the builder's
@@ -177,6 +217,7 @@ class AgentController extends Controller
             $run->update([
                 'status' => 'completed',
                 'final_reply' => $result['reply_text'] ?? null,
+                'final_output' => $result['final'] ?? null,
                 'completed_at' => now(),
             ]);
 

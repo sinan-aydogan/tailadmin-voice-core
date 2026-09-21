@@ -50,11 +50,24 @@ class AgentExecutorService
             $userText = trim((string) ($sttResult['text'] ?? ''));
         }
 
-        if ($userText === '') {
-            throw new \RuntimeException('Ajan için boş bir mesaj/ses gönderildi.');
-        }
-
         $conversationId = (string) (data_get($triggerContext, 'body.conversation_id') ?: Str::random(16));
+
+        if ($userText === '') {
+            if (!empty($triggerContext['audio_path'])) {
+                $fallbackReply = 'Sesiniz net anlaşılamadı veya sessiz kalındı. Lütfen konuşmaya tekrar başlayın.';
+                $run->update([
+                    'status' => 'completed',
+                    'final_reply' => $fallbackReply,
+                    'completed_at' => now(),
+                ]);
+                return [
+                    'final' => $this->packageResponse($agent, $fallbackReply),
+                    'reply_text' => $fallbackReply,
+                    'conversation_id' => $conversationId,
+                ];
+            }
+            throw new \InvalidArgumentException('Ajan için boş bir mesaj gönderildi.');
+        }
 
         $session = AgentSession::firstOrCreate(
             ['agent_id' => $agent->id, 'conversation_id' => $conversationId],
@@ -115,45 +128,23 @@ class AgentExecutorService
                 break;
             }
 
+            // Execute tools requested by LLM
+            $this->executeTools($reply['tool_calls'], $agent, $run, $messages, $newTurnMessages);
+
             if ($iterations >= $maxIterations) {
-                $finalText = trim((string) ($reply['content'] ?? ''))
-                    ?: 'Araç çağrısı döngüsü sınırına ulaşıldı, cevap tamamlanamadı.';
-                break;
-            }
-
-            foreach ($reply['tool_calls'] as $toolCall) {
-                $toolStart = microtime(true);
-                $toolDef = $agent->findTool($toolCall['name']);
-                $flow = $toolDef ? Flow::find($toolDef['flow_id'] ?? null) : null;
-                $errorMessage = null;
-                $toolContent = '';
-
-                try {
-                    if (!$flow) {
-                        throw new \RuntimeException("Tool '{$toolCall['name']}' için tanımlı bir akış bulunamadı.");
-                    }
-
-                    $toolResult = $this->flowExecutor->run($flow, ['body' => $toolCall['arguments'] ?? []]);
-                    $value = $toolResult['final']['value'] ?? null;
-                    $toolContent = is_string($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE);
-                } catch (\Throwable $e) {
-                    $errorMessage = $e->getMessage();
-                    $toolContent = 'Hata: ' . $errorMessage;
-                }
-
-                $this->logStep(
-                    $run, 'tool_call', $toolCall['name'], $flow?->id,
-                    $toolCall['arguments'] ?? [], ['content' => $toolContent], $errorMessage, $toolStart
+                // Synthesize final answer with collected data, disallowing more tool calls
+                $synthReply = $this->llmService->chat(
+                    messages: $messages,
+                    tools: [],
+                    model: $agent->model,
+                    provider: $agent->provider,
+                    apiKey: $agent->api_key,
+                    baseUrl: $agent->base_url,
                 );
-
-                $toolMessage = [
-                    'role' => 'tool',
-                    'tool_call_id' => $toolCall['id'],
-                    'name' => $toolCall['name'],
-                    'content' => $toolContent,
-                ];
-                $messages[] = $toolMessage;
-                $newTurnMessages[] = $toolMessage;
+                $finalText = trim((string) ($synthReply['content'] ?? ''))
+                    ?: 'Araç döngüsü sınırına ulaşıldı, mevcut verilerle cevap tamamlandı.';
+                $newTurnMessages[] = $synthReply;
+                break;
             }
         }
 
@@ -164,6 +155,58 @@ class AgentExecutorService
             'reply_text' => $finalText,
             'conversation_id' => $conversationId,
         ];
+    }
+
+    protected function executeTools(array $toolCalls, Agent $agent, AgentRun $run, array &$messages, array &$newTurnMessages): void
+    {
+        foreach ($toolCalls as $toolCall) {
+            $toolStart = microtime(true);
+            $toolDef = $agent->findTool($toolCall['name']);
+            $flow = $toolDef ? Flow::find($toolDef['flow_id'] ?? null) : null;
+            $errorMessage = null;
+            $toolContent = '';
+
+            try {
+                if (!$flow) {
+                    throw new \RuntimeException("Tool '{$toolCall['name']}' için tanımlı bir akış bulunamadı.");
+                }
+
+                $toolResult = $this->flowExecutor->run($flow, ['body' => $toolCall['arguments'] ?? []]);
+                $value = $toolResult['final']['value'] ?? null;
+
+                // If flow has no output.response node, fallback to the last action node's output in context
+                if ($value === null && !empty($toolResult['context'])) {
+                    $contextNodes = array_filter(
+                        $toolResult['context'],
+                        fn ($k) => !in_array($k, ['trigger', '_flow']),
+                        ARRAY_FILTER_USE_KEY
+                    );
+                    if (!empty($contextNodes)) {
+                        $lastNodeOutput = end($contextNodes);
+                        $value = $lastNodeOutput['output'] ?? $lastNodeOutput['data'] ?? $lastNodeOutput;
+                    }
+                }
+
+                $toolContent = is_string($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE);
+            } catch (\Throwable $e) {
+                $errorMessage = $e->getMessage();
+                $toolContent = 'Hata: ' . $errorMessage;
+            }
+
+            $this->logStep(
+                $run, 'tool_call', $toolCall['name'], $flow?->id,
+                $toolCall['arguments'] ?? [], ['content' => $toolContent], $errorMessage, $toolStart
+            );
+
+            $toolMessage = [
+                'role' => 'tool',
+                'tool_call_id' => $toolCall['id'],
+                'name' => $toolCall['name'],
+                'content' => $toolContent,
+            ];
+            $messages[] = $toolMessage;
+            $newTurnMessages[] = $toolMessage;
+        }
     }
 
     protected function buildKnowledgeBlock(array $documentIds, string $query): string
@@ -203,8 +246,14 @@ class AgentExecutorService
             $profilePath = $profile?->sample_path;
         }
 
+        // Sanitize markdown and voiceover notes so TTS reads natural spoken text
+        $ttsText = PythonVoiceService::sanitizeTextForTts($text);
+        if (trim($ttsText) === '') {
+            $ttsText = $text;
+        }
+
         $this->voiceService->generateTts(
-            $text,
+            $ttsText,
             $agent->tts_engine ?: 'piper-tr',
             $agent->tts_language ?: 'tr',
             $profilePath,

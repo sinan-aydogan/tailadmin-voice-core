@@ -650,7 +650,7 @@ class LlmService
             throw new \Exception('LLM API hatası: HTTP ' . $response->status() . ' - ' . $response->body());
         }
 
-        return $this->fromOpenAiMessage($response->json('choices.0.message') ?? []);
+        return $this->fromOpenAiMessage($response->json('choices.0.message') ?? [], $tools);
     }
 
     protected function toOpenAiMessages(array $messages): array
@@ -683,29 +683,65 @@ class LlmService
         return $out;
     }
 
-    protected function fromOpenAiMessage(array $message): array
+    protected function fromOpenAiMessage(array $message, array $tools = []): array
     {
         if (!empty($message['tool_calls'])) {
             return [
                 'role' => 'assistant',
                 'content' => $message['content'] ?? null,
-                'tool_calls' => array_map(fn ($tc) => [
-                    'id' => $tc['id'] ?? ('call_' . Str::random(10)),
-                    'name' => $tc['function']['name'] ?? '',
-                    'arguments' => json_decode($tc['function']['arguments'] ?? '{}', true) ?? [],
-                ], $message['tool_calls']),
+                'tool_calls' => array_map(function ($tc) {
+                    $rawArgs = $tc['function']['arguments'] ?? [];
+                    $arguments = is_array($rawArgs)
+                        ? $rawArgs
+                        : (is_string($rawArgs) ? (json_decode($rawArgs, true) ?? []) : []);
+
+                    return [
+                        'id' => $tc['id'] ?? ('call_' . Str::random(10)),
+                        'name' => $tc['function']['name'] ?? '',
+                        'arguments' => $arguments,
+                    ];
+                }, $message['tool_calls']),
             ];
         }
 
-        return ['role' => 'assistant', 'content' => trim((string) ($message['content'] ?? ''))];
-    }
+        $content = trim((string) ($message['content'] ?? ''));
 
-    protected function chatWithClaude(string $apiKey, string $model, array $messages, array $tools): array
-    {
-        if (empty($apiKey)) {
-            throw new \Exception('Anthropic Claude için API anahtarı girilmedi.');
+        // Smart fallback for local/Ollama models that output markdown JSON tool calls in text
+        if (!empty($tools) && !empty($content)) {
+            $parsedCall = $this->extractJsonToolCall($content, $tools);
+            if ($parsedCall) {
+                return [
+                    'role' => 'assistant',
+                    'content' => null,
+                    'tool_calls' => [$parsedCall],
+                ];
+            }
         }
 
+        return ['role' => 'assistant', 'content' => $content];
+    }
+
+    protected function extractJsonToolCall(string $content, array $tools): ?array
+    {
+        $toolNames = array_map(fn ($t) => $t['name'] ?? '', $tools);
+
+        if (preg_match('/```(?:json)?\s*(\{[\s\S]*?\})\s*```/s', $content, $m) || preg_match('/(\{[\s\S]*?"name"\s*:\s*"[^"]+"[\s\S]*?\})/s', $content, $m)) {
+            $decoded = json_decode($m[1], true);
+            if (is_array($decoded) && !empty($decoded['name']) && in_array($decoded['name'], $toolNames)) {
+                $rawArgs = $decoded['arguments'] ?? $decoded['parameters'] ?? [];
+                return [
+                    'id' => 'call_' . Str::random(10),
+                    'name' => $decoded['name'],
+                    'arguments' => is_array($rawArgs) ? $rawArgs : (is_string($rawArgs) ? (json_decode($rawArgs, true) ?? []) : []),
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    public function toAnthropicMessages(array $messages, ?string &$system = null): array
+    {
         $system = null;
         $claudeMessages = [];
 
@@ -723,23 +759,50 @@ class LlmService
                     $content[] = ['type' => 'text', 'text' => $m['content']];
                 }
                 foreach ($m['tool_calls'] as $tc) {
-                    $content[] = ['type' => 'tool_use', 'id' => $tc['id'], 'name' => $tc['name'], 'input' => $tc['arguments'] ?? []];
+                    $tcName = $tc['name'] ?? ($tc['function']['name'] ?? '');
+                    $tcInput = $tc['arguments'] ?? ($tc['function']['arguments'] ?? []);
+                    if (is_string($tcInput)) {
+                        $tcInput = json_decode($tcInput, true) ?? [];
+                    }
+                    $content[] = ['type' => 'tool_use', 'id' => $tc['id'] ?? uniqid('call_'), 'name' => $tcName, 'input' => $tcInput];
                 }
                 $claudeMessages[] = ['role' => 'assistant', 'content' => $content];
                 continue;
             }
 
             if ($role === 'tool') {
-                $claudeMessages[] = ['role' => 'user', 'content' => [[
+                $toolResultBlock = [
                     'type' => 'tool_result',
                     'tool_use_id' => $m['tool_call_id'] ?? null,
                     'content' => (string) ($m['content'] ?? ''),
-                ]]];
+                ];
+
+                $lastIdx = count($claudeMessages) - 1;
+                if ($lastIdx >= 0 && ($claudeMessages[$lastIdx]['role'] ?? '') === 'user' && is_array($claudeMessages[$lastIdx]['content'])) {
+                    $claudeMessages[$lastIdx]['content'][] = $toolResultBlock;
+                } else {
+                    $claudeMessages[] = [
+                        'role' => 'user',
+                        'content' => [$toolResultBlock],
+                    ];
+                }
                 continue;
             }
 
             $claudeMessages[] = ['role' => $role, 'content' => (string) ($m['content'] ?? '')];
         }
+
+        return $claudeMessages;
+    }
+
+    protected function chatWithClaude(string $apiKey, string $model, array $messages, array $tools): array
+    {
+        if (empty($apiKey)) {
+            throw new \Exception('Anthropic Claude için API anahtarı girilmedi.');
+        }
+
+        $system = null;
+        $claudeMessages = $this->toAnthropicMessages($messages, $system);
 
         $payload = [
             'model' => $model ?: 'claude-3-5-sonnet-20241022',
@@ -784,13 +847,8 @@ class LlmService
         return ['role' => 'assistant', 'content' => trim((string) $text)];
     }
 
-    protected function chatWithGemini(string $apiKey, string $model, array $messages, array $tools): array
+    public function toGeminiContents(array $messages, ?string &$systemInstruction = null): array
     {
-        if (empty($apiKey)) {
-            throw new \Exception('Google Gemini için API anahtarı girilmedi.');
-        }
-
-        $geminiModel = $model ?: 'gemini-2.0-flash';
         $systemInstruction = null;
         $contents = [];
 
@@ -808,24 +866,52 @@ class LlmService
                     $parts[] = ['text' => $m['content']];
                 }
                 foreach ($m['tool_calls'] as $tc) {
-                    $parts[] = ['functionCall' => ['name' => $tc['name'], 'args' => $tc['arguments'] ?? []]];
+                    $tcName = $tc['name'] ?? ($tc['function']['name'] ?? '');
+                    $tcArgs = $tc['arguments'] ?? ($tc['function']['arguments'] ?? []);
+                    if (is_string($tcArgs)) {
+                        $tcArgs = json_decode($tcArgs, true) ?? [];
+                    }
+                    $parts[] = ['functionCall' => ['name' => $tcName, 'args' => $tcArgs]];
                 }
                 $contents[] = ['role' => 'model', 'parts' => $parts];
                 continue;
             }
 
             if ($role === 'tool') {
-                $contents[] = ['role' => 'function', 'parts' => [[
+                $functionResponsePart = [
                     'functionResponse' => [
                         'name' => $m['name'] ?? '',
                         'response' => ['result' => (string) ($m['content'] ?? '')],
                     ],
-                ]]];
+                ];
+
+                $lastIdx = count($contents) - 1;
+                if ($lastIdx >= 0 && ($contents[$lastIdx]['role'] ?? '') === 'function' && is_array($contents[$lastIdx]['parts'])) {
+                    $contents[$lastIdx]['parts'][] = $functionResponsePart;
+                } else {
+                    $contents[] = [
+                        'role' => 'function',
+                        'parts' => [$functionResponsePart],
+                    ];
+                }
                 continue;
             }
 
             $contents[] = ['role' => $role === 'assistant' ? 'model' : 'user', 'parts' => [['text' => (string) ($m['content'] ?? '')]]];
         }
+
+        return $contents;
+    }
+
+    protected function chatWithGemini(string $apiKey, string $model, array $messages, array $tools): array
+    {
+        if (empty($apiKey)) {
+            throw new \Exception('Google Gemini için API anahtarı girilmedi.');
+        }
+
+        $geminiModel = $model ?: 'gemini-2.0-flash';
+        $systemInstruction = null;
+        $contents = $this->toGeminiContents($messages, $systemInstruction);
 
         $payload = ['contents' => $contents];
         if ($systemInstruction) {
