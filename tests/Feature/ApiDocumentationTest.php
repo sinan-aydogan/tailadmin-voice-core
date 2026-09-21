@@ -29,4 +29,35 @@ class ApiDocumentationTest extends TestCase
         $this->assertArrayHasKey('/api/v1/models', $spec['paths']);
         $this->assertArrayHasKey('/api/v1/profiles', $spec['paths']);
     }
+
+    public function test_in_app_documentation_page_embeds_swagger_ui(): void
+    {
+        $response = $this->get('/documentation');
+
+        $response->assertStatus(200);
+        $response->assertSee('Documentation\/Index', false);
+    }
+
+    public function test_swagger_ui_page_references_static_bundle_not_dynamic_route(): void
+    {
+        // NativePHP's LivewireDispatcher listens on every RequestHandled response and
+        // injects a script before the first "</head>"/"</html>" it finds. swagger-ui-bundle.js
+        // contains that exact substring inside a minified string literal, so serving it through
+        // Laravel's dynamic asset route corrupts the file and leaves the Swagger UI blank in
+        // the desktop app. It must be served from the static public copy instead.
+        $response = $this->get('/api/documentation');
+
+        $response->assertStatus(200);
+        $response->assertSee('/vendor/swagger-ui/swagger-ui-bundle.js', false);
+        $response->assertDontSee('docs/asset/swagger-ui-bundle.js', false);
+    }
+
+    public function test_static_swagger_ui_bundle_matches_vendor_source_byte_for_byte(): void
+    {
+        $vendorFile = base_path('vendor/swagger-api/swagger-ui/dist/swagger-ui-bundle.js');
+        $publicFile = public_path('vendor/swagger-ui/swagger-ui-bundle.js');
+
+        $this->assertFileExists($publicFile);
+        $this->assertSame(file_get_contents($vendorFile), file_get_contents($publicFile));
+    }
 }

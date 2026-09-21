@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\TtsController;
 use App\Http\Controllers\SttController;
 use App\Http\Controllers\ProfileController;
@@ -20,6 +21,7 @@ Route::get('/', function () {
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 Route::get('/support', [SupportController::class, 'index'])->name('support.index');
+Route::get('/documentation', [DocumentationController::class, 'index'])->name('documentation.index');
 
 // TTS
 Route::get('/tts', [TtsController::class, 'index'])->name('tts.index');

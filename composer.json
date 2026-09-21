@@ -56,7 +56,8 @@
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
-            "@php -r \"@mkdir('vendor/nativephp/desktop/resources/electron/electron-plugin/dist/server', 0777, true); @copy('patches/pdfPageSize.js', 'vendor/nativephp/desktop/resources/electron/electron-plugin/dist/server/pdfPageSize.js');\""
+            "@php -r \"@mkdir('vendor/nativephp/desktop/resources/electron/electron-plugin/dist/server', 0777, true); @copy('patches/pdfPageSize.js', 'vendor/nativephp/desktop/resources/electron/electron-plugin/dist/server/pdfPageSize.js');\"",
+            "@php -r \"$s='vendor/swagger-api/swagger-ui/dist'; $d='public/vendor/swagger-ui'; if(is_dir($s)){ @mkdir($d, 0777, true); foreach(new DirectoryIterator($s) as $f){ if($f->isDot() || !$f->isFile()) continue; copy($f->getPathname(), $d.'/'.$f->getFilename()); } }\""
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
