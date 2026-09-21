@@ -158,6 +158,18 @@ class PythonVoiceService
      */
     public function transcribeStt(string $audioFilePath, string $language = 'tr', ?string $modelSize = null): array
     {
+        if (!file_exists($audioFilePath)) {
+            throw new \RuntimeException("Audio file not found: {$audioFilePath}");
+        }
+
+        if (filesize($audioFilePath) < 100) {
+            return [
+                'text' => '',
+                'language' => $language,
+                'segments' => [],
+            ];
+        }
+
         if ($this->isServiceOnline()) {
             $postData = ['language' => $language];
             if (!empty($modelSize)) {
