@@ -195,6 +195,27 @@
                     Sıfırla
                   </button>
                 </div>
+
+                <!-- Staged Location Change Notice -->
+                <div
+                  v-if="isDirChanged"
+                  class="mt-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-150"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-base shrink-0">⚠️</span>
+                    <div class="space-y-0.5 truncate">
+                      <span class="font-semibold text-amber-200">Model konumu değiştirildi</span>
+                      <p class="text-[11px] text-amber-300/80 truncate">Ayarları kaydettiğinizde mevcut modelleri yeni konuma taşıma veya silme seçenekleri sunulacaktır.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    @click="form.models_dir = oldModelsDir"
+                    class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 shrink-0 cursor-pointer"
+                  >
+                    Geri Al
+                  </button>
+                </div>
               </div>
 
               <div class="p-3.5 rounded-xl bg-neutral-900/60 border border-neutral-800 text-xs text-neutral-400 flex items-start gap-2.5">
@@ -282,6 +303,179 @@
             </div>
           </div>
 
+          <!-- Multi-Cloud Audio & Voice Providers Configuration Card -->
+          <div class="p-6 rounded-2xl bg-surface border border-neutral-800 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300">
+                  <span class="text-lg select-none">☁️</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h2 class="text-base font-semibold text-neutral-100">Bulut Ses &amp; Konuşma Sağlayıcıları (Multi-Cloud API)</h2>
+                    <span class="px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/30 text-[10px] font-semibold text-purple-300">
+                      ⚡ 0 MB İndirme • Bulut API
+                    </span>
+                  </div>
+                  <p class="text-xs text-neutral-500 mt-0.5">
+                    OpenAI, ElevenLabs, Google Cloud, Groq ve Freya Voice modellerini doğrudan API anahtarınızla anında kullanın.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Quick Link to Model Manager -->
+              <a href="/models" class="px-3.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-300 transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer">
+                <span>Model Yöneticisi</span>
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </a>
+            </div>
+
+            <!-- Provider Sub-Tab Pills -->
+            <div class="flex items-center gap-1.5 p-1 rounded-xl bg-neutral-900 border border-neutral-800 overflow-x-auto">
+              <button
+                v-for="p in cloudSettingsProviders"
+                :key="p.id"
+                type="button"
+                @click="activeCloudTab = p.id; cloudTestResult = null"
+                :class="[
+                  'px-3.5 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap',
+                  activeCloudTab === p.id
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/60'
+                ]"
+              >
+                <span>{{ p.icon }}</span>
+                <span>{{ p.name }}</span>
+                <span
+                  v-if="isCloudKeySet(p.id)"
+                  class="w-2 h-2 rounded-full bg-emerald-400"
+                  title="API Anahtarı Tanımlı"
+                ></span>
+              </button>
+            </div>
+
+            <!-- Active Provider Configuration Details -->
+            <div v-for="p in cloudSettingsProviders" :key="'panel-' + p.id">
+              <div v-if="activeCloudTab === p.id" class="space-y-4 pt-1">
+                <!-- Provider Overview Header -->
+                <div class="p-3.5 rounded-xl bg-neutral-900/60 border border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div class="space-y-0.5">
+                    <div class="text-xs font-semibold text-neutral-200 flex items-center gap-2">
+                      <span>{{ p.icon }} {{ p.name }}</span>
+                      <span class="px-2 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono">{{ p.badge }}</span>
+                    </div>
+                    <div class="text-[11px] text-neutral-400 leading-relaxed">{{ p.desc }}</div>
+                    <div class="text-[10px] text-neutral-500 pt-0.5">
+                      <span class="text-neutral-400 font-medium">Modeller:</span> {{ p.models }}
+                    </div>
+                  </div>
+
+                  <div class="self-start sm:self-auto">
+                    <span v-if="isCloudKeySet(p.id)" class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-medium text-emerald-400 flex items-center gap-1.5 whitespace-nowrap">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Bulut API Aktif (0 MB)
+                    </span>
+                    <span v-else class="px-2.5 py-1 rounded-lg bg-neutral-800 border border-neutral-700 text-[11px] text-neutral-400 flex items-center gap-1.5 whitespace-nowrap">
+                      <span class="w-1.5 h-1.5 rounded-full bg-neutral-500"></span>
+                      Anahtar Bekleniyor
+                    </span>
+                  </div>
+                </div>
+
+                <!-- API Key Input Field -->
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-xs font-medium text-neutral-400">{{ p.name }} API Anahtarı</label>
+                    <a :href="p.docs_url" target="_blank" rel="noopener noreferrer" class="text-[11px] text-accent hover:underline flex items-center gap-1">
+                      <span>Anahtar Oluştur / Yönet</span>
+                      <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                  <div class="relative flex items-center">
+                    <input
+                      v-model="form[p.keyField]"
+                      :type="showCloudKey[p.id] ? 'text' : 'password'"
+                      :placeholder="p.placeholder"
+                      class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 pr-24 text-xs font-mono text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-accent"
+                    />
+                    <div class="absolute right-2.5 flex items-center gap-1">
+                      <button
+                        type="button"
+                        @click="showCloudKey[p.id] = !showCloudKey[p.id]"
+                        class="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs transition-colors cursor-pointer"
+                        :title="showCloudKey[p.id] ? 'Gizle' : 'Göster'"
+                      >
+                        {{ showCloudKey[p.id] ? 'Gizle' : 'Göster' }}
+                      </button>
+                      <button
+                        v-if="form[p.keyField]"
+                        type="button"
+                        @click="form[p.keyField] = ''"
+                        class="px-2.5 py-1.5 rounded-lg text-neutral-400 hover:text-red-400 text-xs transition-colors cursor-pointer"
+                        title="Temizle"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Freya Default Voice Specific Option -->
+                <div v-if="p.id === 'freya'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-neutral-400 mb-1.5">Varsayılan Freya Sesi</label>
+                    <select
+                      v-model="form.freya_default_voice"
+                      class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-2.5 text-xs text-neutral-100 focus:outline-none focus:border-accent"
+                    >
+                      <option value="adam">Adam - Hiper-Gerçekçi İnsansı Erkek Sesi (Flagship)</option>
+                      <option value="eve">Eve - Hiper-Gerçekçi İnsansı Kadın Sesi (Flagship)</option>
+                      <option value="leyla">Leyla - Türkçe Doğal Kadın Sesi</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Test Connection Button -->
+                <div>
+                  <button
+                    type="button"
+                    @click="testCloudConnection(p.id)"
+                    :disabled="isTestingCloud || !isCloudKeySet(p.id)"
+                    class="px-4 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <span v-if="isTestingCloud" class="w-3.5 h-3.5 border-2 border-purple-300 border-t-transparent rounded-full animate-spin"></span>
+                    <span v-else>⚡</span>
+                    <span>{{ isTestingCloud ? 'Bağlantı Sınanıyor...' : `${p.name} API Bağlantısını Test Et` }}</span>
+                  </button>
+                </div>
+
+                <!-- Test Result Alert -->
+                <div
+                  v-if="cloudTestResult"
+                  :class="[
+                    'p-3.5 rounded-xl text-xs flex items-start gap-2.5 transition-all',
+                    cloudTestResult.success
+                      ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+                      : 'bg-red-500/10 border border-red-500/30 text-red-300'
+                  ]"
+                >
+                  <span class="text-base select-none mt-0.5">{{ cloudTestResult.success ? '✅' : '❌' }}</span>
+                  <div class="flex-1">
+                    <div class="font-medium">{{ cloudTestResult.message }}</div>
+                    <div v-if="cloudTestResult.models && cloudTestResult.models.length > 0" class="text-[10px] opacity-75 mt-0.5">
+                      Kullanılabilir Modeller: {{ cloudTestResult.models.join(', ') }}
+                    </div>
+                  </div>
+                  <button type="button" @click="cloudTestResult = null" class="opacity-60 hover:opacity-100 cursor-pointer">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Default Engine Setting Card -->
           <div class="p-6 rounded-2xl bg-surface border border-neutral-800 space-y-4">
             <div class="flex items-center gap-3">
@@ -299,12 +493,60 @@
                 v-model="form.default_tts_engine"
                 class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs text-neutral-100 focus:outline-none focus:border-accent"
               >
-                <option value="piper-tr">Piper TTS (Türkçe - Ultra Hızlı & Düşük Kaynak)</option>
-                <option value="xtts-v2">Coqui XTTS v2 (Yüksek Kalite / Ses Klonlama)</option>
-                <option value="bark">Suno Bark (Doğal / İfadeli & Çok Dilli)</option>
+                <optgroup label="── ☁️ Bulut API Modelleri ──">
+                  <option value="freya-adam">Freya Voice (Adam - İnsansı Erkek • Bulut)</option>
+                  <option value="freya-eve">Freya Voice (Eve - İnsansı Kadın • Bulut)</option>
+                  <option value="openai-tts-1">OpenAI TTS (tts-1 • Bulut)</option>
+                  <option value="openai-tts-hd">OpenAI TTS HD (tts-1-hd • Bulut)</option>
+                  <option value="elevenlabs-multilingual">ElevenLabs Multilingual v2 (Bulut)</option>
+                  <option value="elevenlabs-flash">ElevenLabs Flash v2.5 (Bulut)</option>
+                  <option value="google-cloud-tts">Google Cloud TTS (Journey &amp; Neural2 • Bulut)</option>
+                </optgroup>
+                <optgroup label="── 💾 Yerel Modeller ──">
+                  <option value="piper-tr">Piper TTS (Türkçe - Ultra Hızlı &amp; Düşük Kaynak)</option>
+                  <option value="freya-tts">FreyaTTS (Türkçe - 183M DiT • Açık Kaynak)</option>
+                  <option value="xtts-v2">Coqui XTTS v2 (Yüksek Kalite / Ses Klonlama)</option>
+                  <option value="bark">Suno Bark (Doğal / İfadeli &amp; Çok Dilli)</option>
+                </optgroup>
               </select>
               <div class="text-[11px] text-neutral-500">
-                Hafif cihazlar ve günlük okumalar için <strong>Piper TTS</strong>; kişisel ses klonlama için <strong>Coqui XTTS v2</strong> önerilir.
+                Hiper-gerçekçi insan sesi için <strong>Freya Adam &amp; Eve</strong> veya <strong>OpenAI / ElevenLabs</strong>; hafif cihazlar için <strong>Piper TTS</strong> veya yerel <strong>FreyaTTS</strong>; ses klonlama için <strong>Coqui XTTS v2</strong> önerilir.
+              </div>
+            </div>
+          </div>
+
+          <!-- Default STT Engine & Model Setting Card -->
+          <div class="p-6 rounded-2xl bg-surface border border-neutral-800 space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+                <span class="text-base select-none">🎧</span>
+              </div>
+              <div>
+                <h2 class="text-base font-semibold text-neutral-100">Varsayılan Sesten Metne (STT) Modeli</h2>
+                <p class="text-xs text-neutral-500 mt-0.5">Ses tanıma, deşifre ve canlı sesli asistan oturumlarında varsayılan olarak kullanılacak Whisper modeli.</p>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <select
+                v-model="form.default_stt_model"
+                class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs text-neutral-100 focus:outline-none focus:border-accent"
+              >
+                <optgroup label="── ☁️ Bulut API STT Modelleri (0 MB İndirme) ──">
+                  <option value="groq-whisper">⚡ Groq Whisper Large v3 (LPU Ultra Hızlı &lt;1s Bulut)</option>
+                  <option value="openai-whisper">☁️ OpenAI Whisper Cloud (whisper-1 Bulut)</option>
+                  <option value="google-cloud-stt">☁️ Google Cloud STT (Chirp v2 Bulut)</option>
+                </optgroup>
+                <optgroup label="── 💾 Yerel Whisper Modelleri ──">
+                  <option value="whisper-medium">Faster Whisper Medium (Önerilen - Yüksek Doğruluk &amp; Hızlı, ~3 GB)</option>
+                  <option value="whisper-small">Faster Whisper Small (Dengeli Hız &amp; Doğruluk, ~1 GB)</option>
+                  <option value="whisper-base">Faster Whisper Base (Hızlı - Düşük Kaynak Tüketimi, ~250 MB)</option>
+                  <option value="whisper-tiny">Faster Whisper Tiny (Ultra Hızlı - Minimum Bellek, ~150 MB)</option>
+                  <option value="whisper-large-v3">Faster Whisper Large V3 (En Yüksek Doğruluk - GPU Önerilir, ~6 GB)</option>
+                </optgroup>
+              </select>
+              <div class="text-[11px] text-neutral-500">
+                Ultra hızlı bulut deşifre için <strong>Groq Whisper Large v3</strong>; çevrimdışı yerel deşifrede en iyi doğruluk için <strong>Faster Whisper Medium</strong> önerilir.
               </div>
             </div>
           </div>
@@ -957,6 +1199,223 @@
         @close="showLogsModal = false"
         @logs-cleared="onLogsCleared"
       />
+
+      <!-- Modal 1: Model Transfer Confirmation Modal -->
+      <div
+        v-if="showMoveModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity"
+        @click.self="cancelMoveModal"
+      >
+        <div class="w-full max-w-lg bg-surface border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <!-- Header -->
+          <div class="p-5 border-b border-neutral-800 flex items-center justify-between bg-neutral-900/60">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-accent/20 border border-accent/30 flex items-center justify-center text-accent shrink-0">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-neutral-100 flex items-center gap-2">
+                  Model Konumu Değiştirildi
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-accent/20 text-accent border border-accent/30">Taşıma Sorusu</span>
+                </h3>
+                <p class="text-xs text-neutral-400">Yapay zeka modellerinin yeni klasöre aktarılması</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              @click="cancelMoveModal"
+              class="text-neutral-500 hover:text-neutral-300 p-1.5 rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="p-6 space-y-4 text-xs">
+            <!-- Path comparison box -->
+            <div class="p-4 rounded-xl bg-neutral-900/80 border border-neutral-800 space-y-2.5">
+              <div>
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 block mb-1">Eski Model Konumu</span>
+                <div class="font-mono text-neutral-300 bg-black/40 p-2 rounded-lg border border-neutral-800/80 break-all text-[11px]">
+                  {{ oldModelsDir }}
+                </div>
+              </div>
+              <div class="flex justify-center text-accent">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </div>
+              <div>
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-accent block mb-1">Yeni Model Konumu</span>
+                <div class="font-mono text-emerald-300 bg-black/40 p-2 rounded-lg border border-accent/30 break-all text-[11px]">
+                  {{ form.models_dir }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Detected models badge and count -->
+            <div class="p-3.5 rounded-xl bg-neutral-900/50 border border-neutral-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="font-medium text-neutral-300">Mevcut İndirilmiş Modeller:</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-800 text-neutral-200 border border-neutral-700">
+                  {{ existingModelsInfo.models_count }} Model ({{ formatBytes(existingModelsInfo.total_size_bytes) }})
+                </span>
+              </div>
+              <div v-if="existingModelsInfo.model_names?.length" class="flex flex-wrap gap-1.5 pt-1">
+                <span
+                  v-for="name in existingModelsInfo.model_names"
+                  :key="name"
+                  class="px-2 py-0.5 rounded-md text-[10.5px] font-mono bg-neutral-800/90 text-neutral-300 border border-neutral-700/60"
+                >
+                  {{ name }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Question Prompt -->
+            <p class="text-neutral-200 text-xs font-semibold leading-relaxed">
+              Eski konumdaki indirilmiş modelleriniz yeni seçilen klasöre taşınsın mı?
+            </p>
+          </div>
+
+          <!-- Actions -->
+          <div class="p-5 border-t border-neutral-800 bg-neutral-900/40 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+            <button
+              type="button"
+              @click="cancelMoveModal"
+              class="w-full sm:w-auto px-4 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors cursor-pointer order-3 sm:order-1"
+            >
+              İptal
+            </button>
+            <button
+              type="button"
+              @click="declineTransferMove"
+              class="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors cursor-pointer order-2"
+            >
+              Hayır, Taşıma
+            </button>
+            <button
+              type="button"
+              @click="confirmTransferMove"
+              class="w-full sm:w-auto px-5 py-2 text-xs font-bold rounded-xl bg-accent text-bg hover:opacity-95 shadow-md shadow-accent/20 transition-all flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-3"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Evet, Modelleri Taşı</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal 2: Danger / Deletion Warning Modal (when user clicks 'Hayır, Taşıma') -->
+      <div
+        v-if="showDeleteConfirmModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md transition-opacity"
+        @click.self="cancelDeleteModal"
+      >
+        <div class="w-full max-w-lg bg-surface border border-rose-500/50 rounded-2xl shadow-2xl shadow-rose-950/50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <!-- Header -->
+          <div class="p-5 border-b border-rose-500/20 flex items-center justify-between bg-rose-500/10">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-rose-200 flex items-center gap-2">
+                  ⚠️ Dikkat: Modelleriniz Silinecektir!
+                </h3>
+                <p class="text-xs text-rose-300/80">Kalıcı silme ve veri kaybı bildirimi</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              @click="cancelDeleteModal"
+              class="text-rose-400 hover:text-rose-200 p-1.5 rounded-lg hover:bg-rose-500/20 transition-colors cursor-pointer"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="p-6 space-y-4 text-xs">
+            <div class="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-2 text-rose-200 leading-relaxed">
+              <div class="font-bold flex items-center gap-2 text-rose-300 text-sm">
+                <span>⚠️</span>
+                <span>Taşıma yapılmazsa modelleriniz silinecektir!</span>
+              </div>
+              <p>
+                Eski konumda (<code class="font-mono text-[11px] bg-black/40 px-1.5 py-0.5 rounded text-rose-200">{{ oldModelsDir }}</code>) bulunan
+                <strong class="text-rose-100 font-semibold">{{ existingModelsInfo.models_count }} adet model</strong>
+                yeni konuma taşınmayacaktır ve diskten <strong>tamamen silinecektir</strong>.
+              </p>
+              <p class="text-rose-300/80 text-[11px]">
+                Yeni konumda (<code class="font-mono text-[10.5px] bg-black/40 px-1.5 py-0.5 rounded text-rose-200">{{ form.models_dir }}</code>) bu modeller yer almayacağı için, modelleri kullanabilmek adına Model Yöneticisi sayfasından tekrar sıfırdan indirmeniz gerekecektir.
+              </p>
+            </div>
+
+            <p class="text-neutral-200 text-xs font-semibold">
+              Eski modellerin silinmesini ve yeni konuma geçilmesini onaylıyor musunuz?
+            </p>
+          </div>
+
+          <!-- Actions -->
+          <div class="p-5 border-t border-neutral-800 bg-neutral-900/60 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+            <button
+              type="button"
+              @click="cancelDeleteModal"
+              class="w-full sm:w-auto px-4 py-2 text-xs font-medium rounded-xl text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors cursor-pointer order-3 sm:order-1"
+            >
+              Vazgeç / İptal
+            </button>
+            <button
+              type="button"
+              @click="fallbackToMove"
+              class="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer order-2"
+              title="Fikrinizi değiştirdiyseniz modellerinizi silmek yerine taşıyabilirsiniz"
+            >
+              🛡️ Vazgeç ve Modelleri Taşı
+            </button>
+            <button
+              type="button"
+              @click="confirmTransferDelete"
+              class="w-full sm:w-auto px-5 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer order-1 sm:order-3"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Evet, Eski Modelleri Sil ve Kaydet</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Processing Transfer Overlay -->
+      <div
+        v-if="isProcessingTransfer"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      >
+        <div class="bg-surface border border-neutral-800 p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div class="w-12 h-12 rounded-2xl bg-accent/20 border border-accent/30 flex items-center justify-center text-accent mx-auto">
+            <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+          </div>
+          <div>
+            <h4 class="text-sm font-bold text-neutral-100">Model Dosyaları İşleniyor</h4>
+            <p class="text-xs text-neutral-400 mt-1">Lütfen bekleyin, model dosyaları işleniyor ve ayarlar güncelleniyor...</p>
+          </div>
+        </div>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -1017,6 +1476,127 @@ onMounted(() => {
 const isBrowsing = ref(false)
 const saveSuccess = ref(false)
 const showToken = ref(false)
+
+// Multi-cloud audio providers state
+const activeCloudTab = ref('openai')
+const showCloudKey = ref({
+  openai: false,
+  elevenlabs: false,
+  google: false,
+  groq: false,
+  freya: false,
+})
+const isTestingCloud = ref(false)
+const cloudTestResult = ref(null)
+
+const cloudSettingsProviders = [
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    icon: '⚡',
+    badge: 'TTS-1 & Whisper',
+    models: 'tts-1, tts-1-hd (6 Ses: alloy, echo, fable, onyx, nova, shimmer), whisper-1',
+    keyField: 'openai_api_key',
+    placeholder: 'sk-proj-... veya sk-...',
+    docs_url: 'https://platform.openai.com/api-keys',
+    desc: 'OpenAI resmi TTS ve Whisper STT bulut servisleri.',
+  },
+  {
+    id: 'elevenlabs',
+    name: 'ElevenLabs',
+    icon: '🎭',
+    badge: 'Duygusal Ses',
+    models: 'eleven_multilingual_v2, eleven_flash_v2_5',
+    keyField: 'elevenlabs_api_key',
+    placeholder: 'xi-...',
+    docs_url: 'https://elevenlabs.io/app/settings/api-keys',
+    desc: 'Zengin duygu, tonlama ve ultra düşük gecikmeli konuşma sentezi.',
+  },
+  {
+    id: 'google',
+    name: 'Google Cloud',
+    icon: '☁️',
+    badge: 'Journey & Chirp',
+    models: 'Journey / Neural2 / Studio TTS, Chirp v2 STT',
+    keyField: 'google_cloud_api_key',
+    placeholder: 'AIzaSy...',
+    docs_url: 'https://console.cloud.google.com/apis/credentials',
+    desc: 'Google Cloud Text-to-Speech ve Chirp Speech-to-Text API altyapısı.',
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    icon: '🚀',
+    badge: 'LPU <1s Ultra Hızlı',
+    models: 'Whisper Large v3 (Bulut)',
+    keyField: 'groq_api_key',
+    placeholder: 'gsk_...',
+    docs_url: 'https://console.groq.com/keys',
+    desc: 'Groq LPU donanımında çalışan 10 kat hızlı Whisper bulut deşifresi.',
+  },
+  {
+    id: 'freya',
+    name: 'Freya Voice',
+    icon: '✨',
+    badge: 'AudioRealismBench #1',
+    models: 'freya-adam, freya-eve (İnsansı Modeller)',
+    keyField: 'freya_api_key',
+    placeholder: 'freya_live_...',
+    docs_url: 'https://freyavoice.ai',
+    desc: 'Dünyanın en gerçekçi insansı Adam & Eve modelleri ve açık kaynak FreyaTTS DiT.',
+  },
+]
+
+const isCloudKeySet = (providerId) => {
+  const map = {
+    openai: form.openai_api_key,
+    elevenlabs: form.elevenlabs_api_key,
+    google: form.google_cloud_api_key,
+    groq: form.groq_api_key,
+    freya: form.freya_api_key,
+  }
+  return !!(map[providerId] && map[providerId].trim())
+}
+
+const testCloudConnection = async (providerId) => {
+  const map = {
+    openai: form.openai_api_key,
+    elevenlabs: form.elevenlabs_api_key,
+    google: form.google_cloud_api_key,
+    groq: form.groq_api_key,
+    freya: form.freya_api_key,
+  }
+  const key = (map[providerId] || '').trim()
+  if (!key) return
+
+  isTestingCloud.value = true
+  cloudTestResult.value = null
+
+  try {
+    const res = await fetch('/api/models/test-cloud-connection', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+      },
+      body: JSON.stringify({
+        provider: providerId,
+        api_key: key,
+      })
+    })
+    const data = await res.json()
+    cloudTestResult.value = data
+  } catch (err) {
+    cloudTestResult.value = {
+      success: false,
+      message: 'Bağlantı hatası: ' + err.message,
+    }
+  } finally {
+    isTestingCloud.value = false
+  }
+}
 
 const copiedUrl = ref(false)
 const copiedCurl = ref(false)
@@ -1284,13 +1864,48 @@ const testLlmConnection = async () => {
   }
 }
 
+const oldModelsDir = ref(props.settings?.models_dir || props.default_models_dir || '')
+const normalizePath = (p) => (p || '').replace(/\\/g, '/').replace(/\/+$/, '').trim().toLowerCase()
+const isDirChanged = computed(() => {
+  return normalizePath(form.models_dir) !== normalizePath(oldModelsDir.value)
+})
+
+const isCheckingDirectory = ref(false)
+const showMoveModal = ref(false)
+const showDeleteConfirmModal = ref(false)
+const isProcessingTransfer = ref(false)
+const existingModelsInfo = ref({
+  has_models: false,
+  models_count: 0,
+  model_names: [],
+  total_size_bytes: 0,
+})
+
+const formatBytes = (bytes, decimals = 1) => {
+  if (!bytes || bytes <= 0) return '0 B'
+  const k = 1024
+  const dm = decimals < 0 ? 0 : decimals
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
+}
+
 const form = useForm({
   models_dir: props.settings?.models_dir || props.default_models_dir || '',
+  model_transfer_action: 'none',
   use_gpu: props.settings?.use_gpu || 'auto',
   max_cpu_threads: props.settings?.max_cpu_threads || 4,
   default_tts_engine: props.settings?.default_tts_engine || 'piper-tr',
+  default_stt_engine: props.settings?.default_stt_engine || 'whisper',
+  default_stt_model: props.settings?.default_stt_model || 'whisper-medium',
   hf_token: props.settings?.hf_token || '',
   voice_core_api_key: props.settings?.voice_core_api_key || '',
+  freya_api_key: props.settings?.freya_api_key || '',
+  freya_default_voice: props.settings?.freya_default_voice || 'adam',
+  openai_api_key: props.settings?.openai_api_key || '',
+  elevenlabs_api_key: props.settings?.elevenlabs_api_key || '',
+  google_cloud_api_key: props.settings?.google_cloud_api_key || '',
+  groq_api_key: props.settings?.groq_api_key || '',
   llm_provider: props.settings?.llm_provider || 'ollama',
   llm_base_url: props.settings?.llm_base_url !== undefined ? props.settings.llm_base_url : 'http://127.0.0.1:11434',
   llm_api_key: props.settings?.llm_api_key || '',
@@ -1367,13 +1982,84 @@ const resetToDefault = () => {
   }
 }
 
-const saveSettings = () => {
+const saveSettings = async () => {
+  if (isDirChanged.value) {
+    isCheckingDirectory.value = true
+    try {
+      const res = await fetch('/settings/check-models-directory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: JSON.stringify({ old_dir: oldModelsDir.value })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        existingModelsInfo.value = data
+        if (data.has_models) {
+          showMoveModal.value = true
+          return
+        }
+      }
+    } catch (e) {
+      console.error('Model klasörü kontrol edilirken hata oluştu:', e)
+    } finally {
+      isCheckingDirectory.value = false
+    }
+  }
+
+  executeSubmit('none')
+}
+
+const confirmTransferMove = () => {
+  showMoveModal.value = false
+  executeSubmit('move')
+}
+
+const declineTransferMove = () => {
+  showMoveModal.value = false
+  showDeleteConfirmModal.value = true
+}
+
+const cancelMoveModal = () => {
+  showMoveModal.value = false
+}
+
+const confirmTransferDelete = () => {
+  showDeleteConfirmModal.value = false
+  executeSubmit('delete')
+}
+
+const fallbackToMove = () => {
+  showDeleteConfirmModal.value = false
+  executeSubmit('move')
+}
+
+const cancelDeleteModal = () => {
+  showDeleteConfirmModal.value = false
+}
+
+const executeSubmit = (transferAction = 'none') => {
+  form.model_transfer_action = transferAction
+  isProcessingTransfer.value = transferAction === 'move' || transferAction === 'delete'
+
   form.post('/settings', {
+    preserveScroll: true,
     onSuccess: () => {
+      oldModelsDir.value = form.models_dir
       saveSuccess.value = true
+      isProcessingTransfer.value = false
       setTimeout(() => {
         saveSuccess.value = false
       }, 4000)
+    },
+    onError: () => {
+      isProcessingTransfer.value = false
+    },
+    onFinish: () => {
+      isProcessingTransfer.value = false
     }
   })
 }

@@ -28,9 +28,14 @@ class MusicGenEngine(BaseTTS):
     def is_model_downloaded(self) -> bool:
         """Check if MusicGen model exists in local directory."""
         try:
-            from transformers import AutoProcessor, MusicgenForConditionalGeneration
-            return True
-        except ImportError:
+            from app.downloader.integrity_checker import is_model_healthy
+            if is_model_healthy(f"musicgen-{self.model_size}"):
+                return True
+            if os.path.isdir(self.model_path):
+                if any(os.path.exists(os.path.join(self.model_path, f)) for f in ["pytorch_model.bin", "model.safetensors"]):
+                    return True
+            return False
+        except Exception:
             return False
 
     def load_model(self):
@@ -47,10 +52,11 @@ class MusicGenEngine(BaseTTS):
             
             logger.info(f"Loading MusicGen model on {self._device}...")
             
-            # Load model from HuggingFace based on size
-            model_name = f"facebook/musicgen-{self.model_size}"
-            self._processor = AutoProcessor.from_pretrained(model_name)
-            self._model = MusicgenForConditionalGeneration.from_pretrained(model_name)
+            # Prefer local directory if downloaded, else HuggingFace repo
+            load_target = self.model_path if (os.path.isdir(self.model_path) and os.path.exists(os.path.join(self.model_path, "config.json"))) else f"facebook/musicgen-{self.model_size}"
+            
+            self._processor = AutoProcessor.from_pretrained(load_target)
+            self._model = MusicgenForConditionalGeneration.from_pretrained(load_target)
             self._model = self._model.to(self._device)
             
             logger.success("MusicGen model loaded successfully")

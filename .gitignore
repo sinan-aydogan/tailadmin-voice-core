@@ -46,6 +46,9 @@ data/models/
 data/outputs/
 data/profiles/
 data/uploads/
+data/bgm/
+data/sfx/
+data/stories/
 data/*.db
 data/*.db-wal
 data/*.db-shm
@@ -54,6 +57,8 @@ data/*.sqlite3
 data/venvies/*/
 !data/venvies/.gitkeep
 data/settings.json
+
+scratch/
 
 # Logs
 logs/

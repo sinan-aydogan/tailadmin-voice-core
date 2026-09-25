@@ -75,9 +75,9 @@ class QueueWorkerService
         $artisan = base_path('artisan');
 
         if (PHP_OS_FAMILY === 'Windows') {
-            pclose(popen("start /B \"\" \"{$phpBin}\" \"{$artisan}\" queue:work --queue=default,tts,stt,downloads --sleep=2 --timeout=600 --tries=1", "r"));
+            pclose(popen("start /B \"\" \"{$phpBin}\" \"{$artisan}\" queue:work --queue=default,tts,stt,downloads --sleep=2 --timeout=3600 --tries=1", "r"));
         } else {
-            exec("{$phpBin} {$artisan} queue:work --queue=default,tts,stt,downloads --sleep=2 --timeout=600 --tries=1 > /dev/null 2>&1 &");
+            exec("{$phpBin} {$artisan} queue:work --queue=default,tts,stt,downloads --sleep=2 --timeout=3600 --tries=1 > /dev/null 2>&1 &");
         }
     }
 

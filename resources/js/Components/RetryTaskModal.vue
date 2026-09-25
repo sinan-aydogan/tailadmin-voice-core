@@ -312,43 +312,74 @@ const ttsModels = computed(() => {
   return defaultTtsModels
 })
 
-const whisperSizes = computed(() => [
-  {
-    id: 'whisper-medium',
-    name: 'Whisper Medium (Önerilen)',
-    desc: 'Yüksek doğruluk ve mükemmel Türkçe/İngilizce deşifre performansı.',
-    size: '1.5 GB',
-    is_downloaded: true,
-  },
-  {
-    id: 'whisper-small',
-    name: 'Whisper Small',
-    desc: 'Hızlı ve dengeli doğruluk, düşük bellek kullanımı.',
-    size: '1.0 GB',
-    is_downloaded: false,
-  },
-  {
-    id: 'whisper-base',
-    name: 'Whisper Base',
-    desc: 'Hızlı temel deşifre modeli.',
-    size: '250 MB',
-    is_downloaded: false,
-  },
-  {
-    id: 'whisper-tiny',
-    name: 'Whisper Tiny',
-    desc: 'En düşük bellek tüketimi, ultra hızlı.',
-    size: '150 MB',
-    is_downloaded: false,
-  },
-  {
-    id: 'whisper-large-v3',
-    name: 'Whisper Large V3',
-    desc: 'En yüksek seviyede deşifre kalitesi, daha yavaş.',
-    size: '6.0 GB',
-    is_downloaded: false,
-  },
-])
+const whisperSizes = computed(() => {
+  const getIsDownloaded = (id, fallback) => {
+    if (props.availableModels) {
+      const found = props.availableModels.find(m => m.id === id)
+      if (found) return !!found.is_downloaded
+    }
+    return fallback
+  }
+
+  return [
+    {
+      id: 'groq-whisper',
+      name: '⚡ Groq Whisper Large v3 (Bulut)',
+      desc: 'Groq LPU çipinde çalışan ultra hızlı (<1s) bulut deşifresi.',
+      size: '0 MB',
+      is_downloaded: getIsDownloaded('groq-whisper', false),
+    },
+    {
+      id: 'openai-whisper',
+      name: '☁️ OpenAI Whisper Cloud (Bulut)',
+      desc: 'OpenAI whisper-1 resmi bulut servisi.',
+      size: '0 MB',
+      is_downloaded: getIsDownloaded('openai-whisper', false),
+    },
+    {
+      id: 'google-cloud-stt',
+      name: '☁️ Google Cloud STT Chirp v2 (Bulut)',
+      desc: 'Google Cloud Speech-to-Text kurumsal deşifre.',
+      size: '0 MB',
+      is_downloaded: getIsDownloaded('google-cloud-stt', false),
+    },
+    {
+      id: 'whisper-medium',
+      name: 'Faster Whisper Medium (Lokal - Önerilen)',
+      desc: 'Yüksek doğruluk ve mükemmel Türkçe/İngilizce deşifre performansı.',
+      size: '1.5 GB',
+      is_downloaded: getIsDownloaded('whisper-medium', true),
+    },
+    {
+      id: 'whisper-small',
+      name: 'Faster Whisper Small (Lokal)',
+      desc: 'Hızlı ve dengeli doğruluk, düşük bellek kullanımı.',
+      size: '1.0 GB',
+      is_downloaded: getIsDownloaded('whisper-small', false),
+    },
+    {
+      id: 'whisper-base',
+      name: 'Faster Whisper Base (Lokal)',
+      desc: 'Hızlı temel deşifre modeli.',
+      size: '250 MB',
+      is_downloaded: getIsDownloaded('whisper-base', false),
+    },
+    {
+      id: 'whisper-tiny',
+      name: 'Faster Whisper Tiny (Lokal)',
+      desc: 'En düşük bellek tüketimi, ultra hızlı.',
+      size: '150 MB',
+      is_downloaded: getIsDownloaded('whisper-tiny', false),
+    },
+    {
+      id: 'whisper-large-v3',
+      name: 'Faster Whisper Large V3 (Lokal)',
+      desc: 'En yüksek seviyede deşifre kalitesi, GPU önerilir.',
+      size: '6.0 GB',
+      is_downloaded: getIsDownloaded('whisper-large-v3', false),
+    },
+  ]
+})
 
 // Sync initial form values when modal opens
 watch(
@@ -365,7 +396,11 @@ watch(
         const alternatives = ttsModels.value.filter(m => m.is_downloaded && m.id !== currentEngine)
         selectedEngine.value = alternatives.length > 0 ? alternatives[0].id : (currentEngine || 'piper-tr')
       } else if (props.task.type === 'stt') {
-        selectedModelSize.value = payload.model_size || 'whisper-medium'
+        if (payload.engine && payload.engine !== 'whisper') {
+          selectedModelSize.value = payload.engine
+        } else {
+          selectedModelSize.value = payload.model_size || 'whisper-medium'
+        }
       }
     }
   },
@@ -382,8 +417,9 @@ const submitRetry = async () => {
 
   isSubmitting.value = true
 
+  const isCloudStt = ['groq-whisper', 'openai-whisper', 'google-cloud-stt'].includes(selectedModelSize.value)
   const data = {
-    engine: props.task.type === 'tts' ? selectedEngine.value : 'whisper',
+    engine: props.task.type === 'tts' ? selectedEngine.value : (isCloudStt ? selectedModelSize.value : 'whisper'),
     model_size: props.task.type === 'stt' ? selectedModelSize.value : null,
     language: selectedLanguage.value,
     profile_path: selectedProfilePath.value,

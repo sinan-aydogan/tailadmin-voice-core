@@ -18,28 +18,89 @@
             />
           </div>
 
-          <!-- Language -->
-          <div class="w-56">
-            <label class="block text-xs font-medium text-neutral-400 mb-1.5">Konuşulan Dil</label>
-            <select
-              v-model="form.language"
-              class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-2.5 text-sm text-neutral-100 focus:outline-none focus:border-accent"
-            >
-              <option value="auto">🌐 Otomatik Algıla</option>
-              <option v-for="lang in VOICE_LANGUAGES" :key="lang.code" :value="lang.code">
-                {{ lang.flag }} {{ lang.name }} ({{ lang.code }})
-              </option>
-            </select>
+          <div class="flex flex-wrap items-center gap-4">
+            <!-- Language -->
+            <div class="w-56">
+              <label class="block text-xs font-medium text-neutral-400 mb-1.5">Konuşulan Dil</label>
+              <select
+                v-model="form.language"
+                class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-2.5 text-sm text-neutral-100 focus:outline-none focus:border-accent"
+              >
+                <option value="auto">🌐 Otomatik Algıla</option>
+                <option v-for="lang in VOICE_LANGUAGES" :key="lang.code" :value="lang.code">
+                  {{ lang.flag }} {{ lang.name }} ({{ lang.code }})
+                </option>
+              </select>
+            </div>
+
+            <!-- Model & Engine Selector -->
+            <div class="w-72">
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-medium text-neutral-400">STT Modeli & Motor</label>
+                <span v-if="isSelectedModelReady" class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Hazır
+                </span>
+                <span v-else class="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Anahtar Gerekli
+                </span>
+              </div>
+              <select
+                v-model="selectedModelKey"
+                @change="onModelChange"
+                class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-2.5 text-sm text-neutral-100 focus:outline-none focus:border-accent"
+              >
+                <optgroup label="── ☁️ Bulut API Modelleri (0 MB İndirme) ──">
+                  <option value="groq-whisper">⚡ Groq Whisper Large v3 (Bulut - Ultra Hızlı &lt;1s)</option>
+                  <option value="openai-whisper">☁️ OpenAI Whisper (whisper-1 Bulut)</option>
+                  <option value="google-cloud-stt">☁️ Google Cloud STT (Chirp v2 Bulut)</option>
+                </optgroup>
+                <optgroup label="── 💾 Yerel Modeller (Faster Whisper) ──">
+                  <option value="whisper-medium">Faster Whisper Medium (Lokal - Önerilen)</option>
+                  <option value="whisper-small">Faster Whisper Small (Lokal - Dengeli)</option>
+                  <option value="whisper-base">Faster Whisper Base (Lokal - Hızlı)</option>
+                  <option value="whisper-tiny">Faster Whisper Tiny (Lokal - Ultra Hızlı)</option>
+                  <option value="whisper-large-v3">Faster Whisper Large V3 (Lokal - En Yüksek)</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+          <!-- Cloud API Key Warning Banner if selected cloud model lacks API key -->
+          <div v-if="!isSelectedModelReady" class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <div class="font-semibold text-amber-200">
+                  {{ getProviderDisplayName(selectedModelInfo?.cloud_provider) }} API Anahtarı Gerekli
+                </div>
+                <div class="text-[11px] text-amber-300/90 mt-0.5">
+                  <strong>{{ selectedModelInfo?.name || selectedModelKey }}</strong> modelini kullanabilmek için Model Yöneticisi'nden API anahtarınızı tanımlamalısınız.
+                </div>
+              </div>
+            </div>
+            <a href="/models" class="px-3.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-medium text-xs whitespace-nowrap transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer">
+              <span>API Anahtarı Tanımla</span>
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </a>
+          </div>
+
+          <div v-if="fileError || (form.errors.audio && !recordedBlob)" class="p-3 rounded-xl bg-danger-500/10 border border-danger-500/20 text-xs text-danger-400">
+            {{ fileError || form.errors.audio }}
           </div>
 
           <div class="flex justify-end pt-2">
             <button
               type="submit"
-              :disabled="form.processing || !form.audio"
-              class="px-6 py-2.5 rounded-xl font-semibold text-sm bg-accent text-bg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+              :disabled="form.processing || !form.audio || !isSelectedModelReady"
+              class="px-6 py-2.5 rounded-xl font-semibold text-sm bg-accent text-bg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2 cursor-pointer"
             >
-              <span v-if="form.processing" class="w-4 h-4 border-2 border-bg border-t-transparent rounded-full animate-spin"></span>
-              <span>{{ form.processing ? 'Yükleniyor & Kuyruğa Alınıyor...' : 'Deşifre Et' }}</span>
+              <span v-if="form.processing && !recordedBlob" class="w-4 h-4 border-2 border-bg border-t-transparent rounded-full animate-spin"></span>
+              <span v-if="!isSelectedModelReady">API Anahtarı Gerekli</span>
+              <span v-else>{{ (form.processing && !recordedBlob) ? 'Yükleniyor & Kuyruğa Alınıyor...' : 'Deşifre Et' }}</span>
             </button>
           </div>
         </form>
@@ -110,11 +171,15 @@
               :disabled="form.processing"
               class="px-5 py-2.5 rounded-xl font-semibold text-sm bg-accent text-bg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
             >
-              <span v-if="form.processing" class="w-4 h-4 border-2 border-bg border-t-transparent rounded-full animate-spin"></span>
-              <span>{{ form.processing ? 'Gönderiliyor...' : 'Deşifre Et' }}</span>
+              <span v-if="form.processing && isSubmittingMic" class="w-4 h-4 border-2 border-bg border-t-transparent rounded-full animate-spin"></span>
+              <span>{{ (form.processing && isSubmittingMic) ? 'Gönderiliyor...' : 'Deşifre Et' }}</span>
             </button>
 
             <span v-if="!micSupported" class="text-xs text-danger-400">Tarayıcınız mikrofon erişimini desteklemiyor.</span>
+          </div>
+
+          <div v-if="micError" class="p-3 rounded-xl bg-danger-500/10 border border-danger-500/20 text-xs text-danger-400">
+            {{ micError }}
           </div>
 
           <!-- Microphone Selection Dropdown -->
@@ -179,6 +244,12 @@
                   <span>·</span>
                   <span class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-300 uppercase text-[11px]">
                     {{ t.payload?.language || 'auto' }}
+                  </span>
+                  <span v-if="t.payload?.engine && t.payload.engine !== 'whisper'" class="px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-mono">
+                    ☁️ {{ t.payload.engine }}
+                  </span>
+                  <span v-else-if="t.payload?.model_size" class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-300 text-[11px] font-mono">
+                    {{ t.payload.model_size }}
                   </span>
                 </div>
               </div>
@@ -290,6 +361,7 @@
     <RetryTaskModal
       :show="showRetryModal"
       :task="selectedRetryTask"
+      :available-models="models"
       @close="showRetryModal = false"
       @retried="onTaskRetried"
     />
@@ -302,9 +374,14 @@ import { useForm } from '@inertiajs/vue3'
 import AppLayout from '../../Layouts/AppLayout.vue'
 import RetryTaskModal from '../../Components/RetryTaskModal.vue'
 import { VOICE_LANGUAGES } from '../../i18n'
+import { useAudioDevices } from '../../Composables/useAudioDevices'
+
+const { audioInputDevices, selectedAudioDeviceId, loadAudioDevices } = useAudioDevices()
 
 const props = defineProps({
   tasks: Array,
+  default_model: String,
+  models: Array,
 })
 
 const tasksList = ref(props.tasks ? [...props.tasks] : [])
@@ -313,6 +390,42 @@ const copySuccessId = ref(null)
 
 const showRetryModal = ref(false)
 const selectedRetryTask = ref(null)
+
+const selectedModelKey = ref(props.default_model || 'whisper-medium')
+
+const isCloudStt = computed(() => {
+  return ['groq-whisper', 'openai-whisper', 'google-cloud-stt'].includes(selectedModelKey.value)
+})
+
+const selectedModelInfo = computed(() => {
+  return (props.models || []).find(m => m.id === selectedModelKey.value)
+})
+
+const isSelectedModelReady = computed(() => {
+  if (!isCloudStt.value) return true
+  return selectedModelInfo.value ? Boolean(selectedModelInfo.value.is_downloaded) : true
+})
+
+const getProviderDisplayName = (p) => {
+  const map = {
+    openai: 'OpenAI',
+    elevenlabs: 'ElevenLabs',
+    google: 'Google Cloud',
+    groq: 'Groq',
+    freya: 'Freya Voice',
+  }
+  return map[p] || (p ? p.toUpperCase() : 'Bulut')
+}
+
+const onModelChange = () => {
+  if (isCloudStt.value) {
+    form.engine = selectedModelKey.value
+    form.model_size = selectedModelKey.value
+  } else {
+    form.engine = 'whisper'
+    form.model_size = selectedModelKey.value
+  }
+}
 
 const openRetryModal = (task) => {
   selectedRetryTask.value = task
@@ -328,6 +441,8 @@ const fileInputRef = ref(null)
 const form = useForm({
   audio: null,
   language: 'tr',
+  model_size: props.default_model || 'whisper-medium',
+  engine: ['groq-whisper', 'openai-whisper', 'google-cloud-stt'].includes(props.default_model) ? props.default_model : 'whisper',
 })
 
 const hasActiveTasks = computed(() => {
@@ -383,19 +498,29 @@ const copyToClipboard = (taskId, text) => {
   }, 2000)
 }
 
+const fileError = ref(null)
+
 const handleFileChange = (e) => {
   form.audio = e.target.files[0]
+  fileError.value = null
 }
 
 const submit = () => {
+  fileError.value = null
   form.post('/stt/transcribe', {
+    preserveScroll: true,
     onSuccess: () => {
       form.reset('audio')
       if (fileInputRef.value) fileInputRef.value.value = ''
+      fileError.value = null
       window.dispatchEvent(new CustomEvent('voice-task-created'))
       fetchTasks()
       setTimeout(() => fetchTasks(), 600)
       setTimeout(() => fetchTasks(), 1600)
+    },
+    onError: (errors) => {
+      console.error('STT dosya yükleme hatası:', errors)
+      fileError.value = errors.audio || Object.values(errors)[0] || 'Dosya gönderilirken bir hata oluştu.'
     }
   })
 }
@@ -430,42 +555,78 @@ const isRecording = ref(false)
 const recordedBlob = ref(null)
 const recordedUrl = ref(null)
 const recordingDuration = ref(0)
-const audioInputDevices = ref([])
-const selectedAudioDeviceId = ref('')
-
-const loadAudioDevices = async () => {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-    return
-  }
-  try {
-    let devices = await navigator.mediaDevices.enumerateDevices()
-    let audioInputs = devices.filter(d => d.kind === 'audioinput')
-
-    const hasLabels = audioInputs.some(d => d.label && d.label.trim().length > 0)
-    if (!hasLabels && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        stream.getTracks().forEach(t => t.stop())
-        devices = await navigator.mediaDevices.enumerateDevices()
-        audioInputs = devices.filter(d => d.kind === 'audioinput')
-      } catch (permErr) {
-        console.warn('Mikrofon izni bekleniyor:', permErr)
-      }
-    }
-
-    audioInputDevices.value = audioInputs
-
-    if (selectedAudioDeviceId.value && !audioInputs.some(d => d.deviceId === selectedAudioDeviceId.value)) {
-      selectedAudioDeviceId.value = ''
-    }
-  } catch (err) {
-    console.error('Mikrofon cihazları taranırken hata:', err)
-  }
-}
 
 let mediaRecorder = null
 let audioChunks = []
 let durationTimer = null
+const micError = ref(null)
+const isSubmittingMic = ref(false)
+
+// Downsample PCM buffer to target rate (e.g. 48000/44100 -> 16000)
+function downsampleBuffer(buffer, sampleRate, outSampleRate = 16000) {
+  if (outSampleRate === sampleRate) return buffer
+  if (outSampleRate > sampleRate) return buffer
+  const sampleRateRatio = sampleRate / outSampleRate
+  const newLength = Math.round(buffer.length / sampleRateRatio)
+  const result = new Float32Array(newLength)
+  let offsetResult = 0
+  let offsetBuffer = 0
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio)
+    let accum = 0
+    let count = 0
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i]
+      count++
+    }
+    result[offsetResult] = count > 0 ? accum / count : 0
+    offsetResult++
+    offsetBuffer = nextOffsetBuffer
+  }
+  return result
+}
+
+// Encode Float32Array to 16-bit PCM mono WAV ArrayBuffer
+function encodeWav(samples, sampleRate = 16000) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2)
+  const view = new DataView(buffer)
+
+  const writeString = (v, offset, str) => {
+    for (let i = 0; i < str.length; i++) {
+      v.setUint8(offset + i, str.charCodeAt(i))
+    }
+  }
+
+  // RIFF identifier
+  writeString(view, 0, 'RIFF')
+  view.setUint32(4, 36 + samples.length * 2, true)
+  writeString(view, 8, 'WAVE')
+
+  // fmt chunk
+  writeString(view, 12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true) // PCM format
+  view.setUint16(22, 1, true) // Mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true) // byte rate (sampleRate * 1 * 16 / 8)
+  view.setUint16(32, 2, true) // block align (1 * 16 / 8)
+  view.setUint16(34, 16, true) // 16-bit
+
+  // data chunk
+  writeString(view, 36, 'data')
+  view.setUint32(40, samples.length * 2, true)
+
+  // 16-bit PCM samples with clipping protection
+  let offset = 44
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]))
+    const val = s < 0 ? s * 0x8000 : s * 0x7FFF
+    view.setInt16(offset, val, true)
+    offset += 2
+  }
+
+  return buffer
+}
 
 const formatTime = (seconds) => {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0')
@@ -483,6 +644,7 @@ const startRecording = async () => {
     recordedBlob.value = null
     recordedUrl.value = null
     recordingDuration.value = 0
+    micError.value = null
 
     // Prefer webm-opus but fall back to whatever is supported
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -497,10 +659,39 @@ const startRecording = async () => {
       if (e.data.size > 0) audioChunks.push(e.data)
     }
 
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
-      recordedBlob.value = blob
-      recordedUrl.value = URL.createObjectURL(blob)
+    mediaRecorder.onstop = async () => {
+      const rawBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
+      try {
+        const arrayBuffer = await rawBlob.arrayBuffer()
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext
+        const audioCtx = new AudioContextClass()
+        const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+
+        // Mix down multi-channel to mono
+        const numChannels = decodedBuffer.numberOfChannels
+        const length = decodedBuffer.length
+        const monoSamples = new Float32Array(length)
+        for (let i = 0; i < numChannels; i++) {
+          const channelData = decodedBuffer.getChannelData(i)
+          for (let j = 0; j < length; j++) {
+            monoSamples[j] += channelData[j] / numChannels
+          }
+        }
+
+        // Downsample to 16kHz for Whisper
+        const downsampled = downsampleBuffer(monoSamples, decodedBuffer.sampleRate, 16000)
+        const wavBuffer = encodeWav(downsampled, 16000)
+        const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' })
+
+        recordedBlob.value = wavBlob
+        recordedUrl.value = URL.createObjectURL(wavBlob)
+        audioCtx.close()
+      } catch (convErr) {
+        console.warn('WAV dönüştürme atlandı, orijinal blob kullanılıyor:', convErr)
+        recordedBlob.value = rawBlob
+        recordedUrl.value = URL.createObjectURL(rawBlob)
+      }
+
       // Stop all tracks
       stream.getTracks().forEach(tr => tr.stop())
     }
@@ -533,22 +724,38 @@ const discardRecording = () => {
   recordedBlob.value = null
   recordedUrl.value = null
   recordingDuration.value = 0
+  micError.value = null
 }
 
 const submitRecording = () => {
   if (!recordedBlob.value) return
-  // Determine file extension from mime
-  const ext = recordedBlob.value.type.includes('webm') ? 'webm' : 'wav'
-  const file = new File([recordedBlob.value], `mic_recording.${ext}`, { type: recordedBlob.value.type })
+  micError.value = null
+  isSubmittingMic.value = true
+
+  const isWav = recordedBlob.value.type.includes('wav')
+  const ext = isWav ? 'wav' : (recordedBlob.value.type.includes('webm') ? 'webm' : 'wav')
+  const file = new File([recordedBlob.value], `mic_recording_${Date.now()}.${ext}`, {
+    type: recordedBlob.value.type || 'audio/wav',
+  })
+
   form.audio = file
   form.post('/stt/transcribe', {
+    preserveScroll: true,
     onSuccess: () => {
       discardRecording()
       form.reset('audio')
+      micError.value = null
       window.dispatchEvent(new CustomEvent('voice-task-created'))
       fetchTasks()
       setTimeout(() => fetchTasks(), 600)
       setTimeout(() => fetchTasks(), 1600)
+    },
+    onError: (errors) => {
+      console.error('STT kayıt gönderim hatası:', errors)
+      micError.value = errors.audio || Object.values(errors)[0] || 'Kayıt gönderilirken bir hata oluştu.'
+    },
+    onFinish: () => {
+      isSubmittingMic.value = false
     }
   })
 }

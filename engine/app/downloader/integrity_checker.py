@@ -57,6 +57,18 @@ MODEL_INTEGRITY_CHECKS = {
         "min_size_mb": 50,
         "optional_files": []
     },
+    "freya-tts": {
+        "required_files": ["config.json"],
+        "min_size_mb": 350,
+        "alternative_files": ["model.safetensors", "pytorch_model.bin"],
+        "optional_files": ["README.md"]
+    },
+    "antalia-1": {
+        "required_files": ["config.json", "model.safetensors"],
+        "min_size_mb": 900,
+        "alternative_files": ["pytorch_model.bin"],
+        "optional_files": ["inference-recipe.json", "timbre-profile.json", "prosody-presets.json", "envelope-stats.json", "README.md", "README.tr.md", "LICENSE.md"]
+    },
     "musicgen-small": {
         "required_files": ["config.json", "pytorch_model.bin"],
         "min_size_mb": 1000,
@@ -76,6 +88,11 @@ MODEL_INTEGRITY_CHECKS = {
         "required_files": ["config.json", "pytorch_model.bin"],
         "min_size_mb": 2500,
         "optional_files": ["generation_config.json", "tokenizer.json"]
+    },
+    "audiogen-medium": {
+        "required_files": ["state_dict.bin"],
+        "min_size_mb": 800,
+        "alternative_files": ["model.safetensors", "pytorch_model.bin", "config.json"]
     },
     "whisper-tiny": {
         "required_files": ["model.bin"],
@@ -117,6 +134,45 @@ def verify_model_files(model_id: str) -> ModelIntegrityResult:
     Returns:
         ModelIntegrityResult with detailed status information
     """
+    from app.downloader.model_registry import get_model_info
+    model_info = get_model_info(model_id)
+    if model_info and model_info.get("is_cloud"):
+        from app.config import reload_custom_settings, settings
+        reload_custom_settings()
+        prov = model_info.get("cloud_provider", "")
+        key = None
+        if prov == "freya":
+            key = os.environ.get("FREYA_API_KEY") or getattr(settings, "FREYA_API_KEY", None)
+        elif prov == "openai":
+            key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "OPENAI_API_KEY", None)
+        elif prov == "elevenlabs":
+            key = os.environ.get("ELEVENLABS_API_KEY") or getattr(settings, "ELEVENLABS_API_KEY", None)
+        elif prov == "google":
+            key = os.environ.get("GOOGLE_CLOUD_API_KEY") or getattr(settings, "GOOGLE_CLOUD_API_KEY", None)
+        elif prov == "gemini":
+            key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_CLOUD_API_KEY") or getattr(settings, "GEMINI_API_KEY", None)
+        elif prov == "groq":
+            key = os.environ.get("GROQ_API_KEY") or getattr(settings, "GROQ_API_KEY", None)
+        elif prov in ("anthropic", "claude"):
+            key = os.environ.get("ANTHROPIC_API_KEY") or getattr(settings, "ANTHROPIC_API_KEY", None)
+        elif prov == "deepseek":
+            key = os.environ.get("DEEPSEEK_API_KEY") or getattr(settings, "DEEPSEEK_API_KEY", None)
+        elif prov == "openrouter":
+            key = os.environ.get("OPENROUTER_API_KEY") or getattr(settings, "OPENROUTER_API_KEY", None)
+        elif prov == "patientdesk":
+            key = os.environ.get("PATIENTDESK_API_KEY") or getattr(settings, "PATIENTDESK_API_KEY", None)
+
+        is_conf = bool(key and str(key).strip())
+        return ModelIntegrityResult(
+            model_id=model_id,
+            status=ModelStatus.DOWNLOADED if is_conf else ModelStatus.NOT_DOWNLOADED,
+            is_healthy=is_conf,
+            missing_files=[] if is_conf else [f"{prov.upper()}_API_KEY"],
+            corrupted_files=[],
+            total_size_mb=0.0,
+            details={"type": "cloud", "provider": prov, "api_configured": is_conf}
+        )
+
     model_path = get_model_path(model_id)
     config = MODEL_INTEGRITY_CHECKS.get(model_id, {})
     

@@ -41,6 +41,12 @@ class WhisperEngine(BaseSTT):
                 return direct_dir
             if os.path.isdir(prefixed_dir) and os.path.exists(os.path.join(prefixed_dir, "model.bin")):
                 return prefixed_dir
+            if model_size.startswith("whisper-"):
+                clean_size = model_size.replace("whisper-", "", 1)
+                clean_dir = os.path.join(models_dir, clean_size)
+                if os.path.isdir(clean_dir) and os.path.exists(os.path.join(clean_dir, "model.bin")):
+                    return clean_dir
+                return clean_size
             return model_size
 
         # If no model_size was passed, auto-detect best downloaded local model
@@ -135,3 +141,33 @@ class WhisperEngine(BaseSTT):
         )
         result = await loop.run_in_executor(None, sync_func)
         return result
+
+    def align_words_sync(self, audio_path: str, language: Optional[str] = None, model_size: Optional[str] = None) -> list:
+        """Extract word-level timestamps using Faster-Whisper for precise SFX anchoring."""
+        if not os.path.exists(audio_path):
+            return []
+        try:
+            model = self._load_model(model_size)
+            segments, info = model.transcribe(audio_path, language=language, word_timestamps=True, beam_size=1)
+            words_list = []
+            for segment in segments:
+                if hasattr(segment, 'words') and segment.words:
+                    for w in segment.words:
+                        clean_word = w.word.strip(' .,!?":;()[]{}').lower()
+                        if clean_word:
+                            words_list.append({
+                                "word": clean_word,
+                                "start_ms": int(round(w.start * 1000)),
+                                "end_ms": int(round(w.end * 1000)),
+                                "probability": round(float(w.probability), 2)
+                            })
+            return words_list
+        except Exception as e:
+            logger.error(f"Whisper Alignment Error: {e}")
+            return []
+
+    async def align_words(self, audio_path: str, language: Optional[str] = None, model_size: Optional[str] = None) -> list:
+        """Asynchronously extract word-level timestamps."""
+        loop = asyncio.get_event_loop()
+        sync_func = partial(self.align_words_sync, audio_path, language, model_size)
+        return await loop.run_in_executor(None, sync_func)

@@ -322,9 +322,17 @@ def download_model(model_id: str) -> bool:
     if not model_info:
         raise ValueError(f"Unknown model ID: {model_id}")
 
+    if model_info.get("is_cloud"):
+        from app.config import reload_custom_settings
+        reload_custom_settings()
+        key = getattr(settings, "FREYA_API_KEY", None) or os.environ.get("FREYA_API_KEY")
+        if not key:
+            raise ValueError(f"{model_info.get('name', model_id)} bir Bulut API modelidir (yerel indirme gerektirmez). Lütfen Ayarlar sayfasından Freya API Anahtarınızı giriniz.")
+        from app.downloader.integrity_checker import is_model_healthy
+        return is_model_healthy(model_id)
+
     local_dir = os.path.join(str(settings.MODELS_DIR), model_id)
     os.makedirs(local_dir, exist_ok=True)
-
 
     if model_info.get("engine", "").startswith("piper"):
         download_piper_model(model_id, model_info, local_dir, db_factory=lambda: _DummyDb())

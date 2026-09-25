@@ -133,7 +133,42 @@
         <header class="h-16 border-b border-neutral-800 bg-surface/50 backdrop-blur px-8 flex items-center justify-between shrink-0 z-10">
           <h1 class="text-lg font-semibold text-neutral-100">{{ title }}</h1>
 
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-3">
+            <!-- Custom Page Header Actions Slot -->
+            <slot name="header-actions" />
+
+            <!-- Microphone Source Dropdown (Dil seçiminin sol tarafı) -->
+            <div class="relative flex items-center">
+              <div
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-700/80 hover:border-neutral-600 transition-colors"
+                :title="t('header.mic_source', 'Mikrofon Kaynağı')"
+              >
+                <svg class="w-3.5 h-3.5 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+                <select
+                  :value="selectedAudioDeviceId"
+                  @focus="ensureMicrophonePermission"
+                  @click="ensureMicrophonePermission"
+                  @change="selectAudioDevice($event.target.value)"
+                  class="bg-transparent text-xs text-neutral-200 font-medium focus:outline-none cursor-pointer max-w-[170px] truncate pr-1"
+                  :title="t('header.mic_source', 'Mikrofon Kaynağı')"
+                >
+                  <option value="" class="bg-neutral-900 text-neutral-200">
+                    {{ t('header.default_mic', 'Varsayılan Mikrofon') }}
+                  </option>
+                  <option
+                    v-for="(dev, idx) in audioInputDevices"
+                    :key="dev.deviceId || idx"
+                    :value="dev.deviceId"
+                    class="bg-neutral-900 text-neutral-200"
+                  >
+                    {{ dev.label || `${t('header.microphone', 'Mikrofon')} ${idx + 1}` }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
             <!-- Language Switcher Dropdown -->
             <div class="relative flex items-center">
               <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
@@ -177,11 +212,12 @@
 </template>
 
 <script setup>
-import { computed, h } from 'vue'
+import { computed, h, onMounted } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import axios from 'axios'
 import SystemFooter from '../Components/SystemFooter.vue'
 import { useI18n } from '../i18n'
+import { useAudioDevices } from '../Composables/useAudioDevices'
 
 const props = defineProps({
   title: {
@@ -191,6 +227,17 @@ const props = defineProps({
 })
 
 const { locale, setLocale, t, languages, currentLanguage } = useI18n()
+const {
+  audioInputDevices,
+  selectedAudioDeviceId,
+  loadAudioDevices,
+  ensureMicrophonePermission,
+  selectAudioDevice,
+} = useAudioDevices()
+
+onMounted(() => {
+  loadAudioDevices()
+})
 
 const handleLanguageChange = (code) => {
   setLocale(code)
@@ -219,6 +266,8 @@ const navItems = computed(() => [
   { label: t('nav.dashboard'), href: '/dashboard', icon: createSvg('M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6') },
   { label: t('nav.tts'), href: '/tts', icon: createSvg('M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z') },
   { label: t('nav.stt'), href: '/stt', icon: createSvg('M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z') },
+  { label: t('nav.sfx'), href: '/sfx', icon: createSvg('M13 10V3L4 14h7v7l9-11h-7z') },
+  { label: t('nav.music'), href: '/music', icon: createSvg('M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3') },
   { label: t('nav.profiles'), href: '/profiles', icon: createSvg('M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z') },
   { label: t('nav.models'), href: '/models', icon: createSvg('M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4') },
   { label: t('nav.queue'), href: '/queue', icon: createSvg('M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01') },

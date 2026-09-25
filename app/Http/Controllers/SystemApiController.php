@@ -204,6 +204,7 @@ class SystemApiController extends Controller
             base_path('data/outputs/' . $filename),
             base_path('data/profiles/' . $filename),
             base_path('data/uploads/' . $filename),
+            base_path('data/sfx/' . $filename),
         ];
 
         $path = null;

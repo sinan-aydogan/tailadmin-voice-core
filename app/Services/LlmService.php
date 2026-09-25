@@ -90,15 +90,13 @@ class LlmService
                     return $this->generateMockResponse($prompt, $model ?: 'simulated-model', 'mock');
             }
         } catch (\Throwable $e) {
-            Log::warning('LLM Generation failed, falling back to intelligent simulation', [
+            Log::warning('LLM Generation failed', [
                 'provider' => $provider,
-                'model' => $model,
-                'error' => $e->getMessage(),
+                'model'    => $model,
+                'error'    => $e->getMessage(),
             ]);
-
-            $mockResult = $this->generateMockResponse($prompt, $model ?: 'model', $provider);
-            $mockResult['warning'] = 'Bağlantı uyarısı (' . $e->getMessage() . '). Test amaçlı simülasyon metni sunuldu. Ayarlar > LLM sekmesinden servis durumunu kontrol edebilirsiniz.';
-            return $mockResult;
+            // Re-throw so callers (e.g. enhanceMusicPrompt, enhanceSfxPrompt) can handle properly.
+            throw $e;
         }
     }
 
@@ -966,5 +964,255 @@ class LlmService
         $mock = $this->generateMockResponse($prompt, 'simulated-model', 'mock');
 
         return ['role' => 'assistant', 'content' => $mock['text']];
+    }
+
+    /**
+     * Get available LLM providers and models configured in the system.
+     */
+    public function getAvailableLlmOptions(): array
+    {
+        $settings = $this->getSettings();
+        $savedProvidersConfig = $settings['llm_providers_config'] ?? [];
+
+        $providers = [
+            [
+                'provider' => 'ollama',
+                'name' => 'Ollama (Yerel)',
+                'icon' => '🦙',
+                'models' => array_values(array_unique(array_filter([
+                    $settings['llm_model'],
+                    'google/gemma-4-e4b',
+                    'llama3:latest',
+                    'mistral:latest',
+                    'qwen2.5:latest',
+                ]))),
+                'is_active' => $settings['llm_provider'] === 'ollama',
+                'has_key' => true,
+            ],
+            [
+                'provider' => 'groq',
+                'name' => 'Groq (Ultra Hızlı LPU)',
+                'icon' => '⚡',
+                'models' => ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
+                'is_active' => $settings['llm_provider'] === 'groq',
+                'has_key' => !empty($savedProvidersConfig['groq']['api_key'] ?? env('GROQ_API_KEY')),
+            ],
+            [
+                'provider' => 'gemini',
+                'name' => 'Google Gemini',
+                'icon' => '✨',
+                'models' => ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+                'is_active' => $settings['llm_provider'] === 'gemini',
+                'has_key' => !empty($savedProvidersConfig['gemini']['api_key'] ?? env('GEMINI_API_KEY')),
+            ],
+            [
+                'provider' => 'openai',
+                'name' => 'OpenAI',
+                'icon' => '🧠',
+                'models' => ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'],
+                'is_active' => $settings['llm_provider'] === 'openai',
+                'has_key' => !empty($savedProvidersConfig['openai']['api_key'] ?? env('OPENAI_API_KEY')),
+            ],
+            [
+                'provider' => 'anthropic',
+                'name' => 'Claude (Anthropic)',
+                'icon' => '🎭',
+                'models' => ['claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022'],
+                'is_active' => $settings['llm_provider'] === 'anthropic',
+                'has_key' => !empty($savedProvidersConfig['anthropic']['api_key'] ?? env('ANTHROPIC_API_KEY')),
+            ],
+            [
+                'provider' => 'deepseek',
+                'name' => 'DeepSeek',
+                'icon' => '🐋',
+                'models' => ['deepseek-chat', 'deepseek-reasoner'],
+                'is_active' => $settings['llm_provider'] === 'deepseek',
+                'has_key' => !empty($savedProvidersConfig['deepseek']['api_key'] ?? env('DEEPSEEK_API_KEY')),
+            ],
+            [
+                'provider' => 'openrouter',
+                'name' => 'OpenRouter',
+                'icon' => '🌐',
+                'models' => ['meta-llama/llama-3.3-70b-instruct', 'deepseek/deepseek-r1'],
+                'is_active' => $settings['llm_provider'] === 'openrouter',
+                'has_key' => !empty($savedProvidersConfig['openrouter']['api_key'] ?? env('OPENROUTER_API_KEY')),
+            ],
+        ];
+
+        return [
+            'current' => [
+                'provider' => $settings['llm_provider'],
+                'model' => $settings['llm_model'],
+                'base_url' => $settings['llm_base_url'],
+            ],
+            'providers' => $providers,
+        ];
+    }
+
+    /**
+     * Enhance a music generation prompt using the selected LLM.
+     */
+    public function enhanceMusicPrompt(string $prompt, array $options = []): array
+    {
+        $provider = $options['provider'] ?? null;
+        $model    = $options['model'] ?? null;
+        $genre    = $options['genre'] ?? 'fairytale_children';
+        $currentBpm   = (int)($options['bpm'] ?? 90);
+        $currentScale = $options['scale'] ?? 'C Major';
+
+        $systemPrompt = "Sen dünyaca ünlü bir müzik prodüktörü ve ses tasarımcısısın (MusicGen, AudioCraft, Suno ve sinematik orkestrasyon uzmanı).
+Görevin, kullanıcının verdiği kaba veya kısa müzik fikrini; enstrümantasyon, akor/armoni, tempo (BPM), gam (Scale), duygu ve akustik doku içeren, müzik yapay zekası (AI Music Generator) için optimize edilmiş profesyonel bir prodüksiyon açıklamasına dönüştürmektir.
+
+Aşağıdaki JSON formatında yanıt ver (Markdown formatı veya ekstra yazı ekleme):
+{
+  \"enhanced_prompt\": \"İngilizce veya Türkçe detaylı, zengin enstrüman ve duygu tasviri içeren müzik promptu\",
+  \"suggested_bpm\": 90,
+  \"suggested_scale\": \"C Major\",
+  \"suggested_genre\": \"{$genre}\",
+  \"suggested_texture\": \"acoustic\"
+}";
+
+        $userPrompt = "Kullanıcı fikri: \"" . ($prompt ?: 'Bahar masalı fon müziği') . "\"\nTür: {$genre}, Mevcut BPM: {$currentBpm}, Gam: {$currentScale}";
+
+        try {
+            $res = $this->generate(
+                prompt: $userPrompt,
+                systemPrompt: $systemPrompt,
+                model: $model,
+                provider: $provider
+            );
+        } catch (\Throwable $e) {
+            throw new \Exception(
+                '🔌 LLM bağlantı hatası: ' . $e->getMessage() .
+                ' — Ayarlar sayfasından ' . ($provider ?? 'sağlayıcı') . ' servis ayarlarını kontrol edin.',
+                0, $e
+            );
+        }
+
+        $rawText = trim($res['text'] ?? '');
+
+        if (empty($rawText)) {
+            throw new \Exception('LLM boş yanıt döndürdü. Model veya bağlantı ayarlarını kontrol edin.');
+        }
+
+        $json = null;
+
+        if (preg_match('/\{[\s\S]*\}/u', $rawText, $matches)) {
+            $json = json_decode($matches[0], true);
+        }
+
+        if (is_array($json) && !empty($json['enhanced_prompt'])) {
+            return [
+                'success'          => true,
+                'enhanced_prompt'  => trim($json['enhanced_prompt']),
+                'suggested_bpm'    => (int)($json['suggested_bpm'] ?? $currentBpm),
+                'suggested_scale'  => $json['suggested_scale'] ?? $currentScale,
+                'suggested_genre'  => $json['suggested_genre'] ?? $genre,
+                'suggested_texture'=> $json['suggested_texture'] ?? 'acoustic',
+                'model_used'       => $res['model'] ?? $model,
+                'provider_used'    => $res['provider'] ?? $provider,
+            ];
+        }
+
+        $cleaned = trim(preg_replace('/^```[a-z]*\s*|\s*```$/i', '', $rawText));
+        $cleaned = trim(trim($cleaned, '"\''));
+
+        if (empty($cleaned)) {
+            throw new \Exception('LLM geçerli bir prompt üretemedi. Lütfen farklı bir model deneyin.');
+        }
+
+        return [
+            'success'          => true,
+            'enhanced_prompt'  => $cleaned,
+            'suggested_bpm'    => $currentBpm,
+            'suggested_scale'  => $currentScale,
+            'suggested_genre'  => $genre,
+            'suggested_texture'=> 'acoustic',
+            'model_used'       => $res['model'] ?? $model,
+            'provider_used'    => $res['provider'] ?? $provider,
+        ];
+    }
+
+    /**
+     * Enhance an SFX generation prompt using the selected LLM.
+     */
+    public function enhanceSfxPrompt(string $prompt, array $options = []): array
+    {
+        $provider = $options['provider'] ?? null;
+        $model    = $options['model'] ?? null;
+        $preset   = $options['preset'] ?? 'birds_chirping';
+        $currentDuration = (float)($options['duration'] ?? 2.0);
+
+        $systemPrompt = "Sen Hollywood düzeyinde bir foley sanatçısı ve ses efekti tasarımcısısın (AudioGen, foley sound and procedural SFX synthesis).
+Görevin, kullanıcının verdiği ses efekti fikrini; sesin kaynağı, vuruş/atak karakteri, frekans ve tını dokusu (sub-bass, parlak kristal tını), akustik mekan ve geçiş dinamiklerini içeren profesyonel bir ses efekti promptuna dönüştürmektir.
+
+Aşağıdaki JSON formatında yanıt ver (Markdown veya fazladan yazı ekleme):
+{
+  \"enhanced_prompt\": \"Detaylı akustik tasvir içeren ses efekti promptu\",
+  \"suggested_duration\": 2.0,
+  \"suggested_reverb\": \"room\",
+  \"suggested_tone\": \"balanced\",
+  \"suggested_preset\": \"{$preset}\"
+}";
+
+        $userPrompt = "Kullanıcı efekti: \"" . ($prompt ?: 'Kuş cıvıltısı ve orman') . "\"\nSeçili Şablon: {$preset}, Mevcut Süre: {$currentDuration}s";
+
+        try {
+            $res = $this->generate(
+                prompt: $userPrompt,
+                systemPrompt: $systemPrompt,
+                model: $model,
+                provider: $provider
+            );
+        } catch (\Throwable $e) {
+            throw new \Exception(
+                '🔌 LLM bağlantı hatası: ' . $e->getMessage() .
+                ' — Ayarlar sayfasından ' . ($provider ?? 'sağlayıcı') . ' servis ayarlarını kontrol edin.',
+                0, $e
+            );
+        }
+
+        $rawText = trim($res['text'] ?? '');
+
+        if (empty($rawText)) {
+            throw new \Exception('LLM boş yanıt döndürdü. Model veya bağlantı ayarlarını kontrol edin.');
+        }
+
+        $json = null;
+
+        if (preg_match('/\{[\s\S]*\}/u', $rawText, $matches)) {
+            $json = json_decode($matches[0], true);
+        }
+
+        if (is_array($json) && !empty($json['enhanced_prompt'])) {
+            return [
+                'success'          => true,
+                'enhanced_prompt'  => trim($json['enhanced_prompt']),
+                'suggested_duration'=> (float)($json['suggested_duration'] ?? $currentDuration),
+                'suggested_reverb' => $json['suggested_reverb'] ?? 'room',
+                'suggested_tone'   => $json['suggested_tone'] ?? 'balanced',
+                'suggested_preset' => $json['suggested_preset'] ?? $preset,
+                'model_used'       => $res['model'] ?? $model,
+                'provider_used'    => $res['provider'] ?? $provider,
+            ];
+        }
+
+        $cleaned = trim(preg_replace('/^```[a-z]*\s*|\s*```$/i', '', $rawText));
+        $cleaned = trim(trim($cleaned, '"\''));
+
+        if (empty($cleaned)) {
+            throw new \Exception('LLM geçerli bir prompt üretemedi. Lütfen farklı bir model deneyin.');
+        }
+
+        return [
+            'success'          => true,
+            'enhanced_prompt'  => $cleaned,
+            'suggested_duration'=> $currentDuration,
+            'suggested_reverb' => 'room',
+            'suggested_tone'   => 'balanced',
+            'suggested_preset' => $preset,
+            'model_used'       => $res['model'] ?? $model,
+            'provider_used'    => $res['provider'] ?? $provider,
+        ];
     }
 }

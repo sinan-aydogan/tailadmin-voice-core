@@ -13,7 +13,7 @@ class DownloadModelJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 1800; // 30 minutes for large models
+    public int $timeout = 3600; // 60 minutes for large multi-gigabyte models
 
     public function __construct(
         public int $downloadId

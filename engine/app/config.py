@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     DEFAULT_TTS_LANGUAGE: str = "tr"
     DEFAULT_STT_ENGINE: str = "whisper"
     DEFAULT_WHISPER_MODEL: str = "medium"
+    DEFAULT_STT_MODEL_SIZE: str = "whisper-medium"
     
     # Hardware / Processing
     USE_GPU: str = "auto"
@@ -78,6 +79,21 @@ class Settings(BaseSettings):
     
     # HuggingFace Token (optional, for authenticated downloads)
     HF_TOKEN: Optional[str] = None
+
+    # Freya Voice (Adam & Eve, YC S25 / Tunga Bayrak)
+    FREYA_API_KEY: Optional[str] = None
+    FREYA_DEFAULT_VOICE: str = "adam"
+
+    # Cloud Providers (TTS, STT & LLM)
+    OPENAI_API_KEY: Optional[str] = None
+    ELEVENLABS_API_KEY: Optional[str] = None
+    GOOGLE_CLOUD_API_KEY: Optional[str] = None
+    GROQ_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+    DEEPSEEK_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
+    PATIENTDESK_API_KEY: Optional[str] = None
     
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -110,6 +126,82 @@ def reload_custom_settings():
                     else:
                         os.environ.pop("HF_TOKEN", None)
                         os.environ.pop("HUGGING_FACE_HUB_TOKEN", None)
+                if "freya_api_key" in _custom:
+                    f_val = str(_custom["freya_api_key"]).strip() if _custom["freya_api_key"] else None
+                    settings.FREYA_API_KEY = f_val
+                    if f_val:
+                        os.environ["FREYA_API_KEY"] = f_val
+                    else:
+                        os.environ.pop("FREYA_API_KEY", None)
+                if "openai_api_key" in _custom:
+                    o_val = str(_custom["openai_api_key"]).strip() if _custom["openai_api_key"] else None
+                    settings.OPENAI_API_KEY = o_val
+                    if o_val:
+                        os.environ["OPENAI_API_KEY"] = o_val
+                    else:
+                        os.environ.pop("OPENAI_API_KEY", None)
+                if "elevenlabs_api_key" in _custom:
+                    e_val = str(_custom["elevenlabs_api_key"]).strip() if _custom["elevenlabs_api_key"] else None
+                    settings.ELEVENLABS_API_KEY = e_val
+                    if e_val:
+                        os.environ["ELEVENLABS_API_KEY"] = e_val
+                    else:
+                        os.environ.pop("ELEVENLABS_API_KEY", None)
+                if "google_cloud_api_key" in _custom or "gemini_api_key" in _custom:
+                    g_val = str(_custom.get("google_cloud_api_key") or _custom.get("gemini_api_key") or "").strip() or None
+                    settings.GOOGLE_CLOUD_API_KEY = g_val
+                    settings.GEMINI_API_KEY = g_val
+                    if g_val:
+                        os.environ["GOOGLE_CLOUD_API_KEY"] = g_val
+                        os.environ["GEMINI_API_KEY"] = g_val
+                    else:
+                        os.environ.pop("GOOGLE_CLOUD_API_KEY", None)
+                        os.environ.pop("GEMINI_API_KEY", None)
+                if "groq_api_key" in _custom:
+                    q_val = str(_custom["groq_api_key"]).strip() if _custom["groq_api_key"] else None
+                    settings.GROQ_API_KEY = q_val
+                    if q_val:
+                        os.environ["GROQ_API_KEY"] = q_val
+                    else:
+                        os.environ.pop("GROQ_API_KEY", None)
+                if "anthropic_api_key" in _custom or "claude_api_key" in _custom:
+                    ant_val = str(_custom.get("anthropic_api_key") or _custom.get("claude_api_key") or "").strip() or None
+                    settings.ANTHROPIC_API_KEY = ant_val
+                    if ant_val:
+                        os.environ["ANTHROPIC_API_KEY"] = ant_val
+                        os.environ["CLAUDE_API_KEY"] = ant_val
+                    else:
+                        os.environ.pop("ANTHROPIC_API_KEY", None)
+                        os.environ.pop("CLAUDE_API_KEY", None)
+                if "deepseek_api_key" in _custom:
+                    ds_val = str(_custom["deepseek_api_key"]).strip() if _custom["deepseek_api_key"] else None
+                    settings.DEEPSEEK_API_KEY = ds_val
+                    if ds_val:
+                        os.environ["DEEPSEEK_API_KEY"] = ds_val
+                    else:
+                        os.environ.pop("DEEPSEEK_API_KEY", None)
+                if "openrouter_api_key" in _custom:
+                    or_val = str(_custom["openrouter_api_key"]).strip() if _custom["openrouter_api_key"] else None
+                    settings.OPENROUTER_API_KEY = or_val
+                    if or_val:
+                        os.environ["OPENROUTER_API_KEY"] = or_val
+                    else:
+                        os.environ.pop("OPENROUTER_API_KEY", None)
+                if "patientdesk_api_key" in _custom:
+                    pd_val = str(_custom["patientdesk_api_key"]).strip() if _custom["patientdesk_api_key"] else None
+                    settings.PATIENTDESK_API_KEY = pd_val
+                    if pd_val:
+                        os.environ["PATIENTDESK_API_KEY"] = pd_val
+                    else:
+                        os.environ.pop("PATIENTDESK_API_KEY", None)
+                if "freya_default_voice" in _custom and _custom["freya_default_voice"]:
+                    settings.FREYA_DEFAULT_VOICE = str(_custom["freya_default_voice"]).strip()
+                if "default_stt_engine" in _custom and _custom["default_stt_engine"]:
+                    settings.DEFAULT_STT_ENGINE = str(_custom["default_stt_engine"]).strip()
+                if "default_stt_model" in _custom and _custom["default_stt_model"]:
+                    stt_mod = str(_custom["default_stt_model"]).strip()
+                    settings.DEFAULT_WHISPER_MODEL = stt_mod
+                    settings.DEFAULT_STT_MODEL_SIZE = stt_mod
         except Exception:
             pass
 

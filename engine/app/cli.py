@@ -67,7 +67,8 @@ def stt_command(args):
     import asyncio
     from app.stt.registry import get_stt_engine
     try:
-        engine = get_stt_engine("whisper")
+        engine_name = getattr(args, "engine", None) or "whisper"
+        engine = get_stt_engine(engine_name)
         lang = args.language if args.language != "auto" else None
         model_size = getattr(args, "model_size", None)
         transcription = asyncio.run(engine.transcribe(
@@ -134,6 +135,93 @@ def system_command(args):
     print(json.dumps(stats))
     return 0
 
+def story_mix_command(args):
+    from app.audio.mixer import mix_tracks
+    try:
+        sfx_list = []
+        if getattr(args, "sfx_json", None):
+            try:
+                if os.path.exists(args.sfx_json):
+                    with open(args.sfx_json, "r", encoding="utf-8") as f:
+                        sfx_list = json.load(f)
+                else:
+                    sfx_list = json.loads(args.sfx_json)
+            except Exception as ex:
+                print(f"Warning: Failed to parse sfx_json: {ex}", file=sys.stderr)
+
+        ducking = not getattr(args, "no_ducking", False)
+        bgm_volume = float(getattr(args, "bgm_volume", 0.25))
+
+        res = mix_tracks(
+            voice_path=args.voice,
+            bgm_path=getattr(args, "bgm", None),
+            sfx_list=sfx_list,
+            output_path=getattr(args, "output", None),
+            ducking=ducking,
+            bgm_volume=bgm_volume,
+            stems_dir=getattr(args, "stems_dir", None),
+        )
+        print(json.dumps(res))
+        return 0
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}), file=sys.stderr)
+        return 1
+
+def story_align_command(args):
+    from app.stt.whisper import WhisperEngine
+    try:
+        engine = WhisperEngine()
+        words = engine.align_words_sync(
+            audio_path=args.audio,
+            language=getattr(args, "language", "tr"),
+            model_size=getattr(args, "model_size", None)
+        )
+        print(json.dumps({"success": True, "words": words}))
+        return 0
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}), file=sys.stderr)
+        return 1
+
+def sfx_generate_command(args):
+    from app.audio.sfx_generator import generate_sfx
+    try:
+        res = generate_sfx(
+            prompt=getattr(args, "prompt", ""),
+            preset=getattr(args, "preset", None),
+            duration=float(getattr(args, "duration", 2.0)),
+            reverb=getattr(args, "reverb", "room"),
+            tone=getattr(args, "tone", "balanced"),
+            output_path=getattr(args, "output", None)
+        )
+        print(json.dumps(res, ensure_ascii=False))
+        return 0
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}), file=sys.stderr)
+        return 1
+
+def music_generate_command(args):
+    from app.audio.music_generator import generate_music
+    try:
+        no_loop = getattr(args, "no_loop", False)
+        bpm = getattr(args, "bpm", None)
+        if bpm is not None:
+            bpm = int(bpm)
+        res = generate_music(
+            prompt=getattr(args, "prompt", ""),
+            genre=getattr(args, "genre", "fairytale_children"),
+            bpm=bpm,
+            scale=getattr(args, "scale", None),
+            texture=getattr(args, "texture", None),
+            duration=float(getattr(args, "duration", 15.0)),
+            loop=not no_loop,
+            output_path=getattr(args, "output", None)
+        )
+        print(json.dumps(res, ensure_ascii=False))
+        return 0
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}), file=sys.stderr)
+        return 1
+
 def main():
     parser = argparse.ArgumentParser(description="TailAdmin Voice Core CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -151,11 +239,48 @@ def main():
     stt_parser.add_argument("--audio", required=True)
     stt_parser.add_argument("--language", default="tr")
     stt_parser.add_argument("--model-size", dest="model_size", default=None)
+    stt_parser.add_argument("--engine", default=None)
 
     # Download
     dl_parser = subparsers.add_parser("download")
     dl_parser.add_argument("--model", required=True)
     dl_parser.add_argument("--token", default=None)
+
+    # Story Mix
+    mix_parser = subparsers.add_parser("story-mix")
+    mix_parser.add_argument("--voice", required=True)
+    mix_parser.add_argument("--bgm", default=None)
+    mix_parser.add_argument("--sfx-json", default=None)
+    mix_parser.add_argument("--output", default=None)
+    mix_parser.add_argument("--stems-dir", default=None)
+    mix_parser.add_argument("--no-ducking", action="store_true", default=False)
+    mix_parser.add_argument("--bgm-volume", default=0.25, type=float)
+
+    # Story Align
+    align_parser = subparsers.add_parser("story-align")
+    align_parser.add_argument("--audio", required=True)
+    align_parser.add_argument("--language", default="tr")
+    align_parser.add_argument("--model-size", default=None)
+
+    # SFX Generate
+    sfx_parser = subparsers.add_parser("sfx-generate")
+    sfx_parser.add_argument("--prompt", default="")
+    sfx_parser.add_argument("--preset", default=None)
+    sfx_parser.add_argument("--duration", type=float, default=2.0)
+    sfx_parser.add_argument("--reverb", default="room")
+    sfx_parser.add_argument("--tone", default="balanced")
+    sfx_parser.add_argument("--output", default=None)
+
+    # Music Generate
+    music_parser = subparsers.add_parser("music-generate")
+    music_parser.add_argument("--prompt", default="")
+    music_parser.add_argument("--genre", default="fairytale_children")
+    music_parser.add_argument("--bpm", type=int, default=None)
+    music_parser.add_argument("--scale", default=None)
+    music_parser.add_argument("--texture", default=None)
+    music_parser.add_argument("--duration", type=float, default=15.0)
+    music_parser.add_argument("--no-loop", action="store_true", default=False)
+    music_parser.add_argument("--output", default=None)
 
     # Models list
     subparsers.add_parser("models")
@@ -170,6 +295,14 @@ def main():
         sys.exit(stt_command(args))
     elif args.command == "download":
         sys.exit(download_command(args))
+    elif args.command == "story-mix":
+        sys.exit(story_mix_command(args))
+    elif args.command == "story-align":
+        sys.exit(story_align_command(args))
+    elif args.command == "sfx-generate":
+        sys.exit(sfx_generate_command(args))
+    elif args.command == "music-generate":
+        sys.exit(music_generate_command(args))
     elif args.command == "models":
         sys.exit(models_command(args))
     elif args.command == "system":

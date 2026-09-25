@@ -141,22 +141,40 @@ class PythonVoiceService
             ->run($cmd);
 
         if (!$result->successful()) {
-            throw new \RuntimeException("TTS generation CLI failed: " . self::cleanUtf8($result->errorOutput()));
+            $humanMsg = self::parseHumanErrorMessage($result->errorOutput(), $engine);
+            throw new \RuntimeException($humanMsg);
         }
 
         $output = self::cleanUtf8($result->output());
         $data = json_decode($output, true);
         if (!$data || empty($data['success'])) {
-            throw new \RuntimeException("TTS generation CLI error: " . ($data['error'] ?? $output));
+            $raw = $data['error'] ?? $output;
+            $humanMsg = self::parseHumanErrorMessage($raw, $engine);
+            throw new \RuntimeException($humanMsg);
         }
 
         return $data;
     }
 
     /**
+     * Get user-configured or environment default STT model.
+     */
+    public function getDefaultSttModel(): string
+    {
+        $settingsFile = base_path('data' . DIRECTORY_SEPARATOR . 'settings.json');
+        if (file_exists($settingsFile)) {
+            $settings = json_decode(file_get_contents($settingsFile), true);
+            if (!empty($settings['default_stt_model'])) {
+                return $settings['default_stt_model'];
+            }
+        }
+        return env('DEFAULT_STT_MODEL', 'whisper-medium');
+    }
+
+    /**
      * Transcribe speech to text (STT).
      */
-    public function transcribeStt(string $audioFilePath, string $language = 'tr', ?string $modelSize = null): array
+    public function transcribeStt(string $audioFilePath, string $language = 'tr', ?string $modelSize = null, ?string $engine = null): array
     {
         if (!file_exists($audioFilePath)) {
             throw new \RuntimeException("Audio file not found: {$audioFilePath}");
@@ -170,10 +188,17 @@ class PythonVoiceService
             ];
         }
 
+        if (empty($modelSize)) {
+            $modelSize = $this->getDefaultSttModel();
+        }
+
         if ($this->isServiceOnline()) {
             $postData = ['language' => $language];
             if (!empty($modelSize)) {
                 $postData['model_size'] = $modelSize;
+            }
+            if (!empty($engine)) {
+                $postData['engine'] = $engine;
             }
 
             $response = Http::timeout(600)
@@ -198,6 +223,11 @@ class PythonVoiceService
         if (!empty($modelSize)) {
             $cmd[] = '--model-size';
             $cmd[] = $modelSize;
+        }
+
+        if (!empty($engine)) {
+            $cmd[] = '--engine';
+            $cmd[] = $engine;
         }
 
         $result = Process::path($this->enginePath)
@@ -248,8 +278,28 @@ class PythonVoiceService
 
         $models = $this->getAvailableModels();
         $targetModel = collect($models)->firstWhere('id', $modelId);
-        $estimateMb = $targetModel['size_estimate_mb'] ?? 1000;
-        $totalBytes = $estimateMb * 1024 * 1024;
+
+        // Cloud models (like Freya Voice Adam & Eve) don't have local weights to download
+        if (!empty($targetModel['is_cloud'])) {
+            $settingsFile = base_path('data' . DIRECTORY_SEPARATOR . 'settings.json');
+            $freyaKey = env('FREYA_API_KEY');
+            if (file_exists($settingsFile)) {
+                $st = json_decode(file_get_contents($settingsFile), true);
+                if (!empty($st['freya_api_key'])) {
+                    $freyaKey = trim($st['freya_api_key']);
+                }
+            }
+            if (empty($freyaKey)) {
+                throw new \RuntimeException("Freya Voice bir Bulut API servisidir (yerel dosya indirmesi gerekmez). Lütfen Ayarlar sayfasından Freya API Anahtarınızı giriniz.");
+            }
+            if ($onProgress) {
+                $onProgress(100.0, 0, 0);
+            }
+            return ['success' => true, 'is_cloud' => true];
+        }
+
+        $estimateMb = (int) ($targetModel['size_estimate_mb'] ?? 1000);
+        $totalBytes = max(1024 * 1024, $estimateMb * 1024 * 1024);
         $targetDir = base_path('data/models/' . $modelId);
 
         // Load custom models dir and HF token from data/settings.json if present
@@ -294,7 +344,9 @@ class PythonVoiceService
         while ($process->running()) {
             if ($onProgress) {
                 $currentBytes = self::getDirectorySize($targetDir);
-                $pct = min(99.0, max(5.0, round(($currentBytes / $totalBytes) * 100, 1)));
+                $pct = $totalBytes > 0
+                    ? min(99.0, max(5.0, round(($currentBytes / $totalBytes) * 100, 1)))
+                    : 5.0;
                 $onProgress($pct, $currentBytes, $totalBytes);
             }
             sleep(1);
@@ -317,26 +369,167 @@ class PythonVoiceService
     public function getAvailableModels(): array
     {
         return Cache::remember('voice_available_models', 180, function () {
+            $fromPython = [];
+
             if ($this->isServiceOnline()) {
                 try {
                     $response = Http::timeout(2)->get("{$this->baseUrl}/models/available");
                     if ($response->successful()) {
-                        return $response->json();
+                        $fromPython = $response->json() ?? [];
                     }
                 } catch (\Throwable $e) {
                     // fall through
                 }
             }
 
-            $result = Process::path($this->enginePath)
-                ->env($this->getExecutionEnvironment())
-                ->timeout(10)
-                ->run([$this->pythonBin, '-m', 'app.cli', 'models']);
+            if (empty($fromPython)) {
+                $result = Process::path($this->enginePath)
+                    ->env($this->getExecutionEnvironment())
+                    ->timeout(10)
+                    ->run([$this->pythonBin, '-m', 'app.cli', 'models']);
 
-            $output = self::cleanUtf8($result->output());
-            return json_decode($output, true) ?? [];
+                $output = self::cleanUtf8($result->output());
+                $fromPython = json_decode($output, true) ?? [];
+            }
+
+            // Augment: inject or reconcile AudioGen model
+            $audiogenPaths = [
+                base_path('data/models/audiogen-medium'),
+                base_path('data/models/audiogen-base'),
+                base_path('data/models/audiocraft'),
+                base_path('engine/models/audiogen'),
+            ];
+            $isAudiogenInstalled = collect($audiogenPaths)->contains(fn($p) => is_dir($p));
+
+            $hasAudiogen = false;
+            foreach ($fromPython as &$m) {
+                if (str_contains(strtolower($m['id'] ?? ''), 'audiogen')) {
+                    $hasAudiogen = true;
+                    $m['type'] = 'sfx';
+                    $m['category'] = 'sfx';
+                    if ($isAudiogenInstalled) {
+                        $m['is_downloaded'] = true;
+                    }
+                }
+            }
+            unset($m);
+
+            if (!$hasAudiogen) {
+                $fromPython[] = [
+                    'id'               => 'audiogen-medium',
+                    'name'             => 'AudioGen Medium',
+                    'type'             => 'sfx',
+                    'category'         => 'sfx',
+                    'description'      => 'Meta AudioCraft — AI tabanlı ses efekti üretimi (foley, ambiyans, sinematik SFX). SFX Stüdyosu\'nda Yerel AudioGen motoru ile kullanılır.',
+                    'is_downloaded'    => $isAudiogenInstalled,
+                    'is_cloud'         => false,
+                    'size_estimate_mb' => 1500,
+                    'tags'             => ['sfx', 'audiogen', 'audiocraft', 'meta'],
+                    'hf_repo'          => 'facebook/audiogen-medium',
+                    'engine'           => 'audiogen',
+                    'requires_gpu'     => false,
+                    'notes'            => $isAudiogenInstalled ? 'Kurulu — SFX Stüdyosu\'nda kullanılabilir.' : 'Kurulu değil — indirmek için tıklayın.',
+                ];
+            }
+
+            // Augment: ElevenLabs Sound Effects cloud model check
+            $hasElevenlabsSfx = collect($fromPython)->contains(fn($m) => ($m['id'] ?? '') === 'elevenlabs-sfx');
+            $settingsFile = base_path('data' . DIRECTORY_SEPARATOR . 'settings.json');
+            $elevenKey = env('ELEVENLABS_API_KEY');
+            if (file_exists($settingsFile)) {
+                $st = json_decode(file_get_contents($settingsFile), true);
+                if (!empty($st['elevenlabs_api_key'])) {
+                    $elevenKey = trim($st['elevenlabs_api_key']);
+                }
+            }
+            $isElevenConfigured = !empty($elevenKey);
+
+            if ($hasElevenlabsSfx) {
+                foreach ($fromPython as &$m) {
+                    if (($m['id'] ?? '') === 'elevenlabs-sfx') {
+                        $m['is_downloaded'] = $isElevenConfigured;
+                    }
+                }
+                unset($m);
+            } else {
+                $fromPython[] = [
+                    'id'               => 'elevenlabs-sfx',
+                    'name'             => 'ElevenLabs Sound Effects',
+                    'type'             => 'sfx',
+                    'category'         => 'sfx',
+                    'description'      => 'ElevenLabs yapay zeka ses efekti ve foley motoru. Zengin ve sinematik ses efektleri üretir (Bulut API).',
+                    'is_downloaded'    => $isElevenConfigured,
+                    'is_cloud'         => true,
+                    'cloud_provider'   => 'elevenlabs',
+                    'size_estimate_mb' => 0,
+                    'tags'             => ['sfx', 'elevenlabs', 'cloud'],
+                    'engine'           => 'elevenlabs-sfx',
+                    'requires_gpu'     => false,
+                ];
+            }
+
+            // Augment: Patientdesk models check
+            $patientdeskKey = env('PATIENTDESK_API_KEY');
+            if (file_exists($settingsFile)) {
+                $st = json_decode(file_get_contents($settingsFile), true);
+                if (!empty($st['patientdesk_api_key'])) {
+                    $patientdeskKey = trim($st['patientdesk_api_key']);
+                }
+            }
+            $isPatientdeskConfigured = !empty($patientdeskKey);
+
+            $hasAlania = collect($fromPython)->contains(fn($m) => ($m['id'] ?? '') === 'alania');
+            $hasDuyu = collect($fromPython)->contains(fn($m) => ($m['id'] ?? '') === 'duyu');
+
+            foreach ($fromPython as &$m) {
+                if (($m['cloud_provider'] ?? '') === 'patientdesk') {
+                    $m['is_downloaded'] = $isPatientdeskConfigured;
+                }
+            }
+            unset($m);
+
+            if (!$hasAlania) {
+                $fromPython[] = [
+                    'id'               => 'alania',
+                    'name'             => 'Patientdesk Alania (Türkçe TTS • Bulut)',
+                    'type'             => 'tts',
+                    'category'         => 'tts',
+                    'engine'           => 'alania',
+                    'repo_id'          => 'patientdesk/alania',
+                    'description'      => 'Patientdesk.ai Türkçe metinden sese modeli. Doğal ve tutarlı tek bir ses üzerinden, düşük gecikmeli akış (streaming) desteğiyle telefon görüşmeleri ve sesli asistanlar için optimize edilmiştir. OpenAI API formatıyla tam uyumlu.',
+                    'is_downloaded'    => $isPatientdeskConfigured,
+                    'is_cloud'         => true,
+                    'cloud_provider'   => 'patientdesk',
+                    'size_estimate_mb' => 0,
+                    'languages'        => ['tr'],
+                    'license'          => 'Lansman Ücretsiz (1 Ay) / Ticari',
+                    'homepage_url'     => 'https://speech.patientdesk.ai',
+                ];
+            }
+
+            if (!$hasDuyu) {
+                $fromPython[] = [
+                    'id'               => 'duyu',
+                    'name'             => 'Patientdesk Duyu (Türkçe STT • Bulut)',
+                    'type'             => 'stt',
+                    'category'         => 'stt',
+                    'engine'           => 'duyu',
+                    'repo_id'          => 'patientdesk/duyu',
+                    'description'      => 'Patientdesk.ai konuşmayı metne dönüştürme (STT) modeli. Kayıtlı sesleri ve canlı konuşmaları metne aktarır. FLEURS açık Türkçe veri setinde %4.71 kelime hata oranıyla Whisper Large-v3\'ü (%5.04) geride bıraktı; telefon konuşmalarında %9.87 WER elde etti. OpenAI Whisper API formatıyla tam uyumlu.',
+                    'is_downloaded'    => $isPatientdeskConfigured,
+                    'is_cloud'         => true,
+                    'cloud_provider'   => 'patientdesk',
+                    'size_estimate_mb' => 0,
+                    'languages'        => ['tr'],
+                    'license'          => 'Lansman Ücretsiz (1 Ay) / Ticari',
+                    'homepage_url'     => 'https://speech.patientdesk.ai',
+                ];
+            }
+
+            return $fromPython;
         });
     }
+
 
     /**
      * Get system resource statistics (CPU, RAM, Disk, GPU).
@@ -400,6 +593,64 @@ class PythonVoiceService
     }
 
     /**
+     * Parse raw CLI stderr and return a user-friendly, descriptive message.
+     */
+    public static function parseHumanErrorMessage(string $rawError, string $engine = ''): string
+    {
+        $clean = self::cleanUtf8($rawError);
+
+        if (str_contains($clean, 'Freya Voice API HTTP error 403') || (str_contains(strtolower($clean), 'freya') && str_contains($clean, 'Invalid API key'))) {
+            return "Freya Voice API Hatası (HTTP 403): API anahtarınız geçersiz (Invalid API key). Lütfen geçerli bir Freya API anahtarı tanımlayın veya yerel bir vokal motoru (Piper TR) seçin.";
+        }
+
+        if (str_contains($clean, 'FREYA_API_KEY is not configured')) {
+            return "Freya Voice API anahtarı tanımlanmamış. Lütfen Ayarlar veya Model Yöneticisi'nden Freya API anahtarınızı kaydedin ya da yerel motorlardan (Piper TR) birini seçin.";
+        }
+
+        if (str_contains($clean, 'Freya Voice Cloud API connection error')) {
+            return "Freya Voice bulut sunucusuna bağlanılamadı. Lütfen internet bağlantınızı kontrol edin veya yerel Piper TR motorunu seçin.";
+        }
+
+        if (str_contains($clean, 'OpenAI') && (str_contains($clean, '401') || str_contains($clean, 'Incorrect API key'))) {
+            return "OpenAI API Hatası: API anahtarınız geçersiz veya yetkisiz. Lütfen OpenAI API anahtarınızı kontrol edin.";
+        }
+
+        if (str_contains($clean, 'ElevenLabs') && (str_contains($clean, '401') || str_contains($clean, 'quota'))) {
+            return "ElevenLabs API Hatası: API anahtarınız geçersiz veya kullanım kotanız dolmuş.";
+        }
+
+        if (str_contains($clean, 'Google Cloud') && str_contains($clean, 'error')) {
+            return "Google Cloud TTS Hatası: Google Cloud API anahtarı veya servis hesabı doğrulanamadı.";
+        }
+
+        if (str_contains(strtolower($clean), 'patientdesk') && (str_contains($clean, '401') || str_contains($clean, '403') || str_contains($clean, 'API key'))) {
+            return "Patientdesk.ai API Hatası: API anahtarınız geçersiz veya yetkisiz. Lütfen speech.patientdesk.ai üzerinden aldığınız anahtarı kontrol edin.";
+        }
+
+        if (str_contains($clean, 'Model not found') && str_contains($clean, 'Model Manager')) {
+            return "Seçilen model dosyaları yerel diskte bulunamadı. Lütfen Model Yöneticisi'nden modeli indirin veya kurulu bir model seçin.";
+        }
+
+        // Strip loguru prefixes if present e.g. "... | ERROR | ... - "
+        if (preg_match('/\|\s*ERROR\s*\|\s*[^:]+:\d+\s*-\s*(.+)$/m', $clean, $m)) {
+            $msg = trim($m[1]);
+            if (preg_match('/\{.*"detail"\s*:\s*"([^"]+)".*\}/', $msg, $jm)) {
+                return "TTS Hatası: " . $jm[1];
+            }
+            if (preg_match('/\{.*"error"\s*:\s*"([^"]+)".*\}/', $msg, $jm)) {
+                return "TTS Hatası: " . $jm[1];
+            }
+            return "TTS Hatası: " . $msg;
+        }
+
+        if (strlen($clean) > 280) {
+            $clean = substr($clean, 0, 280) . '...';
+        }
+
+        return "TTS Üretim Hatası: " . $clean;
+    }
+
+    /**
      * Sanitize text for TTS to ensure speech models (Piper, XTTS, etc.)
      * do not pronounce markdown formatting, asterisks, emojis, or stage directions aloud.
      */
@@ -450,7 +701,7 @@ class PythonVoiceService
      * On Windows, ensures SystemRoot and PATH are present so Winsock (WSAStartup / _overlapped / asyncio)
      * does not fail with WinError 10106 (WSAEPROVIDERFAILEDINIT).
      */
-    protected function getExecutionEnvironment(?array $additionalEnv = null): array
+    public function getExecutionEnvironment(?array $additionalEnv = null): array
     {
         $env = [];
 
@@ -489,6 +740,28 @@ class PythonVoiceService
 
         if ($additionalEnv) {
             $env = array_merge($env, $additionalEnv);
+        }
+
+        // Pass Cloud Provider API Keys to Python subprocess
+        $settingsFile = base_path('data' . DIRECTORY_SEPARATOR . 'settings.json');
+        $savedSettings = [];
+        if (file_exists($settingsFile)) {
+            $savedSettings = json_decode(file_get_contents($settingsFile), true) ?: [];
+        }
+
+        $cloudKeys = [
+            'FREYA_API_KEY' => $savedSettings['freya_api_key'] ?? env('FREYA_API_KEY'),
+            'OPENAI_API_KEY' => $savedSettings['openai_api_key'] ?? env('OPENAI_API_KEY'),
+            'ELEVENLABS_API_KEY' => $savedSettings['elevenlabs_api_key'] ?? env('ELEVENLABS_API_KEY'),
+            'GOOGLE_CLOUD_API_KEY' => $savedSettings['google_cloud_api_key'] ?? $savedSettings['gemini_api_key'] ?? env('GOOGLE_CLOUD_API_KEY') ?: env('GEMINI_API_KEY'),
+            'GROQ_API_KEY' => $savedSettings['groq_api_key'] ?? env('GROQ_API_KEY'),
+            'PATIENTDESK_API_KEY' => $savedSettings['patientdesk_api_key'] ?? env('PATIENTDESK_API_KEY'),
+        ];
+
+        foreach ($cloudKeys as $envName => $keyValue) {
+            if (!isset($env[$envName]) && !empty($keyValue)) {
+                $env[$envName] = trim($keyValue);
+            }
         }
 
         return $env;

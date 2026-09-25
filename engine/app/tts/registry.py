@@ -23,6 +23,17 @@ class TTSRegistry:
         "piper-en": lambda: __import__("app.tts.piper", fromlist=["PiperEngine"]).PiperEngine("en_US-lessac-medium", model_id="piper-en"),
         "piper-de": lambda: __import__("app.tts.piper", fromlist=["PiperEngine"]).PiperEngine("de_DE-thorsten-medium", model_id="piper-de"),
         "piper-fr": lambda: __import__("app.tts.piper", fromlist=["PiperEngine"]).PiperEngine("fr_FR-siwis-medium", model_id="piper-fr"),
+        "freya-tts": lambda: __import__("app.tts.freya", fromlist=["FreyaEngine"]).FreyaEngine(mode="local", model_id="freya-tts"),
+        "freya-adam": lambda: __import__("app.tts.freya", fromlist=["FreyaEngine"]).FreyaEngine(mode="cloud", voice="adam", model_id="freya-adam"),
+        "freya-eve": lambda: __import__("app.tts.freya", fromlist=["FreyaEngine"]).FreyaEngine(mode="cloud", voice="eve", model_id="freya-eve"),
+        "freya-cloud": lambda: __import__("app.tts.freya", fromlist=["FreyaEngine"]).FreyaEngine(mode="cloud", model_id="freya-cloud"),
+        "openai-tts-1": lambda: __import__("app.tts.openai_tts", fromlist=["OpenAITTSEngine"]).OpenAITTSEngine("openai-tts-1"),
+        "openai-tts-hd": lambda: __import__("app.tts.openai_tts", fromlist=["OpenAITTSEngine"]).OpenAITTSEngine("openai-tts-hd"),
+        "elevenlabs-multilingual": lambda: __import__("app.tts.elevenlabs", fromlist=["ElevenLabsTTSEngine"]).ElevenLabsTTSEngine("elevenlabs-multilingual"),
+        "elevenlabs-flash": lambda: __import__("app.tts.elevenlabs", fromlist=["ElevenLabsTTSEngine"]).ElevenLabsTTSEngine("elevenlabs-flash"),
+        "google-cloud-tts": lambda: __import__("app.tts.google_tts", fromlist=["GoogleCloudTTSEngine"]).GoogleCloudTTSEngine("google-cloud-tts"),
+        "alania": lambda: __import__("app.tts.patientdesk_tts", fromlist=["PatientdeskTTSEngine"]).PatientdeskTTSEngine("alania"),
+        "patientdesk-alania": lambda: __import__("app.tts.patientdesk_tts", fromlist=["PatientdeskTTSEngine"]).PatientdeskTTSEngine("alania"),
     }
 
     

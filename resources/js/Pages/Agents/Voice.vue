@@ -88,15 +88,48 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import AppLayout from '../../Layouts/AppLayout.vue'
 import axios from 'axios'
+import { useAudioDevices } from '../../Composables/useAudioDevices'
 
 const props = defineProps({
   agent: Object,
 })
 const agent = props.agent
+
+const { selectedAudioDeviceId, loadAudioDevices } = useAudioDevices()
+
+// Watch for device change during an active voice session to hot-swap audio stream
+watch(selectedAudioDeviceId, async (newDeviceId) => {
+  if (running.value && audioCtx) {
+    try {
+      const audioConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      }
+      if (newDeviceId) {
+        audioConstraints.deviceId = { exact: newDeviceId }
+      }
+      const newStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
+
+      if (sourceNode) {
+        try { sourceNode.disconnect() } catch (e) {}
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop())
+      }
+
+      mediaStream = newStream
+      sourceNode = audioCtx.createMediaStreamSource(mediaStream)
+      sourceNode.connect(scriptProcessor)
+    } catch (err) {
+      micError.value = 'Mikrofon kaynağı değiştirilemedi: ' + err.message
+    }
+  }
+})
 
 // --- VAD tuning ---
 const SPEECH_RMS_THRESHOLD = 0.035
@@ -144,13 +177,18 @@ async function toggleSession() {
 async function startSession() {
   micError.value = ''
   try {
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    }
+    if (selectedAudioDeviceId.value) {
+      audioConstraints.deviceId = { exact: selectedAudioDeviceId.value }
+    }
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      }
+      audio: audioConstraints,
     })
+    loadAudioDevices()
   } catch (e) {
     micError.value = 'Mikrofon erişimi reddedildi veya kullanılamıyor: ' + e.message
     return

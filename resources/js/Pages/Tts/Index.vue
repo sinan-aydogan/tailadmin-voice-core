@@ -60,6 +60,29 @@
                 <span>Karakter: {{ form.text.length }} / 5000</span>
                 <span>Worker izole process'te çalışır, UI donmaz.</span>
               </div>
+
+              <!-- Freya Voice Expressive Tags -->
+              <div v-if="isFreyaEngine" class="mt-2.5 p-2.5 rounded-xl bg-purple-950/20 border border-purple-500/30 flex items-center justify-between gap-2 flex-wrap">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="text-[11px] text-purple-300 font-semibold flex items-center gap-1.5">
+                    <span class="text-sm">✨</span>
+                    <span>Freya İnsansı Duygu Etiketleri:</span>
+                  </span>
+                  <button
+                    v-for="tag in freyaExpressiveTags"
+                    :key="tag.code"
+                    type="button"
+                    @click="insertTag(tag.code)"
+                    class="px-2 py-0.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-[11px] text-purple-200 transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                    :title="tag.desc"
+                  >
+                    <span>{{ tag.icon }}</span>
+                    <span class="font-mono font-medium">{{ tag.code }}</span>
+                    <span class="text-neutral-400 text-[10px]">({{ tag.label }})</span>
+                  </button>
+                </div>
+                <span class="text-[10px] text-purple-400/80 font-mono">AudioRealismBench #1</span>
+              </div>
             </div>
 
             <div class="space-y-4">
@@ -79,14 +102,24 @@
                     v-model="form.engine"
                     class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-2.5 text-sm text-neutral-100 focus:outline-none focus:border-accent"
                   >
-                    <optgroup v-if="downloadedModels.length > 0" label="Kurulu / Kullanıma Hazır Modeller">
-                      <option v-for="m in downloadedModels" :key="m.id" :value="m.id">
-                        ✓ {{ m.name }} (Hazır)
+                    <optgroup v-if="downloadedLocalModels.length > 0" label="💾 Kurulu Yerel / Lokal Modeller">
+                      <option v-for="m in downloadedLocalModels" :key="m.id" :value="m.id">
+                        ✓ [Lokal] {{ m.name }}
                       </option>
                     </optgroup>
-                    <optgroup v-if="notDownloadedModels.length > 0" label="Kurulum Bekleyen Modeller">
-                      <option v-for="m in notDownloadedModels" :key="m.id" :value="m.id">
-                        ⚠ {{ m.name }} (İndirilmedi)
+                    <optgroup v-if="cloudReadyModels.length > 0" label="☁️ Hazır Bulut API Modelleri">
+                      <option v-for="m in cloudReadyModels" :key="m.id" :value="m.id">
+                        ⚡ [Bulut API] {{ m.name }}
+                      </option>
+                    </optgroup>
+                    <optgroup v-if="cloudPendingModels.length > 0" label="☁️ API Anahtarı Bekleyen Bulut Modelleri">
+                      <option v-for="m in cloudPendingModels" :key="m.id" :value="m.id">
+                        🔑 [Bulut API] {{ m.name }} (Yapılandırma Gerekli)
+                      </option>
+                    </optgroup>
+                    <optgroup v-if="notDownloadedLocalModels.length > 0" label="⬇️ İndirme Bekleyen Yerel Modeller">
+                      <option v-for="m in notDownloadedLocalModels" :key="m.id" :value="m.id">
+                        ⚠ [Lokal] {{ m.name }} (İndirilmedi)
                       </option>
                     </optgroup>
                   </select>
@@ -126,14 +159,21 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <div>
-                    <div class="font-semibold text-amber-200">Model Henüz Bilgisayarınızda Kurulu Değil</div>
+                    <div class="font-semibold text-amber-200">
+                      {{ selectedModelInfo.is_cloud ? getProviderDisplayName(selectedModelInfo.cloud_provider) + ' API Anahtarı Gerekli' : 'Model Henüz Bilgisayarınızda Kurulu Değil' }}
+                    </div>
                     <div class="text-[11px] text-amber-300/90 mt-0.5">
-                      <strong>{{ selectedModelInfo.name }}</strong> modelini kullanabilmek için önce Model Yöneticisi'nden indirmeniz gerekmektedir.
+                      <template v-if="selectedModelInfo.is_cloud">
+                        <strong>{{ selectedModelInfo.name }}</strong> modelini kullanabilmek için Model Yöneticisi veya Ayarlar sayfasından {{ getProviderDisplayName(selectedModelInfo.cloud_provider) }} API anahtarınızı tanımlamalısınız (0 MB anında hazır).
+                      </template>
+                      <template v-else>
+                        <strong>{{ selectedModelInfo.name }}</strong> modelini kullanabilmek için önce Model Yöneticisi'nden indirmeniz gerekmektedir.
+                      </template>
                     </div>
                   </div>
                 </div>
-                <a href="/models" class="px-3.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-medium text-xs whitespace-nowrap transition-colors flex items-center gap-1.5 self-start sm:self-auto">
-                  <span>Model Yöneticisi'ne Git</span>
+                <a :href="selectedModelInfo.is_cloud ? '/models' : '/models'" class="px-3.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-medium text-xs whitespace-nowrap transition-colors flex items-center gap-1.5 self-start sm:self-auto">
+                  <span>{{ selectedModelInfo.is_cloud ? 'API Anahtarı Tanımla' : 'Model Yöneticisi\'ne Git' }}</span>
                   <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
@@ -145,10 +185,10 @@
               <button
                 type="submit"
                 :disabled="form.processing || !form.text.trim() || !isCurrentEngineReady"
-                class="px-6 py-2.5 rounded-xl font-semibold text-sm bg-accent text-bg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+                class="px-6 py-2.5 rounded-xl font-semibold text-sm bg-accent text-bg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2 cursor-pointer"
               >
                 <span v-if="form.processing" class="w-4 h-4 border-2 border-bg border-t-transparent rounded-full animate-spin"></span>
-                <span v-if="!isCurrentEngineReady">Model İndirilmeli</span>
+                <span v-if="!isCurrentEngineReady">{{ selectedModelInfo?.is_cloud ? 'API Anahtarı Gerekli' : 'Model İndirilmeli' }}</span>
                 <span v-else-if="form.processing">Kuyruğa Gönderiliyor...</span>
                 <span v-else>Sesi Üret</span>
               </button>
@@ -572,6 +612,22 @@ const notDownloadedModels = computed(() => {
   return ttsModels.value.filter(m => !m.is_downloaded)
 })
 
+const downloadedLocalModels = computed(() => {
+  return ttsModels.value.filter(m => !m.is_cloud && m.is_downloaded)
+})
+
+const cloudReadyModels = computed(() => {
+  return ttsModels.value.filter(m => m.is_cloud && m.is_downloaded)
+})
+
+const cloudPendingModels = computed(() => {
+  return ttsModels.value.filter(m => m.is_cloud && !m.is_downloaded)
+})
+
+const notDownloadedLocalModels = computed(() => {
+  return ttsModels.value.filter(m => !m.is_cloud && !m.is_downloaded)
+})
+
 const form = useForm({
   text: '',
   engine: 'piper-tr',
@@ -583,9 +639,35 @@ const selectedModelInfo = computed(() => {
   return ttsModels.value.find(m => m.id === form.engine || m.engine === form.engine)
 })
 
+const getProviderDisplayName = (p) => {
+  const map = {
+    openai: 'OpenAI',
+    elevenlabs: 'ElevenLabs',
+    google: 'Google Cloud',
+    groq: 'Groq',
+    freya: 'Freya Voice',
+  }
+  return map[p] || (p ? p.toUpperCase() : 'Bulut')
+}
+
 const isCurrentEngineReady = computed(() => {
   return selectedModelInfo.value ? Boolean(selectedModelInfo.value.is_downloaded) : true
 })
+
+const isFreyaEngine = computed(() => {
+  return form.engine && form.engine.startsWith('freya')
+})
+
+const freyaExpressiveTags = [
+  { code: '[pause]', label: 'Es / Duraklama', icon: '⏸️', desc: 'Konuşmada doğal insansı duraklama ekler' },
+  { code: '[laughter]', label: 'Gülüş', icon: '😄', desc: 'İnsansı hafif gülüş veya neşeli ton ekler' },
+  { code: '[deep breath]', label: 'Derin Nefes', icon: '🫁', desc: 'Cümle öncesi veya arasında insansı nefes sesi ekler' },
+  { code: '[sigh]', label: 'İç Çekiş', icon: '💨', desc: 'Duygulu iç çekme efekti ekler' },
+]
+
+const insertTag = (tagCode) => {
+  form.text = (form.text ? form.text.trim() + ' ' : '') + tagCode + ' '
+}
 
 const hasActiveTasks = computed(() => {
   return tasksList.value.some(t => t.status === 'pending' || t.status === 'running')

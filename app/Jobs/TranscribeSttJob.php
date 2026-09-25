@@ -36,8 +36,9 @@ class TranscribeSttJob implements ShouldQueue
             $audioPath = $payload['audio_path'] ?? '';
             $language = $payload['language'] ?? 'tr';
             $modelSize = $payload['model_size'] ?? null;
+            $engine = $payload['engine'] ?? null;
 
-            $result = $service->transcribeStt($audioPath, $language, $modelSize);
+            $result = $service->transcribeStt($audioPath, $language, $modelSize, $engine);
 
             $task->update([
                 'status' => 'completed',
