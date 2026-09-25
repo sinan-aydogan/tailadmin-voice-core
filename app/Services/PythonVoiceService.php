@@ -157,6 +157,22 @@ class PythonVoiceService
     }
 
     /**
+    /**
+     * Get user-configured or environment default TTS engine.
+     */
+    public function getDefaultTtsEngine(): string
+    {
+        $settingsFile = base_path('data' . DIRECTORY_SEPARATOR . 'settings.json');
+        if (file_exists($settingsFile)) {
+            $settings = json_decode(file_get_contents($settingsFile), true);
+            if (!empty($settings['default_tts_engine'])) {
+                return $settings['default_tts_engine'];
+            }
+        }
+        return env('DEFAULT_TTS_ENGINE', 'piper-tr');
+    }
+
+    /**
      * Get user-configured or environment default STT model.
      */
     public function getDefaultSttModel(): string

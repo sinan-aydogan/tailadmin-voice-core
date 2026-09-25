@@ -205,6 +205,9 @@ class SettingsController extends Controller
         if ($request->has('openrouter_api_key')) {
             $current['openrouter_api_key'] = trim($request->input('openrouter_api_key', ''));
         }
+        if ($request->has('patientdesk_api_key')) {
+            $current['patientdesk_api_key'] = trim($request->input('patientdesk_api_key', ''));
+        }
         if ($request->has('llm_provider')) {
             $current['llm_provider'] = trim($request->input('llm_provider', 'ollama'));
         }

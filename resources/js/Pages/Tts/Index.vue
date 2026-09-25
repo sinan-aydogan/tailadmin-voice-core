@@ -512,6 +512,7 @@ const props = defineProps({
   profiles: Array,
   tasks: Array,
   models: Array,
+  default_engine: String,
 })
 
 const tasksList = ref(props.tasks ? [...props.tasks] : [])
@@ -630,7 +631,7 @@ const notDownloadedLocalModels = computed(() => {
 
 const form = useForm({
   text: '',
-  engine: 'piper-tr',
+  engine: props.default_engine || 'piper-tr',
   language: 'tr',
   profile_id: null,
 })

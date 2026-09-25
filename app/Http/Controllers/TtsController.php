@@ -23,6 +23,7 @@ class TtsController extends Controller
             'profiles' => $profiles,
             'tasks' => $tasks,
             'models' => $models,
+            'default_engine' => $service->getDefaultTtsEngine(),
         ]);
     }
 

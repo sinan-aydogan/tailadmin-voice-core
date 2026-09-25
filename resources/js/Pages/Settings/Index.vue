@@ -494,6 +494,7 @@
                 class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs text-neutral-100 focus:outline-none focus:border-accent"
               >
                 <optgroup label="── ☁️ Bulut API Modelleri ──">
+                  <option value="alania">Patientdesk Alania (Doğal Türkçe • Bulut API)</option>
                   <option value="freya-adam">Freya Voice (Adam - İnsansı Erkek • Bulut)</option>
                   <option value="freya-eve">Freya Voice (Eve - İnsansı Kadın • Bulut)</option>
                   <option value="openai-tts-1">OpenAI TTS (tts-1 • Bulut)</option>
@@ -505,12 +506,13 @@
                 <optgroup label="── 💾 Yerel Modeller ──">
                   <option value="piper-tr">Piper TTS (Türkçe - Ultra Hızlı &amp; Düşük Kaynak)</option>
                   <option value="freya-tts">FreyaTTS (Türkçe - 183M DiT • Açık Kaynak)</option>
+                  <option value="antalia-1">Antalia-1 (Patientdesk Türkçe TTS • 1.2 GB)</option>
                   <option value="xtts-v2">Coqui XTTS v2 (Yüksek Kalite / Ses Klonlama)</option>
                   <option value="bark">Suno Bark (Doğal / İfadeli &amp; Çok Dilli)</option>
                 </optgroup>
               </select>
               <div class="text-[11px] text-neutral-500">
-                Hiper-gerçekçi insan sesi için <strong>Freya Adam &amp; Eve</strong> veya <strong>OpenAI / ElevenLabs</strong>; hafif cihazlar için <strong>Piper TTS</strong> veya yerel <strong>FreyaTTS</strong>; ses klonlama için <strong>Coqui XTTS v2</strong> önerilir.
+                Türkçe konuşmada <strong>Patientdesk Alania</strong> veya <strong>Freya Adam &amp; Eve</strong>; hafif cihazlar için <strong>Piper TTS</strong> veya yerel <strong>Antalia-1 / FreyaTTS</strong>; ses klonlama için <strong>Coqui XTTS v2</strong> önerilir.
               </div>
             </div>
           </div>
@@ -523,7 +525,7 @@
               </div>
               <div>
                 <h2 class="text-base font-semibold text-neutral-100">Varsayılan Sesten Metne (STT) Modeli</h2>
-                <p class="text-xs text-neutral-500 mt-0.5">Ses tanıma, deşifre ve canlı sesli asistan oturumlarında varsayılan olarak kullanılacak Whisper modeli.</p>
+                <p class="text-xs text-neutral-500 mt-0.5">Ses tanıma, deşifre ve canlı sesli asistan oturumlarında varsayılan olarak kullanılacak Whisper / STT modeli.</p>
               </div>
             </div>
 
@@ -533,6 +535,7 @@
                 class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs text-neutral-100 focus:outline-none focus:border-accent"
               >
                 <optgroup label="── ☁️ Bulut API STT Modelleri (0 MB İndirme) ──">
+                  <option value="duyu">🎯 Patientdesk Duyu (Türkçe %4.71 WER Yüksek Doğruluk • Bulut)</option>
                   <option value="groq-whisper">⚡ Groq Whisper Large v3 (LPU Ultra Hızlı &lt;1s Bulut)</option>
                   <option value="openai-whisper">☁️ OpenAI Whisper Cloud (whisper-1 Bulut)</option>
                   <option value="google-cloud-stt">☁️ Google Cloud STT (Chirp v2 Bulut)</option>
@@ -546,7 +549,7 @@
                 </optgroup>
               </select>
               <div class="text-[11px] text-neutral-500">
-                Ultra hızlı bulut deşifre için <strong>Groq Whisper Large v3</strong>; çevrimdışı yerel deşifrede en iyi doğruluk için <strong>Faster Whisper Medium</strong> önerilir.
+                Türkçe konuşmalarda en yüksek doğruluk için <strong>Patientdesk Duyu</strong>; ultra hızlı bulut deşifre için <strong>Groq Whisper Large v3</strong>; çevrimdışı yerel deşifrede en iyi doğruluk için <strong>Faster Whisper Medium</strong> önerilir.
               </div>
             </div>
           </div>
@@ -1491,6 +1494,7 @@ const showCloudKey = ref({
   google: false,
   groq: false,
   freya: false,
+  patientdesk: false,
 })
 const isTestingCloud = ref(false)
 const cloudTestResult = ref(null)
@@ -1506,6 +1510,17 @@ const cloudSettingsProviders = [
     placeholder: 'sk-proj-... veya sk-...',
     docs_url: 'https://platform.openai.com/api-keys',
     desc: 'OpenAI resmi TTS ve Whisper STT bulut servisleri.',
+  },
+  {
+    id: 'patientdesk',
+    name: 'Patientdesk.ai',
+    icon: '🩺',
+    badge: 'Alania & Duyu (Türkçe)',
+    models: 'Alania (Doğal Türkçe TTS), Duyu (%4.71 WER Türkçe STT)',
+    keyField: 'patientdesk_api_key',
+    placeholder: 'pd_... veya API anahtarınız',
+    docs_url: 'https://speech.patientdesk.ai',
+    desc: 'Türkçe için geliştirilen Alania TTS ve Duyu STT modelleri. Lansmana özel 1 ay ücretsiz sunulmaktadır.',
   },
   {
     id: 'elevenlabs',
@@ -1556,6 +1571,7 @@ const cloudSettingsProviders = [
 const isCloudKeySet = (providerId) => {
   const map = {
     openai: form.openai_api_key,
+    patientdesk: form.patientdesk_api_key,
     elevenlabs: form.elevenlabs_api_key,
     google: form.google_cloud_api_key,
     groq: form.groq_api_key,
@@ -1567,6 +1583,7 @@ const isCloudKeySet = (providerId) => {
 const testCloudConnection = async (providerId) => {
   const map = {
     openai: form.openai_api_key,
+    patientdesk: form.patientdesk_api_key,
     elevenlabs: form.elevenlabs_api_key,
     google: form.google_cloud_api_key,
     groq: form.groq_api_key,
@@ -1912,6 +1929,7 @@ const form = useForm({
   elevenlabs_api_key: props.settings?.elevenlabs_api_key || '',
   google_cloud_api_key: props.settings?.google_cloud_api_key || '',
   groq_api_key: props.settings?.groq_api_key || '',
+  patientdesk_api_key: props.settings?.patientdesk_api_key || '',
   llm_provider: props.settings?.llm_provider || 'ollama',
   llm_base_url: props.settings?.llm_base_url !== undefined ? props.settings.llm_base_url : 'http://127.0.0.1:11434',
   llm_api_key: props.settings?.llm_api_key || '',
