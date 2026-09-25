@@ -117,6 +117,13 @@ class SettingsController extends Controller
             'llm_providers_config' => 'nullable|array',
         ]);
 
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '2048M');
+        if (function_exists('ignore_user_abort')) {
+            @ignore_user_abort(true);
+        }
+
         $current = $this->getAllSettings();
         $customMessage = null;
         $transferAction = $request->input('model_transfer_action', 'none');
@@ -361,6 +368,13 @@ class SettingsController extends Controller
      */
     protected function moveDirectoryContents(string $sourceDir, string $targetDir): array
     {
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '2048M');
+        if (function_exists('ignore_user_abort')) {
+            @ignore_user_abort(true);
+        }
+
         if (!is_dir($sourceDir)) {
             return ['moved' => 0, 'errors' => ['Kaynak klasör bulunamadı']];
         }
@@ -373,24 +387,43 @@ class SettingsController extends Controller
         $items = scandir($sourceDir) ?: [];
 
         foreach ($items as $item) {
+            @set_time_limit(0);
             if ($item === '.' || $item === '..' || str_starts_with($item, '.')) continue;
 
             $src = $sourceDir . DIRECTORY_SEPARATOR . $item;
             $dst = $targetDir . DIRECTORY_SEPARATOR . $item;
 
             try {
-                // Try rename first (instant on same volume)
+                // 1. Try instant rename first (instant on same volume)
                 if (@rename($src, $dst)) {
                     $movedCount++;
                     continue;
                 }
 
-                // Cross-drive fallback: copy recursively then delete source
+                // 2. High-performance native move for Windows (robocopy with multi-threading)
+                if (DIRECTORY_SEPARATOR === '\\' && is_dir($src)) {
+                    if (!is_dir($dst)) {
+                        @mkdir($dst, 0755, true);
+                    }
+                    $cmd = sprintf('robocopy "%s" "%s" /E /MOVE /R:1 /W:1 /MT:8 /NFL /NDL /NJH /NJS /nc /ns /np', $src, $dst);
+                    $output = [];
+                    $returnCode = 0;
+                    @exec($cmd, $output, $returnCode);
+
+                    // In robocopy, exit codes 0-7 indicate success
+                    if ($returnCode < 8) {
+                        @rmdir($src);
+                        $movedCount++;
+                        continue;
+                    }
+                }
+
+                // 3. Fallback: chunked stream copy / file-by-file with continuous timer resets
                 if (is_dir($src)) {
-                    \Illuminate\Support\Facades\File::copyDirectory($src, $dst);
+                    $this->copyDirectorySafely($src, $dst);
                     \Illuminate\Support\Facades\File::deleteDirectory($src);
                 } else {
-                    \Illuminate\Support\Facades\File::copy($src, $dst);
+                    $this->copyFileSafely($src, $dst);
                     @unlink($src);
                 }
                 $movedCount++;
@@ -404,10 +437,77 @@ class SettingsController extends Controller
     }
 
     /**
+     * Safely copy a file in chunks while continuously resetting execution time limits.
+     */
+    protected function copyFileSafely(string $src, string $dst): void
+    {
+        @set_time_limit(0);
+        $dstDir = dirname($dst);
+        if (!is_dir($dstDir)) {
+            @mkdir($dstDir, 0755, true);
+        }
+
+        $in = @fopen($src, 'rb');
+        if (!$in) {
+            copy($src, $dst);
+            return;
+        }
+
+        $out = @fopen($dst, 'wb');
+        if (!$out) {
+            fclose($in);
+            copy($src, $dst);
+            return;
+        }
+
+        while (!feof($in)) {
+            @set_time_limit(0);
+            $buffer = fread($in, 8388608); // 8MB buffer
+            if ($buffer === false) break;
+            fwrite($out, $buffer);
+        }
+
+        fclose($in);
+        fclose($out);
+    }
+
+    /**
+     * Safely copy directory recursively with continuous time limit resets and folder merging.
+     */
+    protected function copyDirectorySafely(string $srcDir, string $dstDir): void
+    {
+        @set_time_limit(0);
+        if (!is_dir($dstDir)) {
+            @mkdir($dstDir, 0755, true);
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($srcDir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            @set_time_limit(0);
+            $subPath = $iterator->getSubPathname();
+            $targetPath = $dstDir . DIRECTORY_SEPARATOR . $subPath;
+
+            if ($item->isDir()) {
+                if (!is_dir($targetPath)) {
+                    @mkdir($targetPath, 0755, true);
+                }
+            } else {
+                $this->copyFileSafely($item->getPathname(), $targetPath);
+            }
+        }
+    }
+
+    /**
      * Delete all contents of a directory while preserving the parent directory.
      */
     protected function deleteDirectoryContents(string $dir): array
     {
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
         if (!is_dir($dir)) {
             return ['deleted' => 0];
         }
@@ -415,6 +515,7 @@ class SettingsController extends Controller
         $count = 0;
         $items = scandir($dir) ?: [];
         foreach ($items as $item) {
+            @set_time_limit(0);
             if ($item === '.' || $item === '..' || str_starts_with($item, '.')) continue;
             $path = $dir . DIRECTORY_SEPARATOR . $item;
             try {

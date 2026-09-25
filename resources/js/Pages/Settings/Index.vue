@@ -1411,8 +1411,14 @@
             </svg>
           </div>
           <div>
-            <h4 class="text-sm font-bold text-neutral-100">Model Dosyaları İşleniyor</h4>
-            <p class="text-xs text-neutral-400 mt-1">Lütfen bekleyin, model dosyaları işleniyor ve ayarlar güncelleniyor...</p>
+            <h4 class="text-sm font-bold text-neutral-100">
+              {{ form.model_transfer_action === 'move' ? 'Modeller Yeni Konuma Taşınıyor' : 'Model Dosyaları İşleniyor' }}
+            </h4>
+            <p class="text-xs text-neutral-400 mt-1">
+              {{ form.model_transfer_action === 'move'
+                ? 'Model dosyaları yüksek hızda yeni sürücüye taşınıyor. Büyük modeller için bu işlem birkaç dakika sürebilir, lütfen pencereyi kapatmayınız...'
+                : 'Lütfen bekleyin, model dosyaları işleniyor ve ayarlar güncelleniyor...' }}
+            </p>
           </div>
         </div>
       </div>
@@ -2047,6 +2053,7 @@ const executeSubmit = (transferAction = 'none') => {
 
   form.post('/settings', {
     preserveScroll: true,
+    timeout: 3600000,
     onSuccess: () => {
       oldModelsDir.value = form.models_dir
       saveSuccess.value = true
