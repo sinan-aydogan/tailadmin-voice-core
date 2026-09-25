@@ -17,7 +17,7 @@ class PatientdeskTTSEngine(BaseTTS):
     """
     Patientdesk.ai Cloud Text-to-Speech Engine (Alania).
     Optimized for Turkish voice assistants, call centers, and interactive systems.
-    OpenAI API compatible endpoint at https://speech.patientdesk.ai/v1/audio/speech.
+    OpenAI API compatible endpoint at https://voice.patientdesk.ai/v1/audio/speech.
     """
 
     def __init__(self, model_id: str = "alania", default_voice: str = "default"):
@@ -48,7 +48,7 @@ class PatientdeskTTSEngine(BaseTTS):
             return False
 
         selected_voice = voice or self._default_voice
-        endpoint = "https://speech.patientdesk.ai/v1/audio/speech"
+        endpoint = "https://voice.patientdesk.ai/v1/audio/speech"
         payload = {
             "model": self._api_model,
             "input": text,
@@ -65,7 +65,7 @@ class PatientdeskTTSEngine(BaseTTS):
         logger.info(f"Patientdesk TTS ({self._api_model}, voice: {selected_voice}) generating: '{text[:40]}...'")
 
         try:
-            resp = requests.post(endpoint, json=payload, headers=headers, timeout=60)
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=180)
             if resp.status_code != 200:
                 logger.error(f"Patientdesk TTS API error (HTTP {resp.status_code}): {resp.text}")
                 return False

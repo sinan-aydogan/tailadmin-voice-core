@@ -45,13 +45,15 @@ class PatientdeskSTTEngine(BaseSTT):
         if not api_key:
             return "Error: PATIENTDESK_API_KEY is not configured. Please define it in Models or Settings."
 
-        endpoint = "https://speech.patientdesk.ai/v1/audio/transcriptions"
+        endpoint = "https://voice.patientdesk.ai/v1/audio/transcriptions"
         headers = {
             "Authorization": f"Bearer {api_key}"
         }
 
+        # Patientdesk official model identifier is 'duyu-1'
+        api_model = "duyu-1" if self._model_id in ("duyu", "duyu-1", None) else self._model_id
         data = {
-            "model": "duyu",
+            "model": api_model,
             "response_format": "verbose_json"
         }
         if language and language != "auto":

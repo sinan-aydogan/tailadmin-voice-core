@@ -513,7 +513,7 @@ class ModelManagerController extends Controller
             if ($provider === 'patientdesk') {
                 $res = \Illuminate\Support\Facades\Http::timeout(10)
                     ->withToken($key)
-                    ->get('https://speech.patientdesk.ai/v1/models');
+                    ->get('https://voice.patientdesk.ai/v1/models');
                 if ($res->successful() || $res->status() === 405 || $res->status() === 200) {
                     return response()->json(['success' => true, 'message' => 'Patientdesk.ai API bağlantısı başarılı!']);
                 }
