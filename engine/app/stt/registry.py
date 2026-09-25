@@ -16,8 +16,11 @@ class STTRegistry:
         "openai-whisper": lambda: __import__("app.stt.openai_whisper", fromlist=["OpenAIWhisperEngine"]).OpenAIWhisperEngine("openai-whisper"),
         "groq-whisper": lambda: __import__("app.stt.groq_whisper", fromlist=["GroqWhisperEngine"]).GroqWhisperEngine("groq-whisper"),
         "google-cloud-stt": lambda: __import__("app.stt.google_stt", fromlist=["GoogleCloudSTTEngine"]).GoogleCloudSTTEngine("google-cloud-stt"),
-        "duyu": lambda: __import__("app.stt.patientdesk_stt", fromlist=["PatientdeskSTTEngine"]).PatientdeskSTTEngine("duyu"),
-        "patientdesk-duyu": lambda: __import__("app.stt.patientdesk_stt", fromlist=["PatientdeskSTTEngine"]).PatientdeskSTTEngine("duyu"),
+        "duyu": lambda: __import__("app.stt.patientdesk_stt", fromlist=["PatientdeskSTTEngine"]).PatientdeskSTTEngine("duyu-1"),
+        "duyu-1": lambda: __import__("app.stt.patientdesk_stt", fromlist=["PatientdeskSTTEngine"]).PatientdeskSTTEngine("duyu-1"),
+        "patientdesk-duyu": lambda: __import__("app.stt.patientdesk_stt", fromlist=["PatientdeskSTTEngine"]).PatientdeskSTTEngine("duyu-1"),
+        "patientdesk": lambda: __import__("app.stt.patientdesk_stt", fromlist=["PatientdeskSTTEngine"]).PatientdeskSTTEngine("duyu-1"),
+        "patientdesk-stt": lambda: __import__("app.stt.patientdesk_stt", fromlist=["PatientdeskSTTEngine"]).PatientdeskSTTEngine("duyu-1"),
     }
     
     _instances: Dict[str, BaseSTT] = {}

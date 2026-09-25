@@ -2013,6 +2013,8 @@ const directorOptions = ref({
 
 const getTtsModelLabel = (key) => {
   const map = {
+    'alania': 'Patientdesk (Alania)',
+    'antalia-1': 'Patientdesk (Antalia-1)',
     'freya-adam': 'Freya (Adam)',
     'freya-eve': 'Freya (Eve)',
     'openai-tts-1': 'OpenAI (tts-1)',

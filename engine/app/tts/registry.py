@@ -34,6 +34,9 @@ class TTSRegistry:
         "google-cloud-tts": lambda: __import__("app.tts.google_tts", fromlist=["GoogleCloudTTSEngine"]).GoogleCloudTTSEngine("google-cloud-tts"),
         "alania": lambda: __import__("app.tts.patientdesk_tts", fromlist=["PatientdeskTTSEngine"]).PatientdeskTTSEngine("alania"),
         "patientdesk-alania": lambda: __import__("app.tts.patientdesk_tts", fromlist=["PatientdeskTTSEngine"]).PatientdeskTTSEngine("alania"),
+        "patientdesk": lambda: __import__("app.tts.patientdesk_tts", fromlist=["PatientdeskTTSEngine"]).PatientdeskTTSEngine("alania"),
+        "patientdesk-tts": lambda: __import__("app.tts.patientdesk_tts", fromlist=["PatientdeskTTSEngine"]).PatientdeskTTSEngine("alania"),
+        "antalia": lambda: __import__("app.tts.antalia", fromlist=["AntaliaEngine"]).AntaliaEngine("antalia-1"),
         "antalia-1": lambda: __import__("app.tts.antalia", fromlist=["AntaliaEngine"]).AntaliaEngine("antalia-1"),
         "patientdesk-antalia-1": lambda: __import__("app.tts.antalia", fromlist=["AntaliaEngine"]).AntaliaEngine("antalia-1"),
     }

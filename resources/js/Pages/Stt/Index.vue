@@ -50,6 +50,7 @@
                 class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-2.5 text-sm text-neutral-100 focus:outline-none focus:border-accent"
               >
                 <optgroup label="── ☁️ Bulut API Modelleri (0 MB İndirme) ──">
+                  <option value="duyu">🎯 Patientdesk Duyu (Türkçe %4.71 WER • Bulut)</option>
                   <option value="groq-whisper">⚡ Groq Whisper Large v3 (Bulut - Ultra Hızlı &lt;1s)</option>
                   <option value="openai-whisper">☁️ OpenAI Whisper (whisper-1 Bulut)</option>
                   <option value="google-cloud-stt">☁️ Google Cloud STT (Chirp v2 Bulut)</option>
@@ -394,7 +395,7 @@ const selectedRetryTask = ref(null)
 const selectedModelKey = ref(props.default_model || 'whisper-medium')
 
 const isCloudStt = computed(() => {
-  return ['groq-whisper', 'openai-whisper', 'google-cloud-stt'].includes(selectedModelKey.value)
+  return ['groq-whisper', 'openai-whisper', 'google-cloud-stt', 'duyu'].includes(selectedModelKey.value)
 })
 
 const selectedModelInfo = computed(() => {
@@ -413,6 +414,7 @@ const getProviderDisplayName = (p) => {
     google: 'Google Cloud',
     groq: 'Groq',
     freya: 'Freya Voice',
+    patientdesk: 'Patientdesk.ai',
   }
   return map[p] || (p ? p.toUpperCase() : 'Bulut')
 }
@@ -442,7 +444,7 @@ const form = useForm({
   audio: null,
   language: 'tr',
   model_size: props.default_model || 'whisper-medium',
-  engine: ['groq-whisper', 'openai-whisper', 'google-cloud-stt'].includes(props.default_model) ? props.default_model : 'whisper',
+  engine: ['groq-whisper', 'openai-whisper', 'google-cloud-stt', 'duyu'].includes(props.default_model) ? props.default_model : 'whisper',
 })
 
 const hasActiveTasks = computed(() => {

@@ -279,6 +279,36 @@ const defaultTtsModels = [
     is_downloaded: true,
   },
   {
+    id: 'alania',
+    name: 'Patientdesk Alania (Bulut)',
+    description: 'Doğal Türkçe ses sentezleme bulut API motoru.',
+    is_downloaded: true,
+  },
+  {
+    id: 'antalia-1',
+    name: 'Patientdesk Antalia-1 (Lokal)',
+    description: 'Açık kaynaklı Türkçe Flow-Matching TTS modeli.',
+    is_downloaded: true,
+  },
+  {
+    id: 'freya-adam',
+    name: 'Freya Voice - Adam (Bulut)',
+    description: 'Hiper-gerçekçi insansı erkek sesi (Bulut API).',
+    is_downloaded: true,
+  },
+  {
+    id: 'freya-eve',
+    name: 'Freya Voice - Eve (Bulut)',
+    description: 'Hiper-gerçekçi insansı kadın sesi (Bulut API).',
+    is_downloaded: true,
+  },
+  {
+    id: 'freya-tts',
+    name: 'FreyaTTS (Lokal 183M DiT)',
+    description: 'Açık kaynaklı yerel Türkçe DiT ses sentezleme modeli.',
+    is_downloaded: true,
+  },
+  {
     id: 'xtts-v2',
     name: 'Coqui XTTS v2',
     description: 'Yüksek kaliteli, çok dilli ve ses klonlama özellikli TTS.',
@@ -322,6 +352,13 @@ const whisperSizes = computed(() => {
   }
 
   return [
+    {
+      id: 'duyu',
+      name: '🎯 Patientdesk Duyu (Bulut)',
+      desc: 'Patientdesk.ai FLEURS %4.71 WER yüksek doğrulukta Türkçe bulut deşifresi.',
+      size: '0 MB',
+      is_downloaded: getIsDownloaded('duyu', false),
+    },
     {
       id: 'groq-whisper',
       name: '⚡ Groq Whisper Large v3 (Bulut)',
@@ -417,7 +454,7 @@ const submitRetry = async () => {
 
   isSubmitting.value = true
 
-  const isCloudStt = ['groq-whisper', 'openai-whisper', 'google-cloud-stt'].includes(selectedModelSize.value)
+  const isCloudStt = ['groq-whisper', 'openai-whisper', 'google-cloud-stt', 'duyu'].includes(selectedModelSize.value)
   const data = {
     engine: props.task.type === 'tts' ? selectedEngine.value : (isCloudStt ? selectedModelSize.value : 'whisper'),
     model_size: props.task.type === 'stt' ? selectedModelSize.value : null,

@@ -295,18 +295,33 @@ class PythonVoiceService
         $models = $this->getAvailableModels();
         $targetModel = collect($models)->firstWhere('id', $modelId);
 
-        // Cloud models (like Freya Voice Adam & Eve) don't have local weights to download
+        // Cloud models (Patientdesk, Freya, OpenAI, ElevenLabs, etc.) don't have local weights to download
         if (!empty($targetModel['is_cloud'])) {
+            $provider = strtolower($targetModel['cloud_provider'] ?? 'freya');
+            $keyMap = [
+                'freya' => 'freya_api_key',
+                'patientdesk' => 'patientdesk_api_key',
+                'openai' => 'openai_api_key',
+                'elevenlabs' => 'elevenlabs_api_key',
+                'google' => 'google_cloud_api_key',
+                'groq' => 'groq_api_key',
+                'gemini' => 'gemini_api_key',
+                'anthropic' => 'anthropic_api_key',
+                'deepseek' => 'deepseek_api_key',
+                'openrouter' => 'openrouter_api_key',
+            ];
+            $fieldName = $keyMap[$provider] ?? "{$provider}_api_key";
             $settingsFile = base_path('data' . DIRECTORY_SEPARATOR . 'settings.json');
-            $freyaKey = env('FREYA_API_KEY');
+            $providerKey = env(strtoupper($fieldName));
             if (file_exists($settingsFile)) {
                 $st = json_decode(file_get_contents($settingsFile), true);
-                if (!empty($st['freya_api_key'])) {
-                    $freyaKey = trim($st['freya_api_key']);
+                if (!empty($st[$fieldName])) {
+                    $providerKey = trim($st[$fieldName]);
                 }
             }
-            if (empty($freyaKey)) {
-                throw new \RuntimeException("Freya Voice bir Bulut API servisidir (yerel dosya indirmesi gerekmez). Lütfen Ayarlar sayfasından Freya API Anahtarınızı giriniz.");
+            if (empty($providerKey)) {
+                $providerName = ucfirst($provider);
+                throw new \RuntimeException("{$targetModel['name']} bir Bulut API servisidir (yerel dosya indirmesi gerekmez). Lütfen Model Yöneticisi veya Ayarlar sayfasından {$providerName} API Anahtarınızı giriniz.");
             }
             if ($onProgress) {
                 $onProgress(100.0, 0, 0);
