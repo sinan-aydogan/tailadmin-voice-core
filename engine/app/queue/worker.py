@@ -224,7 +224,9 @@ class TaskWorker:
             engine = get_tts_engine(engine_name)
             logger.info(f"[Task {task_id}] Engine initialized, starting audio generation...")
             
-            success = await engine.generate_audio(
+            from app.audio.tts_stitcher import generate_stitched_audio
+            success = await generate_stitched_audio(
+                engine=engine,
                 text=text,
                 output_path=output_path,
                 language=language,

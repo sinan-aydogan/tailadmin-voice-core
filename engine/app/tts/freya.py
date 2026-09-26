@@ -114,6 +114,22 @@ class FreyaEngine(BaseTTS):
                     with open(output_path, "wb") as f:
                         f.write(audio_data)
                     logger.success(f"Freya Voice ({voice}) audio written to {output_path} ({len(audio_data)} bytes)")
+
+                    # Freya Voice Cloud API currently serves a single female model ('leyla' at ~290-310Hz),
+                    # ignoring voice='adam'. To guarantee a distinct, authentic male voice for Adam,
+                    # we acoustically shift Adam to the natural male vocal range (~160-175Hz).
+                    is_male_adam = (str(voice).lower() == "adam") or ("adam" in self._model_id.lower())
+                    if is_male_adam:
+                        try:
+                            import librosa
+                            import soundfile as sf
+                            y, sr = sf.read(output_path, dtype='float32')
+                            y_male = librosa.effects.pitch_shift(y, sr=sr, n_steps=-7.5)
+                            sf.write(output_path, y_male, sr)
+                            logger.info(f"Freya Voice ({voice}) acoustically transformed to natural male baritone register (-7.5 semitones).")
+                        except Exception as pe:
+                            logger.warning(f"Could not apply male acoustic shift to Freya Voice: {pe}")
+
                     return True
                 else:
                     logger.error(f"Freya Voice API returned status {response.status}: {response.read().decode('utf-8', errors='ignore')}")
@@ -194,7 +210,18 @@ class FreyaEngine(BaseTTS):
                 fallback = PiperEngine("tr_TR-dfki-medium", model_id="piper-tr")
                 if fallback.is_model_downloaded():
                     logger.info("Using local Piper-TR fallback for preview...")
-                    return fallback._generate_sync(text, output_path, "tr", profile_path, **kwargs)
+                    ok = fallback._generate_sync(text, output_path, "tr", profile_path, **kwargs)
+                    is_male_adam = (str(voice).lower() == "adam") or ("adam" in self._model_id.lower())
+                    if ok and is_male_adam:
+                        try:
+                            import librosa
+                            import soundfile as sf
+                            y, sr = sf.read(output_path, dtype='float32')
+                            y_male = librosa.effects.pitch_shift(y, sr=sr, n_steps=-7.5)
+                            sf.write(output_path, y_male, sr)
+                        except Exception:
+                            pass
+                    return ok
                 return False
         else:
             return self._generate_local(text, output_path, **kwargs)

@@ -178,15 +178,30 @@
             </div>
 
             <div class="flex items-center gap-2">
-              <!-- Worker status indicator -->
-              <span
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border"
-                :class="isWorkerRunning ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'"
-                :title="isWorkerRunning ? 'Queue worker arka planda aktif' : 'Queue worker çalışmıyor'"
-              >
-                <span class="w-1.5 h-1.5 rounded-full" :class="isWorkerRunning ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'"></span>
-                <span>{{ isWorkerRunning ? 'Worker Aktif' : 'Worker Kapalı' }}</span>
-              </span>
+              <!-- Worker status indicator & quick restart button -->
+              <div class="flex items-center gap-1.5">
+                <span
+                  class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border"
+                  :class="isWorkerRunning ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'"
+                  :title="isWorkerRunning ? 'Queue worker arka planda aktif' : 'Queue worker çalışmıyor'"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="isWorkerRunning ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'"></span>
+                  <span>{{ isWorkerRunning ? 'Worker Aktif' : 'Worker Kapalı' }}</span>
+                </span>
+                <button
+                  v-if="!isWorkerRunning"
+                  @click="restartWorker"
+                  :disabled="isRestartingWorker"
+                  class="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/40 transition-colors cursor-pointer flex items-center gap-1"
+                  title="Worker'ı yeniden başlat"
+                >
+                  <svg v-if="isRestartingWorker" class="w-2.5 h-2.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                  </svg>
+                  <span>{{ isRestartingWorker ? 'Başlatılıyor...' : 'Başlat' }}</span>
+                </button>
+              </div>
 
               <!-- Refresh Button -->
               <button
@@ -512,6 +527,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Link } from '@inertiajs/vue3'
+import { useQueueWorker } from '../Composables/useQueueWorker'
+
+const { isWorkerRunning, setWorkerRunning } = useQueueWorker()
+const isRestartingWorker = ref(false)
 
 // Hardware stats
 const stats = ref({
@@ -550,7 +569,6 @@ const toggleDropdown = () => {
 }
 
 // Computed helpers
-const isWorkerRunning = computed(() => operationsData.value.is_worker_running ?? true)
 const activeCount = computed(() => operationsData.value.active_count || 0)
 const queuedCount = computed(() => operationsData.value.queued_count || 0)
 const hasActiveOperation = computed(() => activeCount.value > 0)
@@ -572,6 +590,28 @@ const triggerTooltip = computed(() => {
   return 'Voice Core Native · Sistem Hazır (İşlem listesi için tıkla)'
 })
 
+// Quick restart worker directly from dropdown
+const restartWorker = async () => {
+  if (isRestartingWorker.value) return
+  isRestartingWorker.value = true
+  try {
+    const res = await fetch('/queue/repair', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    if (res.ok) {
+      await fetchOperations(true)
+    }
+  } catch (e) {
+    // transient
+  } finally {
+    isRestartingWorker.value = false
+  }
+}
+
 // Fetch operations from consolidated API
 const fetchOperations = async (isManual = false) => {
   if (isFetchingOps.value && !isManual) return
@@ -588,6 +628,7 @@ const fetchOperations = async (isManual = false) => {
     if (res.ok) {
       const data = await res.json()
       operationsData.value = data
+      setWorkerRunning(data.is_worker_running)
     }
   } catch (e) {
     // transient network ignore

@@ -23,9 +23,63 @@ if str(ENGINE_DIR) not in sys.path:
 
 from app.config import settings
 
+def split_text_by_pauses(text: str):
+    import re
+    pattern = r'\[(?:pause|es|duraklama)(?::([\d\.]+s?))?\]'
+    matches = list(re.finditer(pattern, text, flags=re.IGNORECASE))
+    if not matches:
+        return [(text.strip(), 0.0)]
+
+    segments = []
+    last_idx = 0
+    for m in matches:
+        chunk = text[last_idx:m.start()].strip()
+        dur_str = m.group(1)
+        dur = 1.0
+        if dur_str:
+            try:
+                dur = float(dur_str.lower().replace('s', '').strip())
+            except ValueError:
+                dur = 1.0
+        if chunk:
+            segments.append((chunk, dur))
+        last_idx = m.end()
+
+    rest = text[last_idx:].strip()
+    if rest:
+        segments.append((rest, 0.0))
+
+    return segments
+
+def clean_segment_text(text: str, engine_name: str = "") -> str:
+    import re
+    if not text:
+        return ""
+    is_bark = "bark" in (engine_name or "").lower()
+
+    if not is_bark:
+        text = re.sub(r'\[(?:whisper|f[ıi]s[ıi]lt[ıi])\]', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\[[a-zA-Z0-9_\-\s]{2,20}\]', ' ', text)
+
+    text = re.sub(r'[.!?,;:]\s*\.{2,}', '... ', text)
+    text = re.sub(r'\.{4,}', '...', text)
+    text = re.sub(r'(?:\s*\.\.\.\s*)+', '... ', text)
+    text = re.sub(r'\s+([,?!.])', r'\1', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
 def tts_command(args):
     from app.tts.registry import get_tts_engine
     try:
+        text = args.text
+        if getattr(args, "text_file", None) and os.path.exists(args.text_file):
+            with open(args.text_file, "r", encoding="utf-8") as tf:
+                text = tf.read()
+
+        if not text:
+            print(json.dumps({"success": False, "error": "No text provided"}), file=sys.stderr)
+            return 1
+
         engine = get_tts_engine(args.engine)
         output_path = args.output
         if not output_path:
@@ -36,12 +90,39 @@ def tts_command(args):
             os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
         import asyncio
+        import uuid
+        import shutil
+        import numpy as np
+        import soundfile as sf
+
+        from app.audio.tts_stitcher import generate_stitched_audio
+
         kwargs = {}
         if args.profile:
             kwargs["profile_path"] = args.profile
+        if getattr(args, "stability", None) is not None:
+            kwargs["stability"] = args.stability
+            # For autoregressive / diffusion models (XTTS, Bark), high stability maps to lower temperature
+            kwargs["temperature"] = max(0.1, min(1.2, round(1.15 - args.stability * 0.75, 2)))
+        if getattr(args, "temperature", None) is not None:
+            kwargs["temperature"] = args.temperature
+        if getattr(args, "speed", None) is not None:
+            kwargs["speed_factor"] = args.speed
+            kwargs["speed"] = args.speed
+        if getattr(args, "pitch", None) is not None:
+            kwargs["pitch"] = args.pitch
+        if getattr(args, "similarity_boost", None) is not None:
+            kwargs["similarity_boost"] = args.similarity_boost
+        if getattr(args, "style", None) is not None:
+            kwargs["style"] = args.style
+        if getattr(args, "voice", None):
+            kwargs["voice"] = args.voice
+        if getattr(args, "default_pause", None) is not None:
+            kwargs["default_pause_sec"] = args.default_pause
 
-        ok = asyncio.run(engine.generate_audio(
-            text=args.text,
+        ok = asyncio.run(generate_stitched_audio(
+            engine=engine,
+            text=text,
             output_path=output_path,
             language=args.language,
             **kwargs
@@ -228,11 +309,20 @@ def main():
 
     # TTS
     tts_parser = subparsers.add_parser("tts")
-    tts_parser.add_argument("--text", required=True)
+    tts_parser.add_argument("--text", default=None)
+    tts_parser.add_argument("--text-file", dest="text_file", default=None)
     tts_parser.add_argument("--engine", default="piper-tr")
     tts_parser.add_argument("--language", default="tr")
     tts_parser.add_argument("--output", default=None)
     tts_parser.add_argument("--profile", default=None)
+    tts_parser.add_argument("--stability", type=float, default=None)
+    tts_parser.add_argument("--temperature", type=float, default=None)
+    tts_parser.add_argument("--speed", type=float, default=None)
+    tts_parser.add_argument("--pitch", type=float, default=0.0)
+    tts_parser.add_argument("--similarity-boost", dest="similarity_boost", type=float, default=None)
+    tts_parser.add_argument("--style", type=float, default=None)
+    tts_parser.add_argument("--voice", default=None)
+    tts_parser.add_argument("--default-pause", dest="default_pause", type=float, default=None)
 
     # STT
     stt_parser = subparsers.add_parser("stt")

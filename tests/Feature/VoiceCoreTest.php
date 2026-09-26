@@ -139,6 +139,20 @@ class VoiceCoreTest extends TestCase
         $this->assertStringNotContainsString('🎤', $clean);
         $this->assertStringContainsString('Değerli izleyiciler, iyi akşamlar.', $clean);
         $this->assertStringContainsString('Bugün yapay zeka alanında kritik bir gelişmeye yer veriyoruz.', $clean);
+
+        // Acoustic shortcode tests: [pause] is normalized to [pause:1.0s] for all engines;
+        // Unsupported vocal bracket codes like [sigh] are stripped for speech models (Alania, Freya, etc.)
+        $pauseRaw = 'Kediler... [pause] Dünyanın en tatlı canavarlarıdır. [pause] [sigh] Çok sevimlidirler.';
+        $cleanAlania = \App\Services\PythonVoiceService::sanitizeTextForTts($pauseRaw, 'alania');
+        $this->assertStringNotContainsString('[pause]', $cleanAlania);
+        $this->assertStringContainsString('[pause:1.0s]', $cleanAlania);
+        $this->assertStringNotContainsString('[sigh]', $cleanAlania);
+
+        // Bark keeps native acoustic tokens like [sigh] and normalizes [pause:1.0s]
+        $cleanBark = \App\Services\PythonVoiceService::sanitizeTextForTts($pauseRaw, 'bark');
+        $this->assertStringNotContainsString('[pause]', $cleanBark);
+        $this->assertStringContainsString('[pause:1.0s]', $cleanBark);
+        $this->assertStringContainsString('[sigh]', $cleanBark);
     }
 
     public function test_freya_cloud_model_download_and_api_key_handling(): void

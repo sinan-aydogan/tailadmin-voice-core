@@ -39,7 +39,8 @@ class LlmService
         ?string $model = null,
         ?string $provider = null,
         ?string $apiKey = null,
-        ?string $baseUrl = null
+        ?string $baseUrl = null,
+        ?string $ttsEngine = null
     ): array {
         $settings = $this->getSettings();
         $provider = $provider ?: $settings['llm_provider'];
@@ -87,7 +88,7 @@ class LlmService
 
                 case 'mock':
                 default:
-                    return $this->generateMockResponse($prompt, $model ?: 'simulated-model', 'mock');
+                    return $this->generateMockResponse($prompt, $model ?: 'simulated-model', 'mock', $ttsEngine);
             }
         } catch (\Throwable $e) {
             Log::warning('LLM Generation failed', [
@@ -526,7 +527,7 @@ class LlmService
     /**
      * Intelligent local fallback when external LLM is offline or in demo mode.
      */
-    protected function generateMockResponse(string $prompt, string $model, string $provider): array
+    protected function generateMockResponse(string $prompt, string $model, string $provider, ?string $ttsEngine = null): array
     {
         $lower = mb_strtolower($prompt, 'UTF-8');
 
@@ -538,6 +539,11 @@ class LlmService
             $text = "Kendi projelerinizde stüdyo kalitesinde Türkçe sesler üretmek artık hayal değil! Voice Core ile yüksek donanım maliyetleri olmadan, tamamen kendi bilgisayarınızda sınırsız ve doğal seslendirmeler yapın. Üstelik sıfır gecikme ve tek tıkla entegrasyonla! Voice Core: Sesin en doğal hali.";
         } else {
             $text = "Yapay zeka ses dünyasına hoş geldiniz. Girmiş olduğunuz metin isteği doğrultusunda hazırlanan bu seslendirme metni, akıcı ve doğal Türkçe tonlamalarıyla dinleyicilerinize ulaşmaya hazır. Şimdi metni seslendir butonuna tıklayarak üretimi başlatabilirsiniz.";
+        }
+
+        if (!empty($ttsEngine)) {
+            $featuresService = new \App\Services\TtsModelFeatures();
+            $text = $featuresService->enrichMockResponse($text, $ttsEngine);
         }
 
         return [

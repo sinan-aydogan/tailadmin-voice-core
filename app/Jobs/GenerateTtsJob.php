@@ -37,9 +37,29 @@ class GenerateTtsJob implements ShouldQueue
             $engine = $payload['engine'] ?? 'piper-tr';
             $language = $payload['language'] ?? 'tr';
             $profilePath = $payload['profile_path'] ?? null;
-            $outputPath = $payload['output_path'] ?? null;
+            $stability = isset($payload['stability']) ? (float) $payload['stability'] : null;
+            $speed = isset($payload['speed']) ? (float) $payload['speed'] : null;
+            $temperature = isset($payload['temperature']) ? (float) $payload['temperature'] : null;
+            $pitch = isset($payload['pitch']) ? (float) $payload['pitch'] : null;
+            $similarityBoost = isset($payload['similarity_boost']) ? (float) $payload['similarity_boost'] : null;
+            $style = isset($payload['style']) ? (float) $payload['style'] : null;
+            $defaultPause = isset($payload['default_pause_sec']) ? (float) $payload['default_pause_sec'] : null;
 
-            $result = $service->generateTts($text, $engine, $language, $profilePath, $outputPath);
+            $outputPath = $payload['output_path'] ?? null;
+            $result = $service->generateTts(
+                $text, 
+                $engine, 
+                $language, 
+                $profilePath, 
+                $outputPath, 
+                $stability, 
+                $speed, 
+                $temperature,
+                $pitch,
+                $similarityBoost,
+                $style,
+                $defaultPause
+            );
 
             $task->update([
                 'status' => 'completed',

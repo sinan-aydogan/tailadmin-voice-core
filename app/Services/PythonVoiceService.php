@@ -17,7 +17,17 @@ class PythonVoiceService
     {
         $this->baseUrl = config('services.python_voice.url', env('PYTHON_VOICE_URL', 'http://127.0.0.1:5001'));
         $this->enginePath = base_path('engine');
-        $this->pythonBin = config('services.python_voice.binary', env('PYTHON_BINARY', 'python'));
+        $configuredBin = config('services.python_voice.binary', env('PYTHON_BINARY', 'python'));
+        if ($configuredBin === 'python') {
+            $venvWin = $this->enginePath . DIRECTORY_SEPARATOR . '.venv' . DIRECTORY_SEPARATOR . 'Scripts' . DIRECTORY_SEPARATOR . 'python.exe';
+            $venvNix = $this->enginePath . DIRECTORY_SEPARATOR . '.venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python';
+            if (file_exists($venvWin)) {
+                $configuredBin = $venvWin;
+            } elseif (file_exists($venvNix)) {
+                $configuredBin = $venvNix;
+            }
+        }
+        $this->pythonBin = $configuredBin;
     }
 
 
@@ -94,19 +104,55 @@ class PythonVoiceService
     /**
      * Generate speech from text (TTS).
      */
-    public function generateTts(string $text, string $engine = 'piper-tr', string $language = 'tr', ?string $profilePath = null, ?string $outputPath = null): array
+    public function generateTts(
+        string $text,
+        string $engine = 'piper-tr',
+        string $language = 'tr',
+        ?string $profilePath = null,
+        ?string $outputPath = null,
+        ?float $stability = null,
+        ?float $speed = null,
+        ?float $temperature = null,
+        ?float $pitch = null,
+        ?float $similarityBoost = null,
+        ?float $style = null,
+        ?float $defaultPause = null
+    ): array
     {
-        $text = self::sanitizeTextForTts($text);
+        $text = self::sanitizeTextForTts($text, $engine);
 
         // Preferred: call HTTP microservice if online
         if ($this->isServiceOnline()) {
-            $response = Http::timeout(600)->post("{$this->baseUrl}/tts/generate", [
+            $postData = [
                 'text' => $text,
                 'engine' => $engine,
                 'language' => $language,
                 'profile_path' => $profilePath,
                 'output_path' => $outputPath,
-            ]);
+            ];
+            if ($stability !== null) {
+                $postData['stability'] = $stability;
+            }
+            if ($speed !== null) {
+                $postData['speed_factor'] = $speed;
+            }
+            if ($temperature !== null) {
+                $postData['temperature'] = $temperature;
+            }
+            if ($pitch !== null) {
+                $postData['pitch'] = $pitch;
+            }
+            if ($similarityBoost !== null) {
+                $postData['similarity_boost'] = $similarityBoost;
+            }
+            if ($style !== null) {
+                $postData['style'] = $style;
+            }
+            if ($defaultPause !== null) {
+                $postData['default_pause_sec'] = $defaultPause;
+            }
+
+            $response = Http::timeout(600)->post("{$this->baseUrl}/tts/generate", $postData);
 
             if ($response->successful()) {
                 return $response->json();
@@ -116,11 +162,14 @@ class PythonVoiceService
         }
 
         // Fallback: execute isolated CLI process via Process facade
+        $tempTextFile = tempnam(sys_get_temp_dir(), 'tts_txt_') . '.txt';
+        file_put_contents($tempTextFile, $text);
+
         $cmd = [
             $this->pythonBin,
             '-m', 'app.cli',
             'tts',
-            '--text', $text,
+            '--text-file', $tempTextFile,
             '--engine', $engine,
             '--language', $language,
         ];
@@ -135,25 +184,66 @@ class PythonVoiceService
             $cmd[] = $profilePath;
         }
 
-        $result = Process::path($this->enginePath)
-            ->env($this->getExecutionEnvironment())
-            ->timeout(600)
-            ->run($cmd);
-
-        if (!$result->successful()) {
-            $humanMsg = self::parseHumanErrorMessage($result->errorOutput(), $engine);
-            throw new \RuntimeException($humanMsg);
+        if ($stability !== null) {
+            $cmd[] = '--stability';
+            $cmd[] = (string) $stability;
         }
 
-        $output = self::cleanUtf8($result->output());
-        $data = json_decode($output, true);
-        if (!$data || empty($data['success'])) {
-            $raw = $data['error'] ?? $output;
-            $humanMsg = self::parseHumanErrorMessage($raw, $engine);
-            throw new \RuntimeException($humanMsg);
+        if ($speed !== null) {
+            $cmd[] = '--speed';
+            $cmd[] = (string) $speed;
         }
 
-        return $data;
+        if ($temperature !== null) {
+            $cmd[] = '--temperature';
+            $cmd[] = (string) $temperature;
+        }
+
+        if ($pitch !== null) {
+            $cmd[] = '--pitch';
+            $cmd[] = (string) $pitch;
+        }
+
+        if ($similarityBoost !== null) {
+            $cmd[] = '--similarity-boost';
+            $cmd[] = (string) $similarityBoost;
+        }
+
+        if ($style !== null) {
+            $cmd[] = '--style';
+            $cmd[] = (string) $style;
+        }
+
+        if ($defaultPause !== null) {
+            $cmd[] = '--default-pause';
+            $cmd[] = (string) $defaultPause;
+        }
+
+        try {
+            $result = Process::path($this->enginePath)
+                ->env($this->getExecutionEnvironment())
+                ->timeout(600)
+                ->run($cmd);
+
+            if (!$result->successful()) {
+                $humanMsg = self::parseHumanErrorMessage($result->errorOutput(), $engine);
+                throw new \RuntimeException($humanMsg);
+            }
+
+            $output = self::cleanUtf8($result->output());
+            $data = json_decode($output, true);
+            if (!$data || empty($data['success'])) {
+                $raw = $data['error'] ?? $output;
+                $humanMsg = self::parseHumanErrorMessage($raw, $engine);
+                throw new \RuntimeException($humanMsg);
+            }
+
+            return $data;
+        } finally {
+            if (file_exists($tempTextFile)) {
+                @unlink($tempTextFile);
+            }
+        }
     }
 
     /**
@@ -579,30 +669,158 @@ class PythonVoiceService
                 }
             }
 
-            // High-speed native PHP metrics (< 0.1ms, non-blocking)
-            $diskTotal = @disk_total_space(base_path()) ?: 1;
-            $diskFree = @disk_free_space(base_path()) ?: 0;
-            $diskUsed = max(0, $diskTotal - $diskFree);
-            $diskPct = round(($diskUsed / $diskTotal) * 100, 1);
-
-            return [
-                'cpu_pct' => 0.0,
-                'ram' => [
-                    'used_gb' => 0.0,
-                    'total_gb' => 0.0,
-                    'pct' => 0.0,
-                ],
-                'disk' => [
-                    'used_gb' => round($diskUsed / (1024 ** 3), 1),
-                    'total_gb' => round($diskTotal / (1024 ** 3), 1),
-                    'pct' => $diskPct,
-                ],
-                'gpu' => [
-                    'backend' => 'cpu',
-                    'allocated_gb' => 0.0,
-                ],
-            ];
+            return $this->getNativeSystemStats();
         });
+    }
+
+    /**
+     * Measure host machine hardware stats (CPU, RAM, Disk, GPU fallback) natively.
+     */
+    public function getNativeSystemStats(): array
+    {
+        $cpuPct = 0.0;
+        $ramTotalGb = 0.0;
+        $ramUsedGb = 0.0;
+        $ramPct = 0.0;
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $vbsFile = storage_path('framework/tailadmin_sys_stats.vbs');
+            if (!file_exists($vbsFile)) {
+                $vbsCode = 'On Error Resume Next
+Set wmi = GetObject("winmgmts:\\\\.\\root\\cimv2")
+totalMem = 0: freeMem = 0: cpuLoad = 0
+For Each os in wmi.ExecQuery("Select TotalVisibleMemorySize, FreePhysicalMemory from Win32_OperatingSystem")
+    totalMem = os.TotalVisibleMemorySize
+    freeMem = os.FreePhysicalMemory
+Next
+For Each proc in wmi.ExecQuery("Select LoadPercentage from Win32_Processor")
+    cpuLoad = proc.LoadPercentage
+    Exit For
+Next
+WScript.Echo totalMem & "|" & freeMem & "|" & cpuLoad
+';
+                @file_put_contents($vbsFile, $vbsCode);
+            }
+
+            $raw = @shell_exec('cscript //nologo //T:5 "' . $vbsFile . '"');
+            if ($raw && str_contains($raw, '|')) {
+                $parts = explode('|', trim($raw));
+                if (count($parts) >= 3) {
+                    $totalKb = (float) trim($parts[0]);
+                    $freeKb = (float) trim($parts[1]);
+                    $cpuVal = (float) trim($parts[2]);
+
+                    if ($totalKb > 0) {
+                        $usedKb = max(0, $totalKb - $freeKb);
+                        $ramTotalGb = round($totalKb / (1024 * 1024), 1);
+                        $ramUsedGb = round($usedKb / (1024 * 1024), 1);
+                        $ramPct = round(($usedKb / $totalKb) * 100, 1);
+                    }
+                    $cpuPct = round($cpuVal, 1);
+                }
+            }
+
+            // Fallback to PowerShell if cscript was unavailable or returned empty
+            if ($ramTotalGb <= 0) {
+                $psCmd = 'powershell -NoProfile -NonInteractive -Command "$os = Get-CimInstance Win32_OperatingSystem; $cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average; Write-Output \"$($os.TotalVisibleMemorySize)|$($os.FreePhysicalMemory)|$cpu\""';
+                $psRaw = @shell_exec($psCmd);
+                if ($psRaw && str_contains($psRaw, '|')) {
+                    $parts = explode('|', trim($psRaw));
+                    if (count($parts) >= 3) {
+                        $totalKb = (float) trim($parts[0]);
+                        $freeKb = (float) trim($parts[1]);
+                        $cpuVal = (float) trim($parts[2]);
+
+                        if ($totalKb > 0) {
+                            $usedKb = max(0, $totalKb - $freeKb);
+                            $ramTotalGb = round($totalKb / (1024 * 1024), 1);
+                            $ramUsedGb = round($usedKb / (1024 * 1024), 1);
+                            $ramPct = round(($usedKb / $totalKb) * 100, 1);
+                        }
+                        $cpuPct = round($cpuVal, 1);
+                    }
+                }
+            }
+        } elseif (PHP_OS_FAMILY === 'Linux') {
+            if (file_exists('/proc/meminfo')) {
+                $meminfo = @file_get_contents('/proc/meminfo');
+                if ($meminfo) {
+                    $totalKb = 0;
+                    $availKb = 0;
+                    $freeKb = 0;
+                    $buffersKb = 0;
+                    $cachedKb = 0;
+
+                    foreach (explode("\n", $meminfo) as $line) {
+                        if (preg_match('/^MemTotal:\s+(\d+)\s+kB/i', $line, $m)) $totalKb = (float) $m[1];
+                        if (preg_match('/^MemAvailable:\s+(\d+)\s+kB/i', $line, $m)) $availKb = (float) $m[1];
+                        if (preg_match('/^MemFree:\s+(\d+)\s+kB/i', $line, $m)) $freeKb = (float) $m[1];
+                        if (preg_match('/^Buffers:\s+(\d+)\s+kB/i', $line, $m)) $buffersKb = (float) $m[1];
+                        if (preg_match('/^Cached:\s+(\d+)\s+kB/i', $line, $m)) $cachedKb = (float) $m[1];
+                    }
+
+                    if ($availKb === 0.0) {
+                        $availKb = $freeKb + $buffersKb + $cachedKb;
+                    }
+
+                    if ($totalKb > 0) {
+                        $usedKb = max(0, $totalKb - $availKb);
+                        $ramTotalGb = round($totalKb / (1024 * 1024), 1);
+                        $ramUsedGb = round($usedKb / (1024 * 1024), 1);
+                        $ramPct = round(($usedKb / $totalKb) * 100, 1);
+                    }
+                }
+            }
+
+            if (function_exists('sys_getloadavg')) {
+                $load = sys_getloadavg();
+                $cores = 1;
+                if (file_exists('/proc/cpuinfo')) {
+                    $cpuinfo = @file_get_contents('/proc/cpuinfo');
+                    $cores = max(1, substr_count($cpuinfo, 'processor'));
+                }
+                if (isset($load[0])) {
+                    $cpuPct = min(100.0, round(($load[0] / $cores) * 100, 1));
+                }
+            }
+        } elseif (PHP_OS_FAMILY === 'Darwin') {
+            $memStr = @shell_exec('sysctl -n hw.memsize 2>/dev/null');
+            if ($memStr) {
+                $totalBytes = (float) trim($memStr);
+                $ramTotalGb = round($totalBytes / (1024 ** 3), 1);
+                $ramUsedGb = round($ramTotalGb * 0.5, 1);
+                $ramPct = 50.0;
+            }
+            if (function_exists('sys_getloadavg')) {
+                $load = sys_getloadavg();
+                if (isset($load[0])) {
+                    $cpuPct = min(100.0, round($load[0] * 10, 1));
+                }
+            }
+        }
+
+        $diskTotal = @disk_total_space(base_path()) ?: 1;
+        $diskFree = @disk_free_space(base_path()) ?: 0;
+        $diskUsed = max(0, $diskTotal - $diskFree);
+        $diskPct = round(($diskUsed / $diskTotal) * 100, 1);
+
+        return [
+            'cpu_pct' => $cpuPct,
+            'ram' => [
+                'used_gb' => $ramUsedGb,
+                'total_gb' => $ramTotalGb,
+                'pct' => $ramPct,
+            ],
+            'disk' => [
+                'used_gb' => round($diskUsed / (1024 ** 3), 1),
+                'total_gb' => round($diskTotal / (1024 ** 3), 1),
+                'pct' => $diskPct,
+            ],
+            'gpu' => [
+                'backend' => 'cpu',
+                'allocated_gb' => 0.0,
+            ],
+        ];
     }
 
     /**
@@ -682,33 +900,52 @@ class PythonVoiceService
     }
 
     /**
-     * Sanitize text for TTS to ensure speech models (Piper, XTTS, etc.)
-     * do not pronounce markdown formatting, asterisks, emojis, or stage directions aloud.
+     * Sanitize text for TTS to ensure speech models (Alania, Piper, XTTS, Bark, Freya, etc.)
+     * do not pronounce markdown formatting, asterisks, emojis, stage directions, or literal shortcode names ([pause], [sigh]).
      */
-    public static function sanitizeTextForTts(string $text): string
+    public static function sanitizeTextForTts(string $text, string $engine = ''): string
     {
         if (empty($text)) {
             return '';
         }
 
-        // 1. Remove voiceover / director notes blocks: (Seslendirme Notu: ...) or [Yönetmen Notu: ...]
+        $isBark = str_contains(strtolower($engine), 'bark');
+
+        // 1. Vocal / emotional shortcodes: Bark synthesizes them natively via acoustic codebooks.
+        // For non-Bark models (Alania, Freya, ElevenLabs, XTTS, Piper), strip them cleanly so models do not pronounce literal tag names.
+        if ($isBark) {
+            $text = preg_replace('/(?:\.{2,}|…)?\s*\[(?:laughter|laughs|gülüş|g\x{00FC}l\x{00FC}\x{015F}|kahkaha)\]\s*(?:\.{2,}|…)?/ui', ' [laughter] ', $text);
+            $text = preg_replace('/(?:\.{2,}|…)?\s*\[(?:sigh|iç\s*çekiş|i\x{00E7}\s*\x{00E7}eki\x{015F})\]\s*(?:\.{2,}|…)?/ui', ' [sigh] ', $text);
+            $text = preg_replace('/(?:\.{2,}|…)?\s*\[(?:deep\s*breath|derin\s*nefes|nefes)\]\s*(?:\.{2,}|…)?/ui', ' [deep breath] ', $text);
+            $text = preg_replace('/(?:\.{2,}|…)?\s*\[(?:gasp|şaşkınlık|\x{015F}a\x{015F}k\x{0131}nl\x{0131}k)\]\s*(?:\.{2,}|…)?/ui', ' [gasp] ', $text);
+            $text = preg_replace('/(?:\.{2,}|…)?\s*\[(?:throat\-clearing|clearing\s*throat|boğaz\s*temizleme|bo\x{011F}az\s*temizleme)\]\s*(?:\.{2,}|…)?/ui', ' [throat-clearing] ', $text);
+            $text = preg_replace('/(?:\.{2,}|…)?\s*\[(?:cough|öksürük|\x{00F6}ks\x{00FC}r\x{00FC}k)\]\s*(?:\.{2,}|…)?/ui', ' [cough] ', $text);
+            $text = preg_replace('/\[(?:whisper|fısıltı|f\x{0131}s\x{0131}lt\x{0131})\]/ui', ' [whisper] ', $text);
+        } else {
+            $text = preg_replace('/\[(?:laughter|laughs|gülüş|g\x{00FC}l\x{00FC}\x{015F}|kahkaha|sigh|iç\s*çekiş|i\x{00E7}\s*\x{00E7}eki\x{015F}|deep\s*breath|derin\s*nefes|nefes|gasp|şaşkınlık|\x{015F}a\x{015F}k\x{0131}nl\x{0131}k|throat\-clearing|clearing\s*throat|boğaz\s*temizleme|bo\x{011F}az\s*temizleme|cough|öksürük|\x{00F6}ks\x{00FC}r\x{00FC}k|whisper|fısıltı|f\x{0131}s\x{0131}lt\x{0131})\]/ui', ' ', $text);
+        }
+
+        // 2. Standardize and preserve [pause], [es], [duraklama] with duration for audio silence stitching across all engines
+        $text = preg_replace('/(?:\.{2,}|…)?\s*\[(?:pause|es|duraklama):([\d\.]+s?)\]\s*(?:\.{2,}|…)?/ui', ' [pause:$1] ', $text);
+        $text = preg_replace('/(?:\.{2,}|…)?\s*\[(?:pause|es|duraklama)\]\s*(?:\.{2,}|…)?/ui', ' [pause:1.0s] ', $text);
+
+        // 3. Remove voiceover / director notes blocks: (Seslendirme Notu: ...) or [Yönetmen Notu: ...]
         $text = preg_replace('/(?:\*{0,2})[\[\(](?:seslendirme\s*notu|y\x{00F6}netmen\s*notu|ton|tarz|talimat|ses\s*tonu|not)[:\-–\s]+[^\]\)]+[\]\)](?:\*{0,2})/iu', ' ', $text);
 
-        // 2. Remove Markdown headings (### 🎤 Title)
+        // 4. Remove Markdown headings (### 🎤 Title)
         $text = preg_replace('/(?:^|\n)\s*#{1,6}\s+[^\n]+/u', ' ', $text);
         $text = preg_replace('/#{1,6}\s+[^*\n]+(?=\*\*|\*|\n|$)/iu', ' ', $text);
         $text = preg_replace('/#{1,6}\s+/u', ' ', $text);
 
-        // 3. Remove stage / section directions in parentheses or brackets:
-        // e.g. **(Giriş – Enerjik)**, (Bülten – Dinamik), (Kapanış – Güven Veren)
-        $text = preg_replace('/(?:\*{0,2})[\[\(](?:giri\x{015F}|geli\x{015F}me|b\x{00FC}lten|kapan\x{0131}\x{015F}|anons|m\x{00FC}zik|es|ton|arka\s*plan|efekt|enerjik|dinamik|tarafs\x{0131}z|g\x{00FC}ven|selamlay\x{0131}c\x{0131}|seslendirme|spiker|not|talimat)[^\]\)]*[\]\)](?:\*{0,2})/iu', ' ', $text);
+        // 5. Remove stage / section directions in parentheses or brackets (excluding pause and vocal tags)
+        $text = preg_replace('/(?:\*{0,2})[\[\(](?:giri\x{015F}|geli\x{015F}me|b\x{00FC}lten|kapan\x{0131}\x{015F}|anons|m\x{00FC}zik|ton|arka\s*plan|efekt|enerjik|dinamik|tarafs\x{0131}z|g\x{00FC}ven|selamlay\x{0131}c\x{0131}|seslendirme|spiker|not|talimat)[^\]\)]*[\]\)](?:\*{0,2})/iu', ' ', $text);
         $text = preg_replace('/\*\*\([^)]+\)\*\*/u', ' ', $text);
         $text = preg_replace('/\[\([^)]+\)\]/u', ' ', $text);
 
-        // 4. Remove horizontal dividers & decorative asterisks
+        // 6. Remove horizontal dividers & decorative asterisks
         $text = preg_replace('/[\*\-_]{3,}/u', ' ', $text);
 
-        // 5. Remove inline markdown bold, italic, code
+        // 7. Remove inline markdown bold, italic, code
         $text = preg_replace('/\*\*([^*]+)\*\*/u', '$1', $text);
         $text = preg_replace('/\*([^*]+)\*/u', '$1', $text);
         $text = preg_replace('/__([^_]+)__/u', '$1', $text);
@@ -716,13 +953,30 @@ class PythonVoiceService
         $text = preg_replace('/`([^`]+)`/u', '$1', $text);
         $text = preg_replace('/~~([^~]+)~~/u', '$1', $text);
 
-        // 6. Remove emojis
+        // 8. Remove emojis
         $text = preg_replace('/[\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F1E0}-\x{1F1FF}]/u', ' ', $text);
 
-        // 7. Remove orphaned symbols
-        $text = preg_replace('/[*#~]/u', '', $text);
+        // 9. Clean leftover bracket shortcodes, EXCEPT supported pauses and Bark vocal effects
+        if ($isBark) {
+            $text = preg_replace('/\[(?!(?:pause:|pause\]|laughter|sigh|deep breath|gasp|throat\-clearing|cough|groan|yawn|whisper))[^\]]+\]/u', ' ', $text);
+        } else {
+            $text = preg_replace('/\[(?!(?:pause:|pause\]))[^\]]+\]/u', ' ', $text);
+        }
 
-        // 8. Normalize whitespace
+        // 10. Remove orphaned markdown symbols (preserve ♪ for Bark musical notation)
+        if ($isBark) {
+            $text = preg_replace('/[*#~]/u', '', $text);
+        } else {
+            $text = preg_replace('/[*#~♪]/u', '', $text);
+        }
+
+        // 11. Normalize punctuation collisions (e.g. . ... -> ... or ..... -> ...)
+        $text = preg_replace('/[.!?,;:]\s*\.{2,}/u', '... ', $text);
+        $text = preg_replace('/\.{4,}/u', '...', $text);
+        $text = preg_replace('/(?:\s*\.\.\.\s*)+/u', '... ', $text);
+        $text = preg_replace('/\s+([,?!.])/u', '$1', $text);
+
+        // 12. Normalize whitespace
         $text = preg_replace('/\s+/u', ' ', $text);
         return trim($text);
     }
@@ -735,6 +989,10 @@ class PythonVoiceService
     public function getExecutionEnvironment(?array $additionalEnv = null): array
     {
         $env = [];
+
+        // Enforce UTF-8 I/O for Python CLI across all platforms
+        $env['PYTHONIOENCODING'] = 'utf-8';
+        $env['PYTHONUTF8'] = '1';
 
         if (PHP_OS_FAMILY === 'Windows') {
             $systemRoot = getenv('SystemRoot') ?: getenv('SYSTEMROOT') ?: 'C:\\Windows';

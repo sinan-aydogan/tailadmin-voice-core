@@ -28,5 +28,21 @@ class AppServiceProvider extends ServiceProvider
                 // Silently skip if generating docs fails
             }
         }
+        // Register Queue Worker Heartbeat for instant, zero-overhead worker health monitoring
+        try {
+            $touchHeartbeat = function () {
+                $heartbeatFile = storage_path('framework/worker_heartbeat.json');
+                @file_put_contents($heartbeatFile, json_encode([
+                    'pid' => getmypid(),
+                    'timestamp' => time(),
+                ]), LOCK_EX);
+            };
+
+            \Illuminate\Support\Facades\Queue::looping($touchHeartbeat);
+            \Illuminate\Support\Facades\Queue::before($touchHeartbeat);
+            \Illuminate\Support\Facades\Queue::after($touchHeartbeat);
+        } catch (\Throwable $e) {
+            // Silently ignore if queue service is not available
+        }
     }
 }

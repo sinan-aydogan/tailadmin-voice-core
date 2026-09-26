@@ -46,7 +46,7 @@ class ElevenLabsTTSEngine(BaseTTS):
             return str(key).strip()
         return None
 
-    def _generate(self, text: str, output_path: str, voice: Optional[str] = None) -> bool:
+    def _generate(self, text: str, output_path: str, voice: Optional[str] = None, **kwargs) -> bool:
         api_key = self._get_api_key()
         if not api_key:
             logger.error("ELEVENLABS_API_KEY is not configured. Please define it in Models or Settings.")
@@ -58,14 +58,36 @@ class ElevenLabsTTSEngine(BaseTTS):
             voice_lower = str(voice).lower().strip()
             voice_id = self.DEFAULT_VOICES.get(voice_lower, voice)
 
+        # Dynamic voice settings
+        stability = kwargs.get("stability")
+        try:
+            stability = float(stability) if stability is not None else 0.50
+            stability = max(0.0, min(1.0, stability))
+        except (ValueError, TypeError):
+            stability = 0.50
+
+        similarity_boost = kwargs.get("similarity_boost")
+        try:
+            similarity_boost = float(similarity_boost) if similarity_boost is not None else 0.75
+            similarity_boost = max(0.0, min(1.0, similarity_boost))
+        except (ValueError, TypeError):
+            similarity_boost = 0.75
+
+        style = kwargs.get("style")
+        try:
+            style = float(style) if style is not None else 0.0
+            style = max(0.0, min(1.0, style))
+        except (ValueError, TypeError):
+            style = 0.0
+
         endpoint = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
         payload = {
             "text": text,
             "model_id": self._api_model,
             "voice_settings": {
-                "stability": 0.50,
-                "similarity_boost": 0.75,
-                "style": 0.0,
+                "stability": stability,
+                "similarity_boost": similarity_boost,
+                "style": style,
                 "use_speaker_boost": True
             }
         }
@@ -109,5 +131,5 @@ class ElevenLabsTTSEngine(BaseTTS):
     ) -> bool:
         voice = kwargs.get("voice", None)
         loop = asyncio.get_running_loop()
-        func = partial(self._generate, text, output_path, voice)
+        func = partial(self._generate, text, output_path, voice, **kwargs)
         return await loop.run_in_executor(_TTS_EXECUTOR, func)

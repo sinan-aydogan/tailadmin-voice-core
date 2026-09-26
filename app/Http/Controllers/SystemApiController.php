@@ -18,6 +18,13 @@ class SystemApiController extends Controller
 
     public function operations(PythonVoiceService $voiceService): JsonResponse
     {
+        $f = storage_path('framework/worker_heartbeat.json');
+        \Illuminate\Support\Facades\Log::info("API worker_heartbeat check", [
+            'path' => $f,
+            'exists' => file_exists($f),
+            'content' => file_exists($f) ? @file_get_contents($f) : null,
+            'is_running' => QueueWorkerService::isRunning(),
+        ]);
         $isWorkerRunning = QueueWorkerService::isRunning();
 
         // Model lookup dictionary for friendly names

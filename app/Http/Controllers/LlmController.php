@@ -31,11 +31,24 @@ class LlmController extends Controller
             'model' => 'nullable|string',
             'api_key' => 'nullable|string',
             'base_url' => 'nullable|string',
+            'tts_engine' => 'nullable|string',
         ]);
 
         $promptText = trim($validated['prompt'] ?? '');
         $systemPrompt = $validated['system_prompt'] ?? null;
         $variables = $validated['variables'] ?? [];
+        $ttsEngine = $validated['tts_engine'] ?? null;
+
+        // If a TTS engine is chosen, inject model-specific shortcode & acoustic instructions into system prompt
+        if (!empty($ttsEngine)) {
+            $ttsFeaturesService = new \App\Services\TtsModelFeatures();
+            $ttsInstruction = $ttsFeaturesService->buildSystemInstruction($ttsEngine);
+            if (!empty($ttsInstruction)) {
+                $systemPrompt = !empty($systemPrompt)
+                    ? $systemPrompt . "\n\n" . $ttsInstruction
+                    : $ttsInstruction;
+            }
+        }
 
         // If a template was selected, render it with supplied variables
         if (!empty($validated['template_id'])) {
@@ -67,10 +80,14 @@ class LlmController extends Controller
             model: $validated['model'] ?? null,
             provider: $validated['provider'] ?? null,
             apiKey: $validated['api_key'] ?? null,
-            baseUrl: $validated['base_url'] ?? null
+            baseUrl: $validated['base_url'] ?? null,
+            ttsEngine: $ttsEngine
         );
 
         $result['compiled_prompt'] = $promptText;
+        if (!empty($ttsEngine)) {
+            $result['tts_engine'] = $ttsEngine;
+        }
 
         return response()->json($result);
     }

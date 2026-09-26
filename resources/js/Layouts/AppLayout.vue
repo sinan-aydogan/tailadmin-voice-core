@@ -192,10 +192,20 @@
             </div>
 
             <!-- Queue Worker Status Badge -->
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-neutral-800/80 text-neutral-300 border border-neutral-700">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              {{ t('header.worker_active') }}
-            </span>
+            <Link
+              href="/queue"
+              class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer"
+              :class="isWorkerRunning
+                ? 'bg-neutral-800/80 text-neutral-300 border-neutral-700 hover:border-neutral-600'
+                : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20'"
+              :title="isWorkerRunning ? t('header.worker_active') : t('header.worker_stopped')"
+            >
+              <span
+                class="w-1.5 h-1.5 rounded-full"
+                :class="isWorkerRunning ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'"
+              ></span>
+              <span>{{ isWorkerRunning ? t('header.worker_active') : t('header.worker_stopped') }}</span>
+            </Link>
           </div>
         </header>
 
@@ -218,6 +228,7 @@ import axios from 'axios'
 import SystemFooter from '../Components/SystemFooter.vue'
 import { useI18n } from '../i18n'
 import { useAudioDevices } from '../Composables/useAudioDevices'
+import { useQueueWorker } from '../Composables/useQueueWorker'
 
 const props = defineProps({
   title: {
@@ -225,6 +236,8 @@ const props = defineProps({
     default: 'Dashboard'
   }
 })
+
+const { isWorkerRunning } = useQueueWorker()
 
 const { locale, setLocale, t, languages, currentLanguage } = useI18n()
 const {

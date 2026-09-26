@@ -142,4 +142,76 @@ class LlmTest extends TestCase
             ]);
         $this->assertStringContainsString('Groq Llama 3.3', $response->json('text'));
     }
+
+    public function test_llm_generate_with_tts_engine_freya_shortcodes(): void
+    {
+        $response = $this->postJson('/api/llm/generate', [
+            'prompt' => 'Tavşan ile karga hikayesi',
+            'provider' => 'mock',
+            'tts_engine' => 'freya-adam',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'tts_engine' => 'freya-adam',
+            ]);
+
+        $text = $response->json('text');
+        $this->assertNotEmpty($text);
+        $this->assertTrue(
+            str_contains($text, '[pause]') || 
+            str_contains($text, '[sigh]') || 
+            str_contains($text, '[laughter]') || 
+            str_contains($text, '[deep breath]')
+        );
+    }
+
+    public function test_llm_generate_with_tts_engine_bark_shortcodes(): void
+    {
+        $response = $this->postJson('/api/llm/generate', [
+            'prompt' => 'Tavşan ile karga hikayesi',
+            'provider' => 'mock',
+            'tts_engine' => 'bark',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'tts_engine' => 'bark',
+            ]);
+
+        $text = $response->json('text');
+        $this->assertNotEmpty($text);
+        $this->assertTrue(
+            str_contains($text, '[laughter]') || 
+            str_contains($text, '[sigh]') || 
+            str_contains($text, '[gasp]') || 
+            str_contains($text, '[whisper]')
+        );
+    }
+
+    public function test_tts_model_features_endpoint(): void
+    {
+        $response = $this->getJson('/api/tts/models-with-features');
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $models = $response->json('models');
+        $this->assertIsArray($models);
+        $this->assertNotEmpty($models);
+
+        $freya = collect($models)->firstWhere('id', 'freya-adam');
+        $this->assertNotNull($freya);
+        $this->assertNotEmpty($freya['shortcodes']);
+        $this->assertContains('[pause]', array_column($freya['shortcodes'], 'code'));
+
+        $bark = collect($models)->firstWhere('id', 'bark');
+        $this->assertNotNull($bark);
+        $this->assertNotEmpty($bark['shortcodes']);
+        $this->assertContains('[sigh]', array_column($bark['shortcodes'], 'code'));
+        $this->assertContains('[laughter]', array_column($bark['shortcodes'], 'code'));
+    }
 }

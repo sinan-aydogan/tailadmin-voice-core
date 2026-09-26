@@ -34,6 +34,12 @@ class TtsController extends Controller
             'engine' => 'required|string',
             'language' => 'required|string|max:10',
             'profile_id' => 'nullable|integer',
+            'stability' => 'nullable|numeric|min:0|max:1',
+            'speed' => 'nullable|numeric|min:0.25|max:3.0',
+            'pitch' => 'nullable|numeric|min:-12|max:12',
+            'similarity_boost' => 'nullable|numeric|min:0|max:1',
+            'style' => 'nullable|numeric|min:0|max:1',
+            'default_pause_sec' => 'nullable|numeric|min:0.1|max:5.0',
         ]);
 
         $profilePath = null;
@@ -58,6 +64,12 @@ class TtsController extends Controller
                 'language' => $validated['language'],
                 'profile_id' => $validated['profile_id'] ?? null,
                 'profile_path' => $profilePath,
+                'stability' => isset($validated['stability']) ? (float) $validated['stability'] : null,
+                'speed' => isset($validated['speed']) ? (float) $validated['speed'] : null,
+                'pitch' => isset($validated['pitch']) ? (float) $validated['pitch'] : null,
+                'similarity_boost' => isset($validated['similarity_boost']) ? (float) $validated['similarity_boost'] : null,
+                'style' => isset($validated['style']) ? (float) $validated['style'] : null,
+                'default_pause_sec' => isset($validated['default_pause_sec']) ? (float) $validated['default_pause_sec'] : null,
                 'output_path' => $outputPath,
                 'filename' => $filename,
             ],

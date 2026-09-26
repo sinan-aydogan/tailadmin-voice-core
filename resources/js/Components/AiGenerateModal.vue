@@ -32,11 +32,108 @@
         <button @click="closeModal" class="text-neutral-400 hover:text-neutral-200 cursor-pointer p-1">✕</button>
       </div>
 
-      <!-- Mode & Template Selection -->
+      <!-- Main Controls -->
       <div class="space-y-4">
+        <!-- Optional Target TTS Model Selection -->
+        <div class="p-3.5 rounded-xl bg-neutral-900/60 border border-neutral-800 space-y-2.5">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs">🎙️</span>
+              <label class="block text-xs font-semibold text-neutral-200">Hedef TTS Modeli (Opsiyonel)</label>
+              <span class="px-1.5 py-0.2 rounded bg-neutral-800 text-[10px] font-mono text-neutral-400">Akustik Kısa Kodlar</span>
+            </div>
+            <div v-if="selectedTtsModel" class="flex items-center gap-2">
+              <label class="inline-flex items-center gap-1.5 text-[11px] text-purple-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  v-model="useModelShortcodes"
+                  class="rounded bg-neutral-950 border-neutral-700 text-purple-500 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                />
+                <span>Kısa Kodları Kullan ([sigh], [pause] vb.)</span>
+              </label>
+            </div>
+          </div>
+
+          <select
+            v-model="selectedTtsEngine"
+            class="w-full rounded-xl bg-neutral-950 border border-neutral-700 p-2.5 text-xs text-neutral-100 focus:outline-none focus:border-accent"
+          >
+            <option value="">— Model Seçilmedi (Genel Doğal Metin) —</option>
+            <optgroup v-for="grp in groupedTtsModels" :key="grp.name" :label="grp.name">
+              <option v-for="m in grp.models" :key="m.id" :value="m.engine || m.id">
+                {{ m.name }} {{ m.badge ? `[${m.badge}]` : '' }}
+              </option>
+            </optgroup>
+          </select>
+
+          <!-- Model Features & Discovered Shortcodes Box -->
+          <div v-if="selectedTtsModel" class="p-3 rounded-lg bg-purple-950/20 border border-purple-500/30 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold text-purple-200">{{ selectedTtsModel.name }}</span>
+                <span v-if="selectedTtsModel.badge" class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  {{ selectedTtsModel.badge }}
+                </span>
+              </div>
+              <span class="text-[10px] text-purple-300/80 font-mono">
+                {{ selectedTtsModel.shortcodes?.length || 0 }} Akustik Kod Tanımlı
+              </span>
+            </div>
+
+            <p class="text-[11px] text-neutral-300 leading-relaxed">
+              {{ selectedTtsModel.description }}
+            </p>
+
+            <!-- Feature Pills -->
+            <div v-if="selectedTtsModel.features?.length > 0" class="flex items-center gap-1 flex-wrap">
+              <span class="text-[10px] text-neutral-400 font-medium">Özellikler:</span>
+              <span
+                v-for="feat in selectedTtsModel.features"
+                :key="feat"
+                class="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-[10px] text-neutral-300"
+              >
+                ✓ {{ feat }}
+              </span>
+            </div>
+
+            <!-- Clickable Shortcodes Chips -->
+            <div v-if="selectedTtsModel.shortcodes?.length > 0" class="pt-2 border-t border-purple-500/20 space-y-1.5">
+              <div class="flex items-center justify-between text-[10px] text-purple-300">
+                <span class="font-semibold">Desteklenen Akustik Kodlar (Prompt'a eklemek için tıklayabilirsiniz):</span>
+                <span v-if="shortcodeCopiedToast" class="text-emerald-400 font-semibold animate-pulse">✓ {{ shortcodeCopiedToast }}</span>
+              </div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button
+                  v-for="sc in selectedTtsModel.shortcodes"
+                  :key="sc.code"
+                  type="button"
+                  @click="insertShortcode(sc.code)"
+                  class="px-2 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/30 border border-purple-500/30 text-[11px] text-purple-200 transition-all cursor-pointer flex items-center gap-1 shadow-sm active:scale-95"
+                  :title="`${sc.desc} — Tıkla ve ekle`"
+                >
+                  <span>{{ sc.icon || '🏷️' }}</span>
+                  <span class="font-mono font-medium">{{ sc.code }}</span>
+                  <span class="text-[10px] text-neutral-400">({{ sc.label }})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode & Template Selection -->
         <div>
           <div class="flex items-center justify-between mb-1.5">
-            <label class="block text-xs font-medium text-neutral-300">Prompt Şablonu</label>
+            <div class="flex items-center gap-2">
+              <label class="block text-xs font-medium text-neutral-300">Prompt Şablonu</label>
+              <button
+                type="button"
+                @click="resetForm"
+                class="text-[11px] text-neutral-400 hover:text-neutral-200 flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0 transition-colors"
+                title="Tüm form alanlarını ve sonucu temizle"
+              >
+                <span>(Sıfırla)</span>
+              </button>
+            </div>
             <button
               type="button"
               @click="goToPrompts"
@@ -116,7 +213,7 @@
           <textarea
             v-model="customPrompt"
             rows="4"
-            placeholder="Örn: 5-12 yaş arası çocuklar için mini hikaye. paylaşımcı olmak ile ilgili olsun, tavşan ile karga arasında geçsin..."
+            placeholder="Örn: 5-12 yaş arası çocuklar için mini hikaye. Paylaşımcı olmak ile ilgili olsun, tavşan ile karga arasında geçsin..."
             class="w-full rounded-xl bg-neutral-900 border border-neutral-700 p-3 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-accent"
           ></textarea>
 
@@ -177,6 +274,10 @@
               <span v-if="resultModel" class="text-[10px] font-mono text-neutral-400 px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800">
                 {{ resultModel }}
               </span>
+              <span v-if="resultTtsEngineLabel" class="text-[10px] font-mono text-purple-300 px-2 py-0.5 rounded bg-purple-950/40 border border-purple-500/30 flex items-center gap-1">
+                <span>🎙️</span>
+                <span>{{ resultTtsEngineLabel }} için optimize edildi</span>
+              </span>
             </div>
 
             <!-- View Switcher: Clean vs Raw -->
@@ -216,7 +317,27 @@
             </div>
             <div class="text-[10px] text-neutral-400 flex items-center gap-1 pt-0.5">
               <span class="text-emerald-400 font-bold">✓ Arındırıldı:</span>
-              <span>Bu talimat ve yıldızlar seslendirme metninden ayrıldı; ses motoru "yıldız" veya talimatı okumaz.</span>
+              <span>Bu talimat seslendirme metninden ayrıldı; ses motoru "yıldız" veya talimatı okumaz.</span>
+            </div>
+          </div>
+
+          <!-- Quick Inserter for Selected Model Shortcodes (Editable) -->
+          <div v-if="selectedTtsModel?.shortcodes?.length > 0" class="flex items-center justify-between gap-2 p-2 rounded-lg bg-neutral-900/80 border border-neutral-800 flex-wrap">
+            <span class="text-[10px] text-neutral-400 font-medium flex items-center gap-1">
+              <span>🏷️</span>
+              <span>Metne Kısa Kod Ekle:</span>
+            </span>
+            <div class="flex items-center gap-1 flex-wrap">
+              <button
+                v-for="sc in selectedTtsModel.shortcodes"
+                :key="sc.code"
+                type="button"
+                @click="appendTagToEditableText(sc.code)"
+                class="px-1.5 py-0.5 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-500/20 text-[10px] font-mono transition-colors cursor-pointer"
+                :title="sc.desc"
+              >
+                {{ sc.code }}
+              </button>
             </div>
           </div>
 
@@ -287,14 +408,22 @@ import { parseVoiceoverText } from '../Utils/textSanitizer'
 const props = defineProps({
   show: Boolean,
   initialTemplateId: [Number, String],
+  initialEngine: String,
+  availableModels: Array,
 })
 
 const emit = defineEmits(['close', 'apply'])
 
 const templates = ref([])
+const ttsModelsList = ref([])
 const activeProvider = ref('')
 const llmInfo = ref(null)
+
 const selectedTemplateId = ref('custom')
+const selectedTtsEngine = ref('')
+const useModelShortcodes = ref(true)
+const shortcodeCopiedToast = ref('')
+
 const customPrompt = ref('')
 const variableValues = ref({})
 const isGenerating = ref(false)
@@ -302,6 +431,7 @@ const generatedResult = ref('')
 const cleanEditableText = ref('')
 const resultViewMode = ref('clean')
 const resultModel = ref('')
+const resultTtsEngine = ref('')
 const resultWarning = ref('')
 const errorMessage = ref(null)
 
@@ -321,12 +451,47 @@ const escapeRegex = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// Compute selected TTS model with all its discovered features
+const selectedTtsModel = computed(() => {
+  if (!selectedTtsEngine.value) return null
+  const needle = selectedTtsEngine.value.toLowerCase()
+  return ttsModelsList.value.find(m => 
+    (m.id && m.id.toLowerCase() === needle) || 
+    (m.engine && m.engine.toLowerCase() === needle)
+  ) || null
+})
+
+// Group models by category for clean optgroups
+const groupedTtsModels = computed(() => {
+  const groups = {}
+  for (const m of ttsModelsList.value) {
+    const cat = m.category || 'Diğer Modeller'
+    if (!groups[cat]) {
+      groups[cat] = []
+    }
+    groups[cat].push(m)
+  }
+  return Object.keys(groups).map(name => ({
+    name,
+    models: groups[name],
+  }))
+})
+
+const resultTtsEngineLabel = computed(() => {
+  if (!resultTtsEngine.value) return null
+  const found = ttsModelsList.value.find(m => m.id === resultTtsEngine.value || m.engine === resultTtsEngine.value)
+  return found ? found.name : resultTtsEngine.value
+})
+
 const fetchTemplates = async () => {
   try {
     const res = await fetch('/api/prompts')
     if (res.ok) {
       const data = await res.json()
       templates.value = data.templates || []
+      if (data.tts_models && Array.isArray(data.tts_models)) {
+        ttsModelsList.value = data.tts_models
+      }
       if (data.llm_info) {
         llmInfo.value = data.llm_info
         activeProvider.value = data.llm_info.provider || ''
@@ -338,15 +503,36 @@ const fetchTemplates = async () => {
   } catch (e) {
     console.warn('Prompt şablonları yüklenemedi:', e)
   }
+
+  // If tts models not populated from api/prompts, fetch from dedicated endpoint
+  if (ttsModelsList.value.length === 0) {
+    try {
+      const resTts = await fetch('/api/tts/models-with-features')
+      if (resTts.ok) {
+        const dataTts = await resTts.json()
+        if (dataTts.models) {
+          ttsModelsList.value = dataTts.models
+        }
+      }
+    } catch (e) {
+      console.warn('TTS model özellikleri yüklenemedi:', e)
+    }
+  }
 }
 
 onMounted(() => {
+  if (props.initialEngine) {
+    selectedTtsEngine.value = props.initialEngine
+  }
   fetchTemplates()
 })
 
 watch(() => props.show, (val) => {
   if (val) {
     fetchTemplates()
+    if (props.initialEngine) {
+      selectedTtsEngine.value = props.initialEngine
+    }
     if (props.initialTemplateId && props.initialTemplateId !== 'custom') {
       selectedTemplateId.value = Number(props.initialTemplateId)
       handleTemplateChange()
@@ -360,6 +546,12 @@ watch(() => props.initialTemplateId, (val) => {
   if (val) {
     selectedTemplateId.value = val === 'custom' ? 'custom' : Number(val)
     handleTemplateChange()
+  }
+})
+
+watch(() => props.initialEngine, (val) => {
+  if (val) {
+    selectedTtsEngine.value = val
   }
 })
 
@@ -404,6 +596,29 @@ const handleTemplateChange = () => {
       variableValues.value[v] = s?.default || ''
     })
   }
+}
+
+// Insert shortcode into custom prompt or copy to clipboard
+const insertShortcode = (code) => {
+  if (selectedTemplateId.value === 'custom') {
+    customPrompt.value = (customPrompt.value ? customPrompt.value.trim() + ' ' : '') + code + ' '
+    shortcodeCopiedToast.value = `${code} prompta eklendi`
+  } else {
+    try {
+      navigator.clipboard.writeText(code)
+      shortcodeCopiedToast.value = `${code} panoya kopyalandı`
+    } catch (e) {
+      shortcodeCopiedToast.value = `${code} seçildi`
+    }
+  }
+
+  setTimeout(() => {
+    shortcodeCopiedToast.value = ''
+  }, 2000)
+}
+
+const appendTagToEditableText = (code) => {
+  cleanEditableText.value = (cleanEditableText.value ? cleanEditableText.value.trim() + ' ' : '') + code + ' '
 }
 
 const compiledPromptPreview = computed(() => {
@@ -479,6 +694,11 @@ const generateText = async () => {
       payload.variables = variableValues.value
     }
 
+    // Attach chosen TTS engine so model shortcodes are integrated into LLM prompt
+    if (selectedTtsEngine.value && useModelShortcodes.value) {
+      payload.tts_engine = selectedTtsEngine.value
+    }
+
     const res = await fetch('/api/llm/generate', {
       method: 'POST',
       headers: {
@@ -495,6 +715,7 @@ const generateText = async () => {
     if (res.ok && data.success) {
       generatedResult.value = data.text
       resultModel.value = data.model || ''
+      resultTtsEngine.value = data.tts_engine || (selectedTtsEngine.value && useModelShortcodes.value ? selectedTtsEngine.value : '')
       activeProvider.value = data.provider || ''
       if (data.warning) {
         resultWarning.value = data.warning
@@ -509,6 +730,34 @@ const generateText = async () => {
   }
 }
 
+const resetForm = () => {
+  customPrompt.value = ''
+  variableValues.value = {}
+  generatedResult.value = ''
+  cleanEditableText.value = ''
+  resultModel.value = ''
+  resultTtsEngine.value = ''
+  resultWarning.value = ''
+  errorMessage.value = null
+  selectedTemplateId.value = props.initialTemplateId || 'custom'
+  if (props.initialEngine) {
+    selectedTtsEngine.value = props.initialEngine
+  }
+}
+
+// Reset form whenever modal closes so it opens completely fresh next time
+watch(() => props.show, (isShown) => {
+  if (!isShown) {
+    resetForm()
+  } else {
+    // When opened fresh
+    selectedTemplateId.value = props.initialTemplateId || 'custom'
+    if (props.initialEngine) {
+      selectedTtsEngine.value = props.initialEngine
+    }
+  }
+})
+
 const applyText = () => {
   if (!generatedResult.value) return
   const textToApply = resultViewMode.value === 'clean' ? (cleanEditableText.value || parsedResult.value.cleanText) : generatedResult.value
@@ -516,21 +765,26 @@ const applyText = () => {
     text: textToApply,
     directive: parsedResult.value.directive || '',
     raw: generatedResult.value,
+    engine: selectedTtsEngine.value || null,
   })
-  closeModal()
+  resetForm()
+  emit('close')
 }
 
 const closeModal = () => {
+  resetForm()
   emit('close')
 }
 
 const goToPrompts = () => {
-  closeModal()
+  resetForm()
+  emit('close')
   router.visit('/prompts')
 }
 
 const goToSettings = () => {
-  closeModal()
+  resetForm()
+  emit('close')
   router.visit('/settings')
 }
 </script>

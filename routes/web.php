@@ -118,6 +118,7 @@ Route::put('/prompts/{id}', [PromptController::class, 'update'])->name('prompts.
 Route::post('/prompts/{id}/favorite', [PromptController::class, 'toggleFavorite'])->name('prompts.favorite');
 Route::delete('/prompts/{id}', [PromptController::class, 'destroy'])->name('prompts.destroy');
 Route::get('/api/prompts', [PromptController::class, 'apiIndex'])->name('api.prompts.index');
+Route::get('/api/tts/models-with-features', [PromptController::class, 'ttsModelFeatures'])->name('api.tts.models_with_features');
 
 // Story Studio & Director (AI Hikaye & Ses Tiyatrosu Makinesi)
 Route::post('/api/story/generate-script', [\App\Http\Controllers\StoryStudioController::class, 'generateScript'])->name('api.story.generate_script');

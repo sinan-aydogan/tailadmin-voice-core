@@ -111,15 +111,29 @@ class PromptController extends Controller
             });
 
         $llmSettings = (new \App\Services\LlmService())->getSettings();
+        $ttsModels = (new \App\Services\TtsModelFeatures())->getAll();
 
         return response()->json([
             'success' => true,
             'templates' => $templates,
+            'tts_models' => $ttsModels,
             'llm_info' => [
                 'provider' => $llmSettings['llm_provider'],
                 'model' => $llmSettings['llm_model'],
                 'base_url' => $llmSettings['llm_base_url'],
             ],
+        ]);
+    }
+
+    /**
+     * API endpoint to list TTS models with their acoustic features and shortcodes.
+     */
+    public function ttsModelFeatures(): JsonResponse
+    {
+        $features = (new \App\Services\TtsModelFeatures())->getAll();
+        return response()->json([
+            'success' => true,
+            'models' => $features,
         ]);
     }
 

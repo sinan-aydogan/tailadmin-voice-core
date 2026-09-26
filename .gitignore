@@ -8,6 +8,8 @@
 /storage/*.key
 /storage/pail
 /storage/api-docs
+/storage/framework/worker_heartbeat.json
+/storage/framework/*.vbs
 /nativephp/
 .env
 

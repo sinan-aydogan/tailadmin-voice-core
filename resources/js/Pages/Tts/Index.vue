@@ -151,6 +151,202 @@
                 </div>
               </div>
 
+              <!-- Advanced Voice Tuning (Stability & Speed) -->
+              <div class="p-3.5 rounded-xl bg-neutral-900/80 border border-neutral-800 space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+                    <span>🎛️ Ses Dinamiği & İfade Ayarları</span>
+                  </span>
+                  <div class="flex items-center gap-3">
+                    <span class="text-[11px] text-neutral-400 hidden sm:inline">
+                      Seçili Motor: <strong class="text-neutral-200">{{ selectedModelInfo?.name || form.engine }}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      @click="showStabilityModal = true"
+                      class="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white border border-neutral-700 hover:border-accent/40 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-sm group"
+                      title="Seslendirme Dökümantasyonu & Akustik Rehber"
+                    >
+                      <svg class="w-3.5 h-3.5 text-accent group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      <span>Seslendirme Dökümantasyonu</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <!-- Stability Slider -->
+                  <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                      <label class="text-xs font-medium text-neutral-400">Duygu & Kararlılık (Stability)</label>
+                      <div class="flex items-center gap-1.5">
+                        <span
+                          class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                          :class="form.stability <= 0.35 
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                            : (form.stability <= 0.65 
+                              ? 'bg-accent/20 text-accent border border-accent/30' 
+                              : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30')"
+                        >
+                          {{ form.stability <= 0.35 ? 'Dramatik / Gülüşlü' : (form.stability <= 0.65 ? 'Doğal Anlatı' : 'Resmi / Spiker') }}
+                        </span>
+                        <span class="font-mono text-xs text-white font-semibold">%{{ Math.round(form.stability * 100) }}</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.10"
+                      max="1.00"
+                      step="0.05"
+                      v-model.number="form.stability"
+                      class="w-full accent-accent h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                    />
+                    <div class="flex justify-between text-[10px] text-neutral-500 font-mono">
+                      <span>%10 (Çok Duygusal/Aktör)</span>
+                      <span>%50 (Dengeli)</span>
+                      <span>%100 (Monoton/Spiker)</span>
+                    </div>
+                  </div>
+
+                  <!-- Speech Speed Slider -->
+                  <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                      <label class="text-xs font-medium text-neutral-400">Konuşma Hızı (Tempo)</label>
+                      <div class="flex items-center gap-1.5">
+                        <span
+                          class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                          :class="form.speed === 1.0 
+                            ? 'bg-neutral-800 text-neutral-300 border border-neutral-700' 
+                            : (form.speed > 1.0 
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                              : 'bg-blue-500/20 text-blue-300 border border-blue-500/30')"
+                        >
+                          {{ form.speed === 1.0 ? 'Normal Hız' : (form.speed > 1.0 ? 'Hızlı' : 'Yavaş / Sakin') }}
+                        </span>
+                        <span class="font-mono text-xs text-white font-semibold">{{ Number(form.speed).toFixed(2) }}x</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.50"
+                      max="2.00"
+                      step="0.05"
+                      v-model.number="form.speed"
+                      class="w-full accent-accent h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                    />
+                    <div class="flex justify-between text-[10px] text-neutral-500 font-mono">
+                      <span>0.50x (Yavaş)</span>
+                      <span>1.00x (Normal)</span>
+                      <span>2.00x (Hızlı)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Expandable More Audio Controls Button -->
+                <div class="pt-1.5 border-t border-neutral-800/80">
+                  <button
+                    type="button"
+                    @click="showMoreAudioParams = !showMoreAudioParams"
+                    class="text-[11px] text-neutral-400 hover:text-accent transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <svg class="w-3.5 h-3.5 transition-transform" :class="showMoreAudioParams ? 'rotate-90 text-accent' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span>{{ showMoreAudioParams ? 'Daha Az Akustik Ayar Göster' : 'İleri Düzey Akustik Ayarları Göster (Perde, Benzerlik, Üslup, Es Süresi)' }}</span>
+                  </button>
+
+                  <!-- Expanded Audio Parameters Grid -->
+                  <div v-if="showMoreAudioParams" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-3 mt-2 border-t border-neutral-800/50">
+                    <!-- Pitch (Ses Perdesi) -->
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-medium text-neutral-400">🎵 Ses Perdesi (Pitch)</label>
+                        <span class="font-mono text-[10px] text-emerald-400 font-semibold">
+                          {{ form.pitch > 0 ? '+' + form.pitch : form.pitch }} st
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="-6"
+                        max="6"
+                        step="1"
+                        v-model.number="form.pitch"
+                        class="w-full accent-emerald-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                      />
+                      <div class="flex justify-between text-[9px] text-neutral-500 font-mono">
+                        <span>-6 (Kalın/Tok)</span>
+                        <span>0 (Doğal)</span>
+                        <span>+6 (İnce/Genç)</span>
+                      </div>
+                    </div>
+
+                    <!-- Similarity Boost -->
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-medium text-neutral-400">🎯 Benzerlik (Clarity)</label>
+                        <span class="font-mono text-[10px] text-blue-400 font-semibold">%{{ Math.round(form.similarity_boost * 100) }}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.10"
+                        max="1.00"
+                        step="0.05"
+                        v-model.number="form.similarity_boost"
+                        class="w-full accent-blue-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                      />
+                      <div class="flex justify-between text-[9px] text-neutral-500 font-mono">
+                        <span>%10 (Pürüzsüz)</span>
+                        <span>%75 (İdeal)</span>
+                        <span>%100 (Birebir)</span>
+                      </div>
+                    </div>
+
+                    <!-- Style Exaggeration -->
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-medium text-neutral-400">🎭 Üslup Abartısı (Style)</label>
+                        <span class="font-mono text-[10px] text-amber-400 font-semibold">%{{ Math.round(form.style * 100) }}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.00"
+                        max="1.00"
+                        step="0.05"
+                        v-model.number="form.style"
+                        class="w-full accent-amber-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                      />
+                      <div class="flex justify-between text-[9px] text-neutral-500 font-mono">
+                        <span>%0 (Doğal)</span>
+                        <span>%40 (Dramatik)</span>
+                        <span>%100 (Tiyatral)</span>
+                      </div>
+                    </div>
+
+                    <!-- Default Pause Duration -->
+                    <div class="space-y-1">
+                      <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-medium text-neutral-400">⏸️ Varsayılan Es Süresi</label>
+                        <span class="font-mono text-[10px] text-purple-400 font-semibold">{{ Number(form.default_pause_sec).toFixed(1) }}s</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.3"
+                        max="2.5"
+                        step="0.1"
+                        v-model.number="form.default_pause_sec"
+                        class="w-full accent-purple-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                      />
+                      <div class="flex justify-between text-[9px] text-neutral-500 font-mono">
+                        <span>0.3s (Seri)</span>
+                        <span>1.0s (Doğal)</span>
+                        <span>2.5s (Uzun Es)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Warning banner if selected model is not downloaded -->
               <div v-if="selectedModelInfo && !selectedModelInfo.is_downloaded"
                    class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -492,8 +688,15 @@
     <AiGenerateModal
       :show="showAiModal"
       :initial-template-id="aiModalTemplateId"
+      :initial-engine="form.engine"
       @close="showAiModal = false"
       @apply="onAiTextApplied"
+    />
+
+    <!-- Stability Info Modal -->
+    <StabilityInfoModal
+      :show="showStabilityModal"
+      @close="showStabilityModal = false"
     />
   </AppLayout>
 </template>
@@ -505,6 +708,7 @@ import AppLayout from '../../Layouts/AppLayout.vue'
 import AudioPlayerModal from '../../Components/AudioPlayerModal.vue'
 import RetryTaskModal from '../../Components/RetryTaskModal.vue'
 import AiGenerateModal from '../../Components/AiGenerateModal.vue'
+import StabilityInfoModal from '../../Components/StabilityInfoModal.vue'
 import { VOICE_LANGUAGES } from '../../i18n'
 import { parseVoiceoverText } from '../../Utils/textSanitizer'
 
@@ -520,6 +724,8 @@ const isRefreshing = ref(false)
 
 // AI Modal & Right tab state
 const showAiModal = ref(false)
+const showStabilityModal = ref(false)
+const showMoreAudioParams = ref(false)
 const aiModalTemplateId = ref('custom')
 const savedPrompts = ref([])
 const activeRightTab = ref('prompts') // 'prompts' | 'models'
@@ -535,6 +741,9 @@ const onAiTextApplied = (payload) => {
     form.text = payload.text || ''
     if (payload.directive) {
       voiceoverDirective.value = payload.directive
+    }
+    if (payload.engine) {
+      form.engine = payload.engine
     }
   } else {
     const parsed = parseVoiceoverText(payload)
@@ -634,6 +843,12 @@ const form = useForm({
   engine: props.default_engine || 'piper-tr',
   language: 'tr',
   profile_id: null,
+  stability: 0.50,
+  speed: 1.00,
+  pitch: 0,
+  similarity_boost: 0.75,
+  style: 0.00,
+  default_pause_sec: 1.0,
 })
 
 const selectedModelInfo = computed(() => {

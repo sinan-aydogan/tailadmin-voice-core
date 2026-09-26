@@ -158,9 +158,20 @@ class TortoiseWrapper:
         norm_profile_path = str(profile_path or "").replace('\\', '/')
         norm_env_path = str(self.tortoise_env_path).replace('\\', '/')
 
-        # Determine sample counts based on preset
+        # Determine sample counts based on preset and hardware
         preset_setting = preset or "fast"
-        if preset_setting in ("ultra_fast", "fast"):
+        try:
+            import torch
+            has_gpu = torch.cuda.is_available()
+        except Exception:
+            has_gpu = False
+
+        if not has_gpu:
+            # On CPU, multi-sample autoregressive passes take 15+ minutes.
+            # Use single sample and minimal diffusion steps to avoid 600s timeout.
+            ar_samples = 1
+            diff_steps = 3
+        elif preset_setting in ("ultra_fast", "fast"):
             ar_samples = 4
             diff_steps = 10
         elif preset_setting == "standard":

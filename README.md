@@ -36,17 +36,17 @@ TailAdmin Voice Core is an open-source, non-freezing desktop AI voice workstatio
 
 ---
 
-## 📥 Downloads (v1.1.0)
+## 📥 Downloads (v1.4.0)
 
 Pre-built binaries for your desktop operating system:
 
 | Platform | Architecture | Download Link | Type |
 |---|---|---|---|
-| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/electron.exe) | Windows Installer / Executable |
-| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.1.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0.AppImage) | Universal Linux AppImage |
-| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.1.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/voice-core_v1.1.0_amd64.deb) | Debian / Ubuntu Package |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.dmg) | macOS DMG (M1 / M2 / M3 / M4) |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.zip) | Portable Application Archive |
+| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/electron.exe) | Windows Installer / Executable |
+| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.4.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0.AppImage) | Universal Linux AppImage |
+| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.4.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/voice-core_v1.4.0_amd64.deb) | Debian / Ubuntu Package |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.4.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0-arm64.dmg) | macOS DMG (M1 / M2 / M3 / M4) |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.4.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0-arm64.zip) | Portable Application Archive |
 
 > Release notes and version history are available on the [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) page.
 
@@ -55,14 +55,25 @@ Pre-built binaries for your desktop operating system:
 ## ✨ Key Features
 
 - 🔊 **Advanced Text-to-Speech (TTS) Engines:**
+  - **Freya Voice (Adam & Eve):** Flagship hyper-realistic human voice models scoring 1418 on AudioRealismBench, featuring distinctive masculine baritone (`Adam`) and natural crystal-clear female (`Eve`) timbres.
   - **Piper TTS:** Ultra-fast, lightweight ONNX-based speech synthesis (5-10x faster than real-time) supporting Turkish, English, German, French, and more.
+  - **Patientdesk AI (Alania & Antalia):** Dedicated Turkish voice models with high naturalness and expressive articulation.
+  - **ElevenLabs Multilingual v2:** Industry standard for emotional nuance, laughter, giggles, and actor-grade delivery.
   - **XTTS v2:** Zero-shot realistic voice cloning using a 3-6 second reference audio sample.
-  - **Bark:** Expressive, human-like speech synthesis with natural breaths, laughter, and emotional tone.
-  - **Tortoise TTS:** High-fidelity, nuanced voice acting.
-  - **MusicGen:** Generate background music and ambient sound effects from text descriptions.
+  - **Bark:** Expressive speech synthesis with natural breaths, laughter (`[laughter]`), and emotional tags.
+  - **Tortoise TTS & MusicGen:** Expressive deep voice acting and text-to-music generation with automatic CPU fallback optimization.
+- 🎛️ **Ses Dinamiği & İfade Ayarları (Acoustic Voice Dynamics):**
+  - **Stability & Emotion (%10 - %100):** Adjust dramatic expressive depth vs. official announcer neutrality.
+  - **Speed / Tempo (0.50x - 2.00x):** Smooth tempo adjustments across all local and cloud engines.
+  - **Acoustic Pitch Shift (-6 to +6 st):** High-fidelity phase-vocoder pitch transposition without tempo distortion.
+  - **Clarity / Similarity Boost (%10 - %100):** Fine-tune vocal timbre adherence during synthesis.
+  - **Style Exaggeration (%0 - %100):** Amplify emotional cadence and expressiveness.
+  - **Custom Pause Duration (0.3s - 2.5s):** Dynamic zero-amplitude silence stitching for `[pause]`, `[es]`, and commas.
+  - **Interactive Documentation Modal:** In-depth guide explaining model parameters, laughter, and punctuation handling.
 - 🎭 **Suno-Style Voiceover Directives & Text Sanitizer:**
   - Automatically detects and separates director instructions (e.g. `(Voiceover Note: Medium tempo, confident tone)`) into a dedicated style prompt card.
   - Automatic markdown and symbol stripping: removes asterisks (`**`), headers (`###`), and emojis so speech engines never read formatting symbols aloud.
+  - Windows UTF-8 text file isolation pipeline preventing shell quote mangling.
   - **"🧹 Clean Text"** button on the editor for instant one-click markdown & note sanitization.
 - 🎙️ **Speech-to-Text (STT) Transcription:**
   - **Faster-Whisper:** Highly accurate audio transcription supporting 90+ languages with minimal CPU/GPU memory footprint.
@@ -188,21 +199,22 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --buil
 
 TailAdmin Voice Core; donmasız, tam süreç izolasyonuna sahip açık kaynaklı bir masaüstü yapay zeka ses istasyonu ve sunucu REST API servisidir. **NativePHP (Electron)**, **Laravel 13**, **Inertia.js**, **Vue 3** ve izole **Python AI Çekirdeği** (FastAPI / CLI) üzerine inşa edilmiştir.
 
-[İndir (v1.1.0)](#-hızlı-indirme-v110) • [Özellikler](#-özellikler-tr) • [Mimari](#-mimari-ve-süreç-izolasyonu-tr) • [Geliştirme](#-kurulum-ve-geliştirme-tr) • [Docker Dağıtımı](DOCKER.md) • [REST API Dokümanı](API.md) • [Destek & Sponsorlar](#-destek-ve-bağış)
+[İndir (v1.4.0)](#-hızlı-indirme-v140) • [Özellikler](#-özellikler-tr) • [Mimari](#-mimari-ve-süreç-izolasyonu-tr) • [Geliştirme](#-kurulum-ve-geliştirme-tr) • [Docker Dağıtımı](DOCKER.md) • [REST API Dokümanı](API.md) • [Destek & Sponsorlar](#-destek-ve-bağış)
 
 ---
 
-## 📥 Hızlı İndirme (v1.1.0)
+<a name="-hızlı-indirme-v140"></a>
+## 📥 Hızlı İndirme (v1.4.0)
 
 Masaüstünüzde doğrudan çalıştırmak için platformunuza uygun sürümü indirin:
 
 | Platform | Mimari | İndirme Bağlantısı | Tür |
 |---|---|---|---|
-| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/electron.exe) | Windows Kurulum / Çalıştırılabilir Dosya |
-| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.1.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0.AppImage) | Taşınabilir Universal Linux AppImage |
-| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.1.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/voice-core_v1.1.0_amd64.deb) | Debian / Ubuntu Kurulum Paketi |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.dmg) | macOS Disk İmajı (M1 / M2 / M3 / M4) |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.1.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.1.0/Voice.Core-v1.1.0-arm64.zip) | macOS Taşınabilir Uygulama Arşivi |
+| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/electron.exe) | Windows Kurulum / Çalıştırılabilir Dosya |
+| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.4.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0.AppImage) | Taşınabilir Universal Linux AppImage |
+| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.4.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/voice-core_v1.4.0_amd64.deb) | Debian / Ubuntu Kurulum Paketi |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.4.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0-arm64.dmg) | macOS Disk İmajı (M1 / M2 / M3 / M4) |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.4.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0-arm64.zip) | macOS Taşınabilir Uygulama Arşivi |
 
 > Tüm sürümleri ve geçmiş sürümleri [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) sayfasında bulabilirsiniz.
 
@@ -212,14 +224,25 @@ Masaüstünüzde doğrudan çalıştırmak için platformunuza uygun sürümü i
 ## ✨ Özellikler
 
 - 🔊 **Gelişmiş Metinden Sese (TTS) Motorları:**
+  - **Freya Voice (Adam & Eve):** AudioRealismBench'te 1418 puan ile lider konumda bulunan amiral gemisi Türkçe modeller; tok ve karizmatik erkek bariton (`Adam`) ile berrak ve doğal kadın (`Eve`) ses tonları.
   - **Piper TTS:** ONNX tabanlı, gerçek zamanlıdan 5-10 kat daha hızlı, ultra hafif metinden sese dönüştürme (Türkçe, İngilizce, Almanca, Fransızca).
+  - **Patientdesk AI (Alania & Antalia):** Yüksek akıcılık ve doğal diksiyona sahip yerli Türkçe seslendirme modelleri.
+  - **ElevenLabs Multilingual v2:** Duygusal tonlama, gülüş (`[laughter]`), iç çekiş ve aktör düzeyinde seslendirme standardı.
   - **XTTS v2:** 3-6 saniyelik referans ses kaydı ile sıfır veri kaybıyla yüksek kaliteli ses klonlama (Voice Cloning).
   - **Bark:** Duygulu, nefes ve tonlama vurgularına sahip doğal insan konuşması üretimi.
-  - **Tortoise TTS:** Derinlikli, yüksek doğruluklu metin seslendirme.
-  - **MusicGen:** Metin tanımlarından müzik ve atmosferik ses üretimi.
+  - **Tortoise TTS & MusicGen:** CPU güvenli akıllı optimizasyon ile derin metin seslendirme ve metinden müzik üretimi.
+- 🎛️ **Ses Dinamiği & İfade Ayarları (Akustik Kontroller):**
+  - **Duygu & Kararlılık (Stability - %10 - %100):** Aktör/dramatik tonlama ile spiker kararlılığı arasındaki dengeyi ayarlama.
+  - **Konuşma Hızı (Tempo - 0.50x - 2.00x):** Tüm yerel ve bulut motorlarda akıcı hız kontrolü.
+  - **Ses Perdesi (Pitch Shift - -6 ila +6 st):** Kalın/tok veya ince/genç ses tınısı için yüksek doğruluklu faz-vokoder perde transpozisyonu.
+  - **Benzerlik / Berraklık (Clarity Boost - %10 - %100):** Orijinal konuşmacı tınısına sadakat oranı.
+  - **Üslup Abartısı (Style Exaggeration - %0 - %100):** Duygusal coşku ve vurgu yoğunluğunu artırma.
+  - **Özelleştirilebilir Es / Duraklama Süresi (0.3s - 2.5s):** `[pause]`, `[es]` ve virgül duraklamaları için kesin sıfır genlikli sessizlik dikişi.
+  - **Seslendirme Dökümantasyonu Modalı:** Sağ üst köşedeki interaktif rehber ile her modelin duygu, gülüş ve noktalama davranışını ayrıntılı inceleme.
 - 🎭 **Suno Tarzı Seslendirme Talimatları & Metin Arındırıcı:**
   - Metin içindeki `(Seslendirme Notu: ...)` veya `[Yönetmen Notu: ...]` talimatlarını otomatik olarak ayrı bir stil kartına ayırır.
   - Yıldız (`**`), başlık (`###`) ve emojileri temizleyerek ses motorunun sembolleri seslendirmesini engeller.
+  - Windows UTF-8 geçici dosya izolasyon boru hattı ile tırnak işareti (`"`) ve kabuk kaçırma hatalarını tamamen önler.
   - Metin kutusu üzerindeki **"🧹 Yıldız & Notları Arındır"** butonu ile tek tıkla temiz seslendirme metni elde etme.
 - 🎙️ **Sesten Metne (STT - Speech to Text):**
   - **Faster-Whisper:** Türkçe dahil 90+ dilde düşük kaynak tüketimi ve yüksek doğruluk oranı ile ses kaydından metin çıkarma ve transkripsiyon.

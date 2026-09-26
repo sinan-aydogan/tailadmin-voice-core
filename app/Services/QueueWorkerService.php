@@ -11,16 +11,101 @@ use Illuminate\Support\Facades\Process;
 
 class QueueWorkerService
 {
+    private static function heartbeatFile(): string
+    {
+        return storage_path('framework/worker_heartbeat.json');
+    }
+
+    /**
+     * Check if a specific PID is alive.
+     */
+    public static function isPidAlive(int $pid): bool
+    {
+        if ($pid <= 0) return false;
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            exec("tasklist /FI \"PID eq {$pid}\" /NH 2>nul", $output, $code);
+            $joined = implode(' ', $output);
+            return stripos($joined, 'php.exe') !== false;
+        }
+
+        return function_exists('posix_kill') ? @posix_kill($pid, 0) : true;
+    }
+
+    /**
+     * Resolve the PowerShell executable path on Windows.
+     */
+    public static function getPowerShellBinary(): string
+    {
+        $systemRoot = getenv('SystemRoot') ?: 'C:\\Windows';
+        $candidates = [
+            $systemRoot . '\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+            'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+            'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+            'powershell.exe',
+            'powershell',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === 'powershell' || $candidate === 'powershell.exe' || file_exists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return 'powershell';
+    }
+
     /**
      * Check if a queue worker process is currently active.
      */
     public static function isRunning(): bool
     {
+        // 1. Instant check: Heartbeat file continuously touched by Queue::looping / Queue::before / Queue::after
+        $heartbeatFile = self::heartbeatFile();
+        if (file_exists($heartbeatFile)) {
+            $content = @file_get_contents($heartbeatFile);
+            $data = $content ? @json_decode($content, true) : null;
+            if (is_array($data) && !empty($data['timestamp'])) {
+                $age = time() - (int)$data['timestamp'];
+                $pid = (int)($data['pid'] ?? 0);
+
+                // Fresh heartbeat (worker looped within last 12 seconds)
+                if ($age <= 12) {
+                    return true;
+                }
+
+                // If running a longer task, verify PID is still running
+                if ($pid > 0 && $age <= 300) {
+                    if (self::isPidAlive($pid)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // 2. Secondary check: Process lookup
         if (PHP_OS_FAMILY === 'Windows') {
             try {
-                $cmd = 'powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name = \'php.exe\'\" | Where-Object { $_.CommandLine -like \'*queue:work*\' -or $_.CommandLine -like \'*queue:listen*\' } | Select-Object -ExpandProperty ProcessId"';
-                $result = Process::timeout(3)->run($cmd);
-                return !empty(trim($result->output()));
+                $ps = self::getPowerShellBinary();
+                $result = Process::timeout(4)->run([
+                    $ps,
+                    '-NoProfile',
+                    '-Command',
+                    'Get-CimInstance Win32_Process -Filter "Name = \'php.exe\'" | Where-Object { $_.CommandLine -like \'*queue:work*\' -or $_.CommandLine -like \'*queue:listen*\' } | Select-Object -ExpandProperty ProcessId'
+                ]);
+                $output = trim($result->output());
+                if (!empty($output)) {
+                    $lines = preg_split('/[\r\n]+/', $output);
+                    $firstPid = (int)trim($lines[0]);
+                    if ($firstPid > 0) {
+                        @file_put_contents(self::heartbeatFile(), json_encode([
+                            'pid' => $firstPid,
+                            'timestamp' => time(),
+                        ]), LOCK_EX);
+                    }
+                    return true;
+                }
+                return false;
             } catch (\Throwable $e) {
                 return false;
             }
@@ -41,22 +126,49 @@ class QueueWorkerService
     {
         Log::info("Stopping queue worker processes...");
 
+        $killed = 0;
+
+        // 1. If heartbeat file has PID, kill that specific worker first
+        $heartbeatFile = self::heartbeatFile();
+        if (file_exists($heartbeatFile)) {
+            $data = @json_decode(file_get_contents($heartbeatFile), true);
+            $pid = (int)($data['pid'] ?? 0);
+            if ($pid > 0 && self::isPidAlive($pid)) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    exec("taskkill /F /PID {$pid} 2>nul", $kOut, $kCode);
+                    if ($kCode === 0) $killed++;
+                } else {
+                    if (function_exists('posix_kill')) {
+                        @posix_kill($pid, 9);
+                    }
+                    $killed++;
+                }
+            }
+            @unlink($heartbeatFile);
+        }
+
+        // 2. Kill any remaining queue worker processes
         if (PHP_OS_FAMILY === 'Windows') {
             try {
-                $cmd = 'powershell -NoProfile -Command "$procs = Get-CimInstance Win32_Process -Filter \"Name = \'php.exe\'\" | Where-Object { $_.CommandLine -like \'*queue:work*\' -or $_.CommandLine -like \'*queue:listen*\' }; $count = $procs.Count; if ($count -gt 0) { $procs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force } }; Write-Output $count"';
-                $result = Process::timeout(5)->run($cmd);
-                return (int) trim($result->output());
+                $ps = self::getPowerShellBinary();
+                $result = Process::timeout(6)->run([
+                    $ps,
+                    '-NoProfile',
+                    '-Command',
+                    '$procs = Get-CimInstance Win32_Process -Filter "Name = \'php.exe\'" | Where-Object { $_.CommandLine -like \'*queue:work*\' -or $_.CommandLine -like \'*queue:listen*\' }; $count = $procs.Count; if ($count -gt 0) { $procs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force } }; Write-Output $count'
+                ]);
+                $count = (int) trim($result->output());
+                return max($killed, $count);
             } catch (\Throwable $e) {
-                Log::warning("Failed to kill queue workers on Windows: " . $e->getMessage());
-                return 0;
+                return $killed;
             }
         }
 
         try {
             $result = Process::timeout(3)->run('pkill -f "artisan queue:work|artisan queue:listen"');
-            return $result->successful() ? 1 : 0;
+            return $result->successful() ? max(1, $killed) : $killed;
         } catch (\Throwable $e) {
-            return 0;
+            return $killed;
         }
     }
 
@@ -75,7 +187,10 @@ class QueueWorkerService
         $artisan = base_path('artisan');
 
         if (PHP_OS_FAMILY === 'Windows') {
-            pclose(popen("start /B \"\" \"{$phpBin}\" \"{$artisan}\" queue:work --queue=default,tts,stt,downloads --sleep=2 --timeout=3600 --tries=1", "r"));
+            $vbs = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'launch_voice_worker.vbs';
+            $cmd = "\"{$phpBin}\" \"{$artisan}\" queue:work --queue=default,tts,stt,downloads --sleep=2 --timeout=3600 --tries=1";
+            @file_put_contents($vbs, 'CreateObject("Wscript.Shell").Run "' . str_replace('"', '""', $cmd) . '", 0, False');
+            pclose(popen("wscript.exe \"{$vbs}\"", "r"));
         } else {
             exec("{$phpBin} {$artisan} queue:work --queue=default,tts,stt,downloads --sleep=2 --timeout=3600 --tries=1 > /dev/null 2>&1 &");
         }
