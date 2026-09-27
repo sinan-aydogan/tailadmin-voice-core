@@ -40,9 +40,24 @@
       </div>
     </div>
 
-    <!-- Right: Operations Indicator & Upward Dropdown -->
-    <div class="relative" ref="dropdownRef">
-      <!-- Trigger Pill Button -->
+    <!-- Right: Update Status & Operations Indicator -->
+    <div class="flex items-center gap-2.5">
+      <!-- Update Available Notification Pill -->
+      <button
+        v-if="updateInfo.has_update"
+        @click="showUpdateModal = true"
+        type="button"
+        class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition-all shadow-md shadow-emerald-500/10 cursor-pointer animate-pulse"
+        :title="`Yeni sürüm hazır (v${updateInfo.latest_version})! Sürüm notları ve indirme linki için tıklayın.`"
+      >
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <span>v{{ updateInfo.latest_version }} Hazır</span>
+      </button>
+
+      <div class="relative" ref="dropdownRef">
+        <!-- Trigger Pill Button -->
       <button
         @click="toggleDropdown"
         type="button"
@@ -521,6 +536,10 @@
         </div>
       </Transition>
     </div>
+    </div>
+
+    <!-- Global In-App Update Modal -->
+    <UpdateModal />
   </footer>
 </template>
 
@@ -528,8 +547,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import { useQueueWorker } from '../Composables/useQueueWorker'
+import { useUpdateChecker } from '../Composables/useUpdateChecker'
+import UpdateModal from './UpdateModal.vue'
 
 const { isWorkerRunning, setWorkerRunning } = useQueueWorker()
+const { updateInfo, showUpdateModal, checkForUpdates } = useUpdateChecker()
 const isRestartingWorker = ref(false)
 
 // Hardware stats
@@ -763,6 +785,7 @@ onMounted(() => {
   statsTimer = setInterval(fetchStats, 10000)
 
   runAdaptivePoll()
+  checkForUpdates(false)
 
   document.addEventListener('click', handleClickOutside)
   window.addEventListener('voice-task-created', onTaskDispatched)

@@ -7,6 +7,10 @@ use App\Models\VoiceTask;
 use App\Services\QueueWorkerService;
 use App\Services\PythonVoiceService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SystemApiController extends Controller
@@ -266,5 +270,70 @@ class SystemApiController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    public function checkUpdate(Request $request): JsonResponse
+    {
+        $force = $request->boolean('force', false);
+        $packageJsonPath = base_path('package.json');
+        $currentVersion = config('nativephp.version', '1.5.0');
+        if (file_exists($packageJsonPath)) {
+            $pkg = json_decode(@file_get_contents($packageJsonPath), true);
+            if (!empty($pkg['version'])) {
+                $currentVersion = (string)$pkg['version'];
+            }
+        }
+
+        $cacheKey = 'tailadmin_latest_github_release';
+        if ($force) {
+            Cache::forget($cacheKey);
+        }
+
+        $releaseData = Cache::remember($cacheKey, 3600, function () use ($currentVersion) {
+            try {
+                $response = Http::withHeaders([
+                    'User-Agent' => 'TailAdminVoiceCore/' . $currentVersion,
+                    'Accept' => 'application/vnd.github.v3+json',
+                ])->timeout(8)->get('https://api.github.com/repos/sinan-aydogan/tailadmin-voice-core/releases/latest');
+
+                if ($response->successful()) {
+                    return $response->json();
+                }
+            } catch (\Throwable $e) {
+                Log::warning('GitHub release check failed: ' . $e->getMessage());
+            }
+            return null;
+        });
+
+        if (!$releaseData || empty($releaseData['tag_name'])) {
+            return response()->json([
+                'success' => false,
+                'current_version' => $currentVersion,
+                'latest_version' => null,
+                'latest_tag' => null,
+                'has_update' => false,
+                'message' => 'GitHub Releases bilgisine ulaşılamadı veya henüz yayınlanmış bir sürüm bulunamadı.',
+                'checked_at' => now()->toIso8601String(),
+            ]);
+        }
+
+        $latestTag = (string)$releaseData['tag_name'];
+        $cleanLatest = ltrim($latestTag, 'vV');
+        $cleanCurrent = ltrim($currentVersion, 'vV');
+
+        $hasUpdate = version_compare($cleanLatest, $cleanCurrent, '>');
+
+        return response()->json([
+            'success' => true,
+            'current_version' => $currentVersion,
+            'latest_version' => $cleanLatest,
+            'latest_tag' => $latestTag,
+            'has_update' => $hasUpdate,
+            'release_name' => $releaseData['name'] ?? $latestTag,
+            'release_url' => $releaseData['html_url'] ?? 'https://github.com/sinan-aydogan/tailadmin-voice-core/releases',
+            'published_at' => $releaseData['published_at'] ?? null,
+            'body' => $releaseData['body'] ?? '',
+            'checked_at' => now()->toIso8601String(),
+        ]);
     }
 }

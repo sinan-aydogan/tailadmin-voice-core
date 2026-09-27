@@ -36,17 +36,17 @@ TailAdmin Voice Core is an open-source, non-freezing desktop AI voice workstatio
 
 ---
 
-## 📥 Downloads (v1.4.0)
+## 📥 Downloads (v1.5.0)
 
 Pre-built binaries for your desktop operating system:
 
 | Platform | Architecture | Download Link | Type |
 |---|---|---|---|
-| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/electron.exe) | Windows Installer / Executable |
-| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.4.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0.AppImage) | Universal Linux AppImage |
-| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.4.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/voice-core_v1.4.0_amd64.deb) | Debian / Ubuntu Package |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.4.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0-arm64.dmg) | macOS DMG (M1 / M2 / M3 / M4) |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.4.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0-arm64.zip) | Portable Application Archive |
+| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/electron.exe) | Windows Installer / Executable |
+| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.5.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/Voice.Core-v1.5.0.AppImage) | Universal Linux AppImage |
+| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.5.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/voice-core_v1.5.0_amd64.deb) | Debian / Ubuntu Package |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.5.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/Voice.Core-v1.5.0-arm64.dmg) | macOS DMG (M1 / M2 / M3 / M4) |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.5.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/Voice.Core-v1.5.0-arm64.zip) | Portable Application Archive |
 
 > Release notes and version history are available on the [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) page.
 
@@ -199,22 +199,22 @@ docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --buil
 
 TailAdmin Voice Core; donmasız, tam süreç izolasyonuna sahip açık kaynaklı bir masaüstü yapay zeka ses istasyonu ve sunucu REST API servisidir. **NativePHP (Electron)**, **Laravel 13**, **Inertia.js**, **Vue 3** ve izole **Python AI Çekirdeği** (FastAPI / CLI) üzerine inşa edilmiştir.
 
-[İndir (v1.4.0)](#-hızlı-indirme-v140) • [Özellikler](#-özellikler-tr) • [Mimari](#-mimari-ve-süreç-izolasyonu-tr) • [Geliştirme](#-kurulum-ve-geliştirme-tr) • [Docker Dağıtımı](DOCKER.md) • [REST API Dokümanı](API.md) • [Destek & Sponsorlar](#-destek-ve-bağış)
+[İndir (v1.5.0)](#-hızlı-indirme-v150) • [Özellikler](#-özellikler-tr) • [Mimari](#-mimari-ve-süreç-izolasyonu-tr) • [Geliştirme](#-kurulum-ve-geliştirme-tr) • [Docker Dağıtımı](DOCKER.md) • [REST API Dokümanı](API.md) • [Destek & Sponsorlar](#-destek-ve-bağış)
 
 ---
 
-<a name="-hızlı-indirme-v140"></a>
-## 📥 Hızlı İndirme (v1.4.0)
+<a name="-hızlı-indirme-v150"></a>
+## 📥 Hızlı İndirme (v1.5.0)
 
 Masaüstünüzde doğrudan çalıştırmak için platformunuza uygun sürümü indirin:
 
 | Platform | Mimari | İndirme Bağlantısı | Tür |
 |---|---|---|---|
-| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/electron.exe) | Windows Kurulum / Çalıştırılabilir Dosya |
-| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.4.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0.AppImage) | Taşınabilir Universal Linux AppImage |
-| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.4.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/voice-core_v1.4.0_amd64.deb) | Debian / Ubuntu Kurulum Paketi |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.4.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0-arm64.dmg) | macOS Disk İmajı (M1 / M2 / M3 / M4) |
-| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.4.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.4.0/Voice.Core-v1.4.0-arm64.zip) | macOS Taşınabilir Uygulama Arşivi |
+| **Windows** | x64 | [⬇️ `electron.exe`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/electron.exe) | Windows Kurulum / Çalıştırılabilir Dosya |
+| **Linux** | x64 (amd64) | [⬇️ `Voice.Core-v1.5.0.AppImage`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/Voice.Core-v1.5.0.AppImage) | Taşınabilir Universal Linux AppImage |
+| **Linux** | x64 (amd64) | [⬇️ `voice-core_v1.5.0_amd64.deb`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/voice-core_v1.5.0_amd64.deb) | Debian / Ubuntu Kurulum Paketi |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.5.0-arm64.dmg`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/Voice.Core-v1.5.0-arm64.dmg) | macOS Disk İmajı (M1 / M2 / M3 / M4) |
+| **macOS** | Apple Silicon (arm64) | [⬇️ `Voice.Core-v1.5.0-arm64.zip`](https://github.com/sinan-aydogan/tailadmin-voice-core/releases/download/v1.5.0/Voice.Core-v1.5.0-arm64.zip) | macOS Taşınabilir Uygulama Arşivi |
 
 > Tüm sürümleri ve geçmiş sürümleri [Releases](https://github.com/sinan-aydogan/tailadmin-voice-core/releases) sayfasında bulabilirsiniz.
 

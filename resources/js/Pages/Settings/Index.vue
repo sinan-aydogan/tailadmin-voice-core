@@ -140,6 +140,155 @@
               </div>
             </div>
           </div>
+
+          <!-- Version & Update Checker Card -->
+          <div class="p-6 rounded-2xl bg-surface border border-neutral-800 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-9 h-9 rounded-xl flex items-center justify-center border"
+                  :class="updateInfo.has_update
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                    : 'bg-accent/10 border-accent/20 text-accent'"
+                >
+                  <svg v-if="updateInfo.has_update" class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <svg v-else class="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-base font-semibold text-neutral-100 flex items-center gap-2">
+                    Sürüm ve Güncelleme Kontrolü
+                    <span
+                      class="px-2 py-0.5 rounded-full text-[10px] font-mono border font-medium"
+                      :class="updateInfo.has_update
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : 'bg-neutral-800 text-neutral-300 border-neutral-700'"
+                    >
+                      v{{ updateInfo.current_version }}
+                    </span>
+                  </h3>
+                  <p class="text-xs text-neutral-500 mt-0.5">
+                    GitHub Releases üzerinden en son güncellemeleri ve sürüm notlarını denetleyin.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Status Badge -->
+              <span
+                v-if="updateInfo.has_update"
+                class="px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-bold text-emerald-300 animate-pulse"
+              >
+                Yeni Sürüm: v{{ updateInfo.latest_version }}
+              </span>
+              <span
+                v-else-if="hasCheckedUpdate"
+                class="px-2.5 py-1 rounded-md bg-neutral-800 border border-neutral-700 text-[10px] font-medium text-neutral-300"
+              >
+                Sistem Güncel
+              </span>
+            </div>
+
+            <!-- Update Available Highlight Alert -->
+            <div
+              v-if="updateInfo.has_update"
+              class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-200 space-y-2"
+            >
+              <div class="font-bold flex items-center gap-2 text-emerald-300 text-sm">
+                <span>🚀</span>
+                <span>Yeni sürüm yayınlandı: {{ updateInfo.release_name || `v${updateInfo.latest_version}` }}</span>
+              </div>
+              <p class="text-emerald-300/80 leading-relaxed text-[11px]">
+                En son yapay zeka modelleri, performans optimizasyonları ve hata düzeltmeleri için güncel sürüme geçmeniz önerilir.
+              </p>
+              <div class="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  @click="openReleaseUrl(updateInfo.release_url)"
+                  class="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-950 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <span>GitHub'dan İndir</span>
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  @click="showUpdateModal = true"
+                  class="px-3.5 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-200 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  Sürüm Notlarını İncele
+                </button>
+              </div>
+            </div>
+
+            <!-- Version Details Grid -->
+            <div class="p-3.5 rounded-xl bg-neutral-900/80 border border-neutral-800 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <div class="text-[10px] text-neutral-500">Yüklü Sürüm</div>
+                <div class="font-mono text-neutral-200 font-medium">v{{ updateInfo.current_version }}</div>
+              </div>
+              <div>
+                <div class="text-[10px] text-neutral-500">GitHub Son Sürüm</div>
+                <div class="font-mono font-medium" :class="updateInfo.has_update ? 'text-emerald-400' : 'text-neutral-200'">
+                  v{{ updateInfo.latest_version || updateInfo.current_version }}
+                </div>
+              </div>
+              <div>
+                <div class="text-[10px] text-neutral-500">Son Kontrol</div>
+                <div class="font-mono text-neutral-300 text-[11px] truncate">
+                  {{ updateInfo.checked_at ? formatRelativeTime(updateInfo.checked_at) || 'Yeni' : 'Bekliyor' }}
+                </div>
+              </div>
+              <div>
+                <div class="text-[10px] text-neutral-500">Dağıtım Kanalı</div>
+                <div class="font-mono text-accent-400 font-medium">GitHub Releases</div>
+              </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="flex flex-wrap items-center gap-3 pt-1">
+              <button
+                type="button"
+                @click="checkForUpdates(true)"
+                :disabled="isCheckingUpdate"
+                class="px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-100 text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-2 border border-neutral-700/80 cursor-pointer"
+              >
+                <svg
+                  class="w-4 h-4 text-accent"
+                  :class="{ 'animate-spin': isCheckingUpdate }"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>{{ isCheckingUpdate ? 'Kontrol Ediliyor...' : 'Güncellemeleri Kontrol Et' }}</span>
+              </button>
+
+              <button
+                type="button"
+                @click="openReleaseUrl('https://github.com/sinan-aydogan/tailadmin-voice-core/releases')"
+                class="px-4 py-2.5 rounded-xl bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>GitHub Releases Sayfası</span>
+                <svg class="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </button>
+
+              <button
+                v-if="hasCheckedUpdate"
+                type="button"
+                @click="showUpdateModal = true"
+                class="px-4 py-2.5 rounded-xl bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Sürüm Notlarını Gör</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- ==================== TAB 2: AI MODELLERİ & DEPOLAMA ==================== -->
@@ -1425,6 +1574,9 @@
           </div>
         </div>
       </div>
+
+      <!-- In-App Update Modal -->
+      <UpdateModal />
     </div>
   </AppLayout>
 </template>
@@ -1434,6 +1586,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import AppLayout from '../../Layouts/AppLayout.vue'
 import ApiKeyLogsModal from '../../Components/ApiKeyLogsModal.vue'
+import UpdateModal from '../../Components/UpdateModal.vue'
+import { useUpdateChecker } from '../../Composables/useUpdateChecker'
 import { useI18n } from '../../i18n'
 
 const props = defineProps({
@@ -1443,6 +1597,21 @@ const props = defineProps({
 })
 
 const { locale, setLocale, t, languages } = useI18n()
+const {
+  updateInfo,
+  isChecking: isCheckingUpdate,
+  checkError: updateCheckError,
+  hasChecked: hasCheckedUpdate,
+  showUpdateModal,
+  checkForUpdates,
+  openReleaseUrl,
+} = useUpdateChecker()
+
+onMounted(() => {
+  if (!hasCheckedUpdate.value) {
+    checkForUpdates(false)
+  }
+})
 
 // Tab definitions
 const tabs = [

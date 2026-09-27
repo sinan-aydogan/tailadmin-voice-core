@@ -85,6 +85,19 @@
         <!-- Environment Info -->
         <div class="p-4 border-t border-neutral-800 text-xs text-neutral-500 space-y-1.5 shrink-0 bg-surface">
           <div class="flex items-center justify-between">
+            <span>Sürüm</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-neutral-300 font-mono">v{{ updateInfo.current_version }}</span>
+              <button
+                v-if="updateInfo.has_update"
+                @click="showUpdateModal = true"
+                type="button"
+                class="w-2 h-2 rounded-full bg-emerald-400 animate-ping cursor-pointer"
+                title="Yeni güncelleme hazır! İncelemek için tıklayın."
+              ></button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
             <span>{{ t('header.runtime') }}</span>
             <span class="text-neutral-300 font-mono">NativePHP</span>
           </div>
@@ -229,6 +242,7 @@ import SystemFooter from '../Components/SystemFooter.vue'
 import { useI18n } from '../i18n'
 import { useAudioDevices } from '../Composables/useAudioDevices'
 import { useQueueWorker } from '../Composables/useQueueWorker'
+import { useUpdateChecker } from '../Composables/useUpdateChecker'
 
 const props = defineProps({
   title: {
@@ -238,6 +252,7 @@ const props = defineProps({
 })
 
 const { isWorkerRunning } = useQueueWorker()
+const { updateInfo, showUpdateModal } = useUpdateChecker()
 
 const { locale, setLocale, t, languages, currentLanguage } = useI18n()
 const {

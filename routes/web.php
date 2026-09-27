@@ -110,6 +110,7 @@ Route::get('/api/audio/{filename}', [SystemApiController::class, 'audio'])->name
 Route::get('/api/tasks/{type}', [SystemApiController::class, 'tasks'])->name('api.tasks');
 Route::delete('/api/tasks/{id}', [SystemApiController::class, 'deleteTask'])->name('api.tasks.delete');
 Route::post('/api/system/open-url', [SystemApiController::class, 'openUrl'])->name('api.system.open_url');
+Route::get('/api/system/check-update', [SystemApiController::class, 'checkUpdate'])->name('api.system.check_update');
 
 // Prompts Management
 Route::get('/prompts', [PromptController::class, 'index'])->name('prompts.index');
